@@ -91,7 +91,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             pipe.debug = True
 
         # -------------------------------------------------- DEPTH --------------------------------------------
-        if iteration > opt.hard_depth_start:
+        if opt.depth_scale > 0 and iteration > opt.hard_depth_start:
             render_pkg = render_for_depth(viewpoint_cam, gaussians, pipe, background)
             depth = render_pkg["depth"]
 
@@ -109,7 +109,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             loss_global = patch_norm_mse_loss_global(depth[None,...], depth_mono[None,...], randint(patch_range[0], patch_range[1]), opt.error_tolerance)
             loss_hard += 1 * loss_global
 
-            loss_hard.backward()
+            (opt.depth_scale * loss_hard).backward()
 
             # Optimizer step
             if iteration < opt.iterations:
@@ -117,7 +117,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 gaussians.optimizer.zero_grad(set_to_none = True)
 
         # -------------------------------------------------- pnt --------------------------------------------
-        if iteration > opt.soft_depth_start :
+        if opt.depth_scale > 0 and iteration > opt.soft_depth_start :
             render_pkg = render_for_opa(viewpoint_cam, gaussians, pipe, background)
             viewspace_point_tensor, visibility_filter = render_pkg["viewspace_points"], render_pkg["visibility_filter"]
             depth, alpha = render_pkg["depth"], render_pkg["alpha"]
@@ -135,7 +135,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             loss_global = patch_norm_mse_loss_global(depth[None,...], depth_mono[None,...], randint(patch_range[0], patch_range[1]), opt.error_tolerance)
             loss_pnt += 1 * loss_global
 
-            loss_pnt.backward()
+            (opt.depth_scale * loss_pnt).backward()
 
             # Optimizer step
             if iteration < opt.iterations:
@@ -234,6 +234,22 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt_latest.pth")
             
+
+def write_run_config(args):
+    """config.json: all arguments + git commit + GPU name (team output layout)."""
+    if not args.model_path:
+        return
+    import json, subprocess
+    try:
+        commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
+                                cwd=os.path.dirname(os.path.abspath(__file__))).stdout.strip()
+    except Exception:
+        commit = ""
+    os.makedirs(args.model_path, exist_ok=True)
+    cfg = dict(vars(args), git_commit=commit, gpu=torch.cuda.get_device_name(0))
+    with open(os.path.join(args.model_path, "config.json"), "w") as f:
+        json.dump(cfg, f, indent=2, default=str)
+
 
 def prepare_output_and_logger(args, opt):    
     if not args.model_path:
@@ -385,6 +401,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
     parser.add_argument("--near", type=int, default=0)
+    parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args(sys.argv[1:])
     args.save_iterations.append(args.iterations)
     # args.checkpoint_iterations.append(args.iterations)
@@ -392,7 +409,8 @@ if __name__ == "__main__":
     print("Optimizing " + args.model_path)
 
     # Initialize system state (RNG)
-    safe_state(args.quiet)
+    safe_state(args.quiet, args.seed)
+    write_run_config(args)
 
     # Start GUI server, configure and run training
     # network_gui.init(args.ip, args.port)
