@@ -202,7 +202,7 @@ One private repository, owned by you and built from your already-working DNGauss
 
 ### Step 1 (you, Monday morning): turn your working clone into the team repo
 
-> ✅ **Done 12 Oct (revised).** The repo is `github.com/aayxsh23/dngs-dropout`, made **private** on 12 Oct evening (Colab clones need `GH_TOKEN`). Tag `upstream-baseline` = `81c3d83`. The nested `.git` folders were three, not two (`third_party/glm` inside the rasterizer too). The tracked `gridencoder`/`shencoder` egg-info folders needed `git rm -r --cached`. The commands below are kept for reference.
+> ✅ **Done 12 Oct (revised).** The repo is `github.com/aayxsh23/dngs-dropout`, **public** (briefly private on 12 Oct evening; public again so the GitHub ruleset can enforce the merge gate). Tag `upstream-baseline` = `81c3d83`. The nested `.git` folders were three, not two (`third_party/glm` inside the rasterizer too). The tracked `gridencoder`/`shencoder` egg-info folders needed `git rm -r --cached`. The commands below are kept for reference.
 
 The DNGaussian README has you clone `diff-gaussian-rasterization` and `simple-knn` inside `submodules/`, so they are nested git repositories. Pushed as they are, they arrive on GitHub as empty folders. Remove their `.git` folders so the source is committed directly, along with any compile fixes you made during setup.
 

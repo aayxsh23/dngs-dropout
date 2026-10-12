@@ -32,36 +32,23 @@ API_DANGER = re.compile(r"pulls/\d+/merge\b|/merges\b|git/refs/heads/main\b|merg
                         r"enablePullRequestAutoMerge|event[=:]\s*\\?\"?APPROVE")
 
 
-def _close_paren(text, i):
-    """Index of the ')' that closes a '$(' whose body starts at i (handles nesting and quotes)."""
-    depth, quote = 1, None
-    while i < len(text):
-        ch = text[i]
-        if quote:
-            if ch == "\\" and quote == '"':
-                i += 2; continue
-            if ch == quote:
-                quote = None
-        elif ch == "\\":
-            i += 2; continue
-        elif ch in "'\"":
-            quote = ch
-        elif ch == "(":
-            depth += 1
-        elif ch == ")":
-            depth -= 1
-            if depth == 0:
-                return i
-        i += 1
-    return len(text)
+class Unbalanced(ValueError):
+    pass
 
 
 def segments(text):
     """Split a command line into simple commands (lists of words). Separators outside quotes:
     newline ; & | ( ) and the bounds of $( ) and backticks. Quoted text stays inside one word.
-    Heredoc bodies and comments are skipped. Substitutions inside double quotes are parsed too."""
+    Heredoc bodies and comments are skipped. Substitutions inside double quotes are parsed as
+    commands by the same scanner (so heredocs inside them are handled too). Unterminated quotes or
+    substitutions raise Unbalanced; main() then blocks guarded commands (fail closed)."""
+    return _scan(text, 0, False)[0]
+
+
+def _scan(text, i, in_subst):
+    """Scan from i. If in_subst, stop at the ')' that closes a $( and return (segs, its index)."""
     segs, words, cur, has_word = [], [], [], False
-    quote, heredocs, i = None, [], 0
+    quote, heredocs, depth = None, [], 0
 
     def end_word():
         nonlocal cur, has_word
@@ -91,11 +78,12 @@ def segments(text):
             if ch == '"':
                 quote = None; i += 1; continue
             if ch == "$" and text[i + 1:i + 2] == "(" and text[i + 2:i + 3] != "(":
-                j = _close_paren(text, i + 2)
-                segs.extend(segments(text[i + 2:j])); cur.append("$(...)"); i = j + 1; continue
+                inner, j = _scan(text, i + 2, True)
+                segs.extend(inner); cur.append("$(...)"); i = j + 1; continue
             if ch == "`":
                 j = text.find("`", i + 1)
-                j = len(text) if j < 0 else j
+                if j < 0:
+                    raise Unbalanced("unterminated backtick")
                 segs.extend(segments(text[i + 1:j])); cur.append("`...`"); i = j + 1; continue
             cur.append(ch); i += 1
             continue
@@ -122,7 +110,7 @@ def segments(text):
                 continue
             cur.append(ch); has_word = True
         elif ch == "$" and text[i + 1:i + 2] == "(":
-            end_seg(); i += 2; continue
+            end_seg(); depth += 1; i += 2; continue
         elif ch == "&" and ((cur and cur[-1] in "<>") or text[i + 1:i + 2] == ">"):
             cur.append(ch); has_word = True  # part of a redirection: >&  <&  &>
         elif ch == "\n":
@@ -137,15 +125,24 @@ def segments(text):
                         break
             heredocs = []
             continue
-        elif ch in ";&|()`":
+        elif ch == "(":
+            end_seg(); depth += 1
+        elif ch == ")":
+            end_seg()
+            if depth == 0 and in_subst:
+                return segs, i
+            depth = max(depth - 1, 0)
+        elif ch in ";&|`":
             end_seg()
         elif ch in " \t":
             end_word()
         else:
             cur.append(ch); has_word = True
         i += 1
+    if quote or in_subst:
+        raise Unbalanced("unterminated quote or command substitution")
     end_seg()
-    return segs
+    return segs, i
 
 
 def strip_redirs(words):
@@ -284,7 +281,11 @@ def decide(cmd, online=True, branch=None):
             return ("Agents never submit APPROVE reviews: approvals must come from the other teammate "
                     "(AGENTS.md, Change workflow). Post the review report as a comment instead.")
         api = command_index(words, "gh")
-        if api is not None and words[api + 1:api + 2] == ["api"] and API_DANGER.search(" ".join(words[api + 2:])):
+        api_args = " ".join(words[api + 2:]) if api is not None and words[api + 1:api + 2] == ["api"] else None
+        if api_args is not None and "--input" in api_args and re.search(r"pulls/\d+/reviews|graphql", api_args):
+            return ("`gh api ... --input` on reviews/GraphQL can approve or merge outside the gate; "
+                    "post review reports with `gh pr comment` instead.")
+        if api_args is not None and API_DANGER.search(api_args):
             return ("This `gh api` call would merge, approve or move main outside the gate; "
                     "use the pr-gate skill (approvals are for humans).")
 
@@ -309,7 +310,8 @@ def decide(cmd, online=True, branch=None):
 
 def selftest():
     B, G = "block", "merge-needs-gate"
-    heredoc_commit = "git commit -m \"$(cat <<'EOF'\nfix: x\n\ngh pr merge 5 --admin\nEOF\n)\" && git push -u origin HEAD"
+    apos = "git commit -m \"$(cat <<'EOF'\nfix: don't break (x)\nEOF\n)\""
+    heredoc_commit ="git commit -m \"$(cat <<'EOF'\nfix: x\n\ngh pr merge 5 --admin\nEOF\n)\" && git push -u origin HEAD"
     cases = [  # (command, expectation, current branch)
         ("ls -la", None, "feat/x"),
         ("git push -u origin feat/dropout", None, "feat/x"),
@@ -371,6 +373,14 @@ def selftest():
         ("bc <<< x\ngit push origin main", B, "feat/x"),
         ("git commit -m 'note: cat <<END'\ngh pr merge 5 --admin", B, "feat/x"),
         ("grep -n 'push' x # git push origin main", None, "feat/x"),
+        (apos + " && git push origin main", B, "feat/x"),
+        (apos + " && gh pr merge 5 --admin", B, "feat/x"),
+        (apos + " && gh pr merge 5 --squash", G, "feat/x"),
+        (apos + "\ngit push origin main", B, "feat/x"),
+        (apos + " && git push -u origin HEAD", None, "feat/x"),
+        ("gh pr comment 5 --body \"$(cat <<'EOF'\nIt's ready (really)\nEOF\n)\" && gh pr merge 5 --admin", B, "feat/x"),
+        ("echo $((1+2)); x=$(( (1+2)*3 )); [[ -n $x ]] && echo ok", None, "feat/x"),
+        ("gh api repos/o/r/pulls/5/reviews --input r.json", B, "feat/x"),
     ]
     bad = 0
     for cmd, want, br in cases:

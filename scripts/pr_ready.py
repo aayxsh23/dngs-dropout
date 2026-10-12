@@ -91,9 +91,12 @@ def codeowners_rules(root, base, head_sha):
     for ref in ("origin/" + base, head_sha):
         out = subprocess.run(["git", "show", "%s:.github/CODEOWNERS" % ref], cwd=root, capture_output=True,
                              text=True, timeout=15)
-        if out.returncode == 0:
-            sets.append(parse_codeowners(out.stdout))
-    return [r for r, _ in sets], set().union(*[o for _, o in sets]) if sets else set()
+        sets.append(parse_codeowners(out.stdout) if out.returncode == 0 else None)
+    found = [x for x in sets if x is not None]
+    # Classification: union of base and head (a PR can't un-protect paths). Owners: base only, as on
+    # GitHub (a PR can't add its own approver); head only when base has no CODEOWNERS yet (bootstrap).
+    owners = sets[0][1] if sets[0] is not None else (sets[1][1] if sets[1] is not None else set())
+    return [r for r, _ in found], owners
 
 
 def server_requires_ci(repo, root):
