@@ -1,6 +1,16 @@
 # Sparse-View 3DGS Project — Team Playbook (You + Disha)
 
-Oct 12, 2026 · @Aayush
+Oct 12, 2026 · @Aayush · **revised Mon 12 Oct evening** after the first measurements
+
+> **What changed in this revision.** The first measurements and a close reading of the DNGaussian and DropGaussian code changed several assumptions. Sections that changed are marked **(revised)**. The hour-by-hour schedule, the full specs and the current status now live in [PLAN.md](PLAN.md); where the two disagree, PLAN.md wins.
+>
+> - **Measured:** Colab T4 **4.9 min/run**; laptop **7.5 min/run** with a **1663 MB** training footprint (it fits); laptop reproduction **18.73 / 0.594 / 0.297** against the paper's 19.12 / 0.591 / 0.294.
+> - **Machines:** all of Tier 1 runs on Colab T4s (about 9.8 GPU-hours in total). Tier 2 runs on the laptop. The A100 is optional.
+> - **Variants:** DNGaussian renders depth in **two separate passes** (hard and soft) before the photometric pass, each with its own optimizer step. So D means "the dropout mask also hits the depth passes", and E costs **no extra render**.
+> - **Dropout:** the official code is `torch.nn.Dropout(p=0.2*iteration/10000)` applied to a ones vector, then multiplied into opacity. We use γ = 0.2 with the schedule rescaled to our 6000 iterations.
+> - **Files:** `metrics.py` writes **`results_eval.json`** (not `results.json`) and renders go to **`eval/`** (not `test/`). Training also needs **shencoder**. Checkpoints must load through `load_checkpoint()`, because the laptop runs **PyTorch 1.12 / Python 3.7** and Colab runs PyTorch 2.11 / Python 3.13.
+> - **Storage:** a full upstream run is 337 MB (164 MB checkpoint, 13 MB TensorBoard). The runner deletes these, or 15 GB Drive quotas overflow.
+> - **DropGaussian's initialization** is a COLMAP **dense stereo** point cloud from the sparse views, not plain SfM points.
 
 ## Read first: we have 8 days, not 22
 
@@ -10,12 +20,13 @@ Three decisions make 8 days workable:
 
 - **One codebase for every variant.** We add dropout and diagnostics to our own copy of DNGaussian behind command-line flags. Every variant is then the same code with different flags, which is both faster to build and a cleaner controlled experiment.
 - **Parallel work from day one.** We agree the file formats today, so Disha can write the analysis scripts while you write the training code.
-- **Hard scope tiers.** Tier 1 is the report. Tier 2 runs on the A100 on Saturday and Sunday, only after Tier 1 is complete. Tier 3 is cut and replaced with published numbers.
+- **Hard scope tiers (revised).** Tier 1 is the report and runs on Colab T4s. Tier 2 runs on the laptop from Wednesday afternoon, in parallel with Tier 1. Tier 3 is cut and replaced with published numbers.
 
 | Tier | What it covers | Training runs | Rule |
 | --- | --- | --- | --- |
-| 1 Must | LLFF 3-view, variants A–E, 8 scenes, 3 seeds (2 minimum), diagnostics, tables, qualitative and failure-case figures | 120 | Non-negotiable |
-| 2 Should | View sparsity 2, 6, 9 for variants B, C and the better of D/E, 8 scenes, seed 0 | 72 | Runs on the A100 on Sat 17 and Sun 18, after Tier 1 is complete |
+| 1 Must | LLFF 3-view, variants A–E, 8 scenes, 3 seeds (2 minimum), diagnostics, tables, qualitative and failure-case figures | 120 | Non-negotiable. All on Colab T4 (one GPU type) |
+| 2 Should | View sparsity **2, 3, 6, 9** for variants **B, C, D and E**, 8 scenes, seed 0 | **128** | **Laptop**, Wed 14:00 to Thu ~06:00. The 3-view point keeps the whole curve on one GPU |
+| 2b Could | D and E at γ ∈ {0.1, 0.3}, 3-view, seed 0 | 32 | Only if Tier 1 is complete by Thu night (Colab or A100) |
 | 3 Cut | Blender 8-view, DTU, Mip-NeRF 360, re-running DropGaussian, DropoutGS, FSGS, CoR-GS, FreeNeRF, SparseNeRF | 0 | Use numbers from their papers, labelled "reported" |
 
 If the real deadline turns out to be later, keep this order and add Tier 3 at the end; do not stretch Tier 1 to fill the time.
@@ -37,7 +48,7 @@ Use VS Code installed on Windows with the WSL extension. The window, shortcuts a
 9. The Source Control panel uses the git inside WSL. Set your name, email and SSH key inside Ubuntu, not in Windows (see the GitHub section).
 10. To view outputs: open rendered PNGs directly in VS Code, or browse `\\wsl$\Ubuntu\home\<you>\projects` in Windows Explorer. TensorBoard started in the WSL terminal opens at http://localhost:6006 in your Windows browser.
 
-Create `.vscode/launch.json` so you can set breakpoints inside training (F5). Copy the remaining flags from `scripts/run_llff.sh` into `args`:
+Create `.vscode/launch.json` so you can set breakpoints inside training (F5). The `args` below are the full flag set from `scripts/run_llff.sh` with 500 iterations; the laptop already has this file:
 
 ```json
 {
@@ -49,7 +60,14 @@ Create `.vscode/launch.json` so you can set breakpoints inside training (F5). Co
       "request": "launch",
       "program": "${workspaceFolder}/train_llff.py",
       "args": ["-s", "data/llff/fern", "--model_path", "output/debug/fern",
-               "--eval", "--n_sparse", "3", "--iterations", "500"],
+               "-r", "8", "--eval", "--n_sparse", "3", "--rand_pcd", "--iterations", "500",
+               "--lambda_dssim", "0.2", "--densify_grad_threshold", "0.0013", "--prune_threshold", "0.01",
+               "--densify_until_iter", "6000", "--percent_dense", "0.01",
+               "--position_lr_init", "0.016", "--position_lr_final", "0.00016",
+               "--position_lr_max_steps", "5500", "--position_lr_start", "500",
+               "--split_opacity_thresh", "0.1", "--error_tolerance", "0.00025",
+               "--scaling_lr", "0.003", "--shape_pena", "0.002", "--opa_pena", "0.001", "--near", "10"],
+      "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": false,
       "env": {"CUDA_VISIBLE_DEVICES": "0"}
@@ -97,13 +115,20 @@ Splitting by folder keeps you out of each other's files, so merge conflicts beco
 
 All five variants come from one DNGaussian fork with four new flags. Depth on or off crossed with dropout on or off gives a 2×2 design, and variant E tests the fix. Because everything else stays identical, any difference between variants is caused by the regularizers, not by different codebases.
 
+**How DNGaussian trains (revised; this shapes D and E).** Every iteration runs three separate rasterizations, each with its own backward pass and optimizer step:
+1. **Hard depth** (`render_for_depth`): opacity is fixed at 0.95, and the depth loss moves positions only.
+2. **Soft depth** (`render_for_opa`, from iteration 1000): positions, scales and rotations are frozen, and the depth loss moves opacity only.
+3. **Photometric** (`render`): L1 + D-SSIM plus shape, scale and opacity penalties.
+
+The depth loss never uses the photometric render. So "depth loss on the dropout render" means the dropout mask is also applied to the two depth passes.
+
 | ID | Name | `--depth_scale` | `--drop_rate` | `--depth_render` | What it isolates |
 | --- | --- | --- | --- | --- | --- |
-| A | base | 0 | 0 | shared | DNGaussian with depth regularization switched off |
+| A | base | 0 | 0 | shared | DNGaussian with depth regularization switched off (both depth passes skipped) |
 | B | depth | 1 | 0 | shared | DNGaussian as published |
-| C | drop | 0 | DropGaussian default | shared | Dropout alone, same codebase |
-| D | depth + drop, shared | 1 | DropGaussian default | shared | Naive combination: depth loss computed on the dropout render |
-| E | depth + drop, decoupled | 1 | DropGaussian default | clean | Depth loss computed on a second render with no dropout |
+| C | drop | 0 | 0.2 | shared | Dropout alone, same codebase |
+| D | depth + drop, shared | 1 | 0.2 | shared | Naive combination: one mask per iteration hits all three passes |
+| E | depth + drop, decoupled | 1 | 0.2 | clean | The mask hits only the photometric pass; both depth passes see the full model. **No extra render** |
 
 How the results map to the research question:
 
@@ -113,14 +138,17 @@ How the results map to the research question:
 
 ### Implementation rules (you)
 
-1. **Add `--seed`.** Code derived from 3DGS fixes all seeds to 0 inside `safe_state()` in `utils/general_utils.py`. Pass `args.seed` into it, otherwise "three seeds" are three copies of one run.
-2. **Add `--depth_scale`.** One multiplier on every depth term in `train_llff.py`. Using our own flag means we never depend on the repo's internal loss-weight names.
-3. **Port dropout, do not rewrite it.** Copy the mask, the opacity compensation for surviving Gaussians and the progressive schedule (the rate grows linearly over training, r = γ × t ÷ t\_total) from the official DropGaussian code ([DCVL-3D/DropGaussian\_release](https://github.com/DCVL-3D/DropGaussian_release)). Keep their default rate and schedule; mention in the report that it was tuned on vanilla 3DGS.
-4. **Training only.** Dropout must be active only inside the training loop. `render.py` and every evaluation path must never apply a mask.
-5. **Check densification.** Dropped Gaussians get zero gradient that iteration, which changes densification statistics. Mirror whatever DropGaussian does with the visibility filter.
-6. **Decoupled mode.** With `--depth_render clean`, rasterize a second time without the mask and compute the depth losses on that render; the photometric loss keeps the dropout render. It costs one extra render per iteration, so log the time.
-7. **Initialization differs from the DropGaussian paper.** DropGaussian initializes from SfM points of the sparse views, while DNGaussian initializes randomly. Our variant C inherits random initialization, so it will not match DropGaussian's published 20.76 PSNR, and the report must say why.
-8. **One SSIM.** The DNGaussian README notes two SSIM implementations (3DGS and sklearn) give different values. Use the repo's `metrics.py` for every variant and name the implementation in the report.
+1. **Add `--seed`.** ✅ *Done on `feat/dropout`.* Code derived from 3DGS fixes all seeds to 0 inside `safe_state()` in `utils/general_utils.py`. Pass `args.seed` into it, otherwise "three seeds" are three copies of one run. `--rand_pcd` draws the initial cloud from `np.random`, so it now changes per seed.
+2. **Add `--depth_scale`.** ✅ *Done.* One multiplier on both depth passes in `train_llff.py`. At `0` both passes are **skipped entirely**. Multiplying by zero would still let Adam momentum move the parameters and would add extra optimizer steps.
+3. **Port dropout, do not rewrite it (revised).** The official code ([DCVL-3D/DropGaussian\_release](https://github.com/DCVL-3D/DropGaussian_release), `gaussian_renderer/__init__.py`) is `compensation = torch.nn.Dropout(p=0.2*iteration/10000)(torch.ones(N))`, then `opacity = opacity * compensation[:, None]`. That is the mask and the 1/(1−r) compensation in one step; 10000 is their total iteration count. We use γ = 0.2 and r = 0.2 × t ÷ 6000. Mention in the report that the rate was tuned on vanilla 3DGS and the schedule was rescaled. Exact code: PLAN.md W2.
+4. **Training only.** Dropout must be active only inside the training loop. `render.py` and every evaluation path must never apply a mask. Render functions get a `drop_comp=None` argument that only the training loop sets.
+5. **Check densification (revised).** DropGaussian does nothing special here: densification uses the dropout render's `visibility_filter` and `radii`. Radii don't depend on opacity, so dropped Gaussians count as visible with zero gradient that iteration. Mirror that, which means changing nothing.
+6. **Decoupled mode (revised).** With `--depth_render clean`, the two depth passes get no mask and only the photometric pass is dropped. DNGaussian already renders depth separately, so this costs **no extra render**.
+7. **Initialization differs from the DropGaussian paper (revised).** DropGaussian builds its initial cloud by running COLMAP on the sparse views (SfM, then `patch_match_stereo` and `stereo_fusion`: a dense stereo cloud). DNGaussian initializes randomly. Our variant C inherits random initialization, so it will not match DropGaussian's published 20.76 PSNR, and the report must say why.
+8. **One SSIM (revised).** `metrics.py` reports both: `SSIM` (3DGS implementation) and `SSIM_sk` (scikit-image). **The main table uses 3DGS SSIM**, which matches the paper: our reproduction gives 0.594 vs the paper's 0.591, while sklearn gives 0.583. Both go into `metrics.json`. LPIPS uses the VGG backbone; name both in the report.
+9. **Two Python and PyTorch versions (new).** The laptop runs Python 3.7 / PyTorch 1.12, Colab runs Python 3.13 / PyTorch 2.11. Training code must use Python 3.7 syntax and load checkpoints with `utils.general_utils.load_checkpoint()` (PR #3).
+10. **Opacity penalty (new).** `opa_pena` uses the **pre-dropout** opacity, so the regularizer is identical across variants.
+11. **Random point-cloud race (new).** `--rand_pcd` writes `sparse/0/points3D_random.ply` into the dataset folder, so parallel runs on one scene race on that file. Write it to a temporary directory instead (PLAN.md W7).
 
 ### Diagnostics: `diag.csv`, one row every 100 iterations
 
@@ -128,34 +156,41 @@ How the results map to the research question:
 | --- | --- |
 | `iter` | Iteration number |
 | `loss_rgb` | Photometric loss used for the update |
-| `loss_depth_used` | Depth loss that produced gradients: dropout render in D, clean render in E |
-| `loss_depth_clean` | Depth loss on a no-dropout render, no gradient, logged in every variant |
-| `depth_var_masks` | Mean per-pixel variance of rendered depth across 4 random masks at one fixed training view |
+| `loss_depth_used` | Hard + soft depth loss on the renders that receive gradients in this variant: masked in C and D, unmasked in A, B and E. Computed without gradient at a **fixed patch size of 11**, so it is comparable with the next column |
+| `loss_depth_clean` | The same loss on unmasked renders, logged in every variant. Equal to `loss_depth_used` in A, B and E by construction |
+| `depth_var_masks` | Mean per-pixel variance of soft-pass depth across 4 random masks at one fixed training view, at a **fixed probe rate of 0.2 in every variant**. A separate RNG keeps it from changing training |
 | `n_gaussians` | Current Gaussian count |
 | `drop_rate_now` | Current rate from the schedule |
 | `iter_ms` | Mean milliseconds per iteration since the previous row |
 | `vram_peak_mb` | `torch.cuda.max_memory_reserved()` in MB |
 
-The central piece of evidence is the gap between `loss_depth_used` and `loss_depth_clean` in variant D. It measures directly how much dropout perturbs the depth signal DNGaussian learns from.
+The central piece of evidence is the gap between `loss_depth_used` and `loss_depth_clean` in variant D. It measures directly how much dropout perturbs the depth signal DNGaussian learns from. The diagnostics are computed right after the photometric backward pass and **before** densification, which runs on the same multiples of 100. Full spec: PLAN.md W4.
 
-### Output layout and `metrics.json` (agree today, do not change later)
+### Output layout and `metrics.json` (agreed; add keys, never rename) (revised)
 
 ```text
 outputs/llff_3v/<variant>/<scene>/seed<k>/
-    config.json      all arguments + git commit hash + GPU name
+    config.json          all arguments + git commit hash + GPU name (written by train_llff.py)
+    opt_args, cfg_args   upstream's own argument dumps
     diag.csv
-    metrics.json
-    point_cloud/...  final iteration only
-    test/...         rendered test images, kept for seed 0 only
+    train_stats.json     train_time_s, n_gaussians, vram_peak_mb, model_size_mb, torch_version
+    render_stats.json    fps from a timed render loop (render.py)
+    results_eval.json    metrics.py output: {"ours_6000": {"PSNR", "SSIM", "SSIM_sk", "LPIPS"}}
+    metrics.json         one flat record built by the runner (below), written last
+    run.log              stdout/stderr of all three steps
+    eval/ours_6000/      renders/, gt/, depth/ for the held-out views (all seeds, about 3 MB)
+    input.ply            the random initial cloud
+    point_cloud/, chkpnt_latest.pth   seed 0 only. TensorBoard events are deleted
 ```
 
 ```json
 {
   "variant": "D", "scene": "fern", "n_views": 3, "seed": 0,
-  "psnr": 0.0, "ssim": 0.0, "lpips": 0.0,
+  "psnr": 0.0, "ssim": 0.0, "ssim_sk": 0.0, "lpips": 0.0,
   "train_time_s": 0.0, "fps": 0.0, "n_gaussians": 0,
-  "model_size_mb": 0.0, "vram_peak_mb": 0.0,
-  "git_commit": "abc1234", "gpu": "Tesla T4", "shared_gpu": false
+  "model_size_mb": 0.0, "vram_peak_mb": 0.0, "wall_time_s": 0.0,
+  "git_commit": "abc1234", "code_tag": "v1.0-exp", "gpu": "Tesla T4", "shared_gpu": false,
+  "torch_version": "2.11.0+cu130", "drop_rate": 0.2, "depth_scale": 1, "depth_render": "shared"
 }
 ```
 
@@ -166,6 +201,8 @@ Disha writes `aggregate.py` against hand-made files in exactly this shape on Mon
 One private repository, owned by you and built from your already-working DNGaussian clone, holds all code; Disha joins as a collaborator. Data, depth maps and training outputs never go into git; they live on Google Drive.
 
 ### Step 1 (you, Monday morning): turn your working clone into the team repo
+
+> ✅ **Done 12 Oct (revised).** The repo is `github.com/aayxsh23/dngs-dropout`, currently **public** (decision D10 in PLAN.md: go private before results). Tag `upstream-baseline` = `81c3d83`. The nested `.git` folders were three, not two (`third_party/glm` inside the rasterizer too). The tracked `gridencoder`/`shencoder` egg-info folders needed `git rm -r --cached`. The commands below are kept for reference.
 
 The DNGaussian README has you clone `diff-gaussian-rasterization` and `simple-knn` inside `submodules/`, so they are nested git repositories. Pushed as they are, they arrive on GitHub as empty folders. Remove their `.git` folders so the source is committed directly, along with any compile fixes you made during setup.
 
@@ -258,7 +295,11 @@ git push origin v1.0-exp
 
 ```text
 experiments/matrix.yaml        variants, scenes, seeds (you)
+experiments/matrix_tier2.yaml  views 2/3/6/9, variants B-E, seed 0 (you)
+experiments/matrix_smoke.yaml  fern, 1100 iterations, all variants: pre-freeze check (you)
 experiments/run_matrix.py      resumable runner (you)
+experiments/stats.py           paired comparisons and verdict rules (Disha)
+experiments/fixtures/          fake metrics.json for testing aggregate.py (Disha)
 experiments/aggregate.py       metrics.json -> tables (Disha)
 experiments/plots/             figure scripts (Disha)
 notebooks/colab_runner.ipynb   Colab pipeline (Disha)
@@ -266,6 +307,12 @@ results/reported_baselines.csv published numbers + citations (Disha)
 results/tables/  results/figures/
 RUNLOG.md                      what ran where, problems, reruns
 environment.lock.yml           exact laptop environment
+setup_env.sh                   laptop install, step by step (PR #2)
+pip_freeze_laptop.txt          resolved pip versions on the laptop
+scripts/peak_vram.py           peak GPU memory of one training run
+docs/PLAN.md                   current plan, status, specs (overrides this playbook)
+docs/research_proposal_sparse_view_3dgs_2.md   this playbook
+AGENTS.md, CLAUDE.md, GEMINI.md, .github/copilot-instructions.md   instructions for AI coding agents
 ```
 
 Track work as GitHub Issues: one issue per row of the ownership table, assigned to its owner and closed by the pull request that finishes it.
@@ -278,9 +325,11 @@ Disha creates one Drive folder, `sparse3dgs`, and shares it with you as Editor. 
 sparse3dgs/
     data/llff_with_depth.tar     8 LLFF scenes + DPT depth, one archive
     weights/                     DPT weights file the dpt/ scripts expect
-    wheels/torch-<version>/      compiled CUDA extension wheels for Colab
-    outputs/llff_3v/<variant>/<scene>/seed<k>/
-    outputs/llff_2v/  llff_6v/  llff_9v/      Tier 2 only
+    data/llff_with_depth.manifest.json   md5 0f6bd7bdae837ec58ad757c7c00b0561 and per-scene counts
+    wheels/torch-<version>-src-<hash>/   compiled CUDA extension wheels for Colab, keyed by source hash
+    outputs/llff_3v/<variant>/<scene>/seed<k>/   Tier 1 (Colab)
+    outputs/laptop/llff_{2,3,6,9}v/...          Tier 2 (laptop), copied up after the runs
+    outputs/repro_upstream/<scene>/              T4 reproduction at upstream-baseline (Cell 7a)
     logs/                        one log file per shard
     run_tracker                  Google Sheet: who runs which shard where
 ```
@@ -290,11 +339,13 @@ Four details that save hours:
 1. **Add a shortcut, or Colab cannot see it.** A folder shared with you does not appear under `/content/drive/MyDrive`. In Drive, right-click `sparse3dgs`, choose Organize > Add shortcut, and place it in My Drive. It then appears at `/content/drive/MyDrive/sparse3dgs` for both of you.
 2. **Store data as one archive.** Thousands of small image files copy very slowly out of Drive. Generate the DPT depth maps once, then `tar -cf llff_with_depth.tar llff/` and upload that single file. Each Colab session extracts it to local disk in a minute or two.
 3. **Generate depth exactly once.** Both of you must train on identical DPT depth maps, so never regenerate them per machine. Run `cd dpt && python get_depth_map_for_llff_dtu.py --root_path <llff folder> --benchmark LLFF` once, on Colab or the laptop.
-4. **Watch the quota.** In a shared folder each file counts against the quota of whoever created it. Keep only the final checkpoint per run and rendered test images for seed 0.
+4. **Watch the quota (revised).** In a shared folder each file counts against the quota of whoever created it. A full upstream run is **337 MB** (164 MB checkpoint, 13 MB TensorBoard, 127 MB spiral renders). The runner skips the spiral, deletes TensorBoard events everywhere, and keeps the checkpoint and point cloud for seed 0 only. That leaves about 4 MB per run (seeds 1–2) and about 170 MB (seed 0): roughly 7 GB for Tier 1, split across both accounts. On Colab the runner trains on local disk (`--work_root /content/work`) and copies the slimmed run to Drive at the end.
 
 The run tracker sheet has one row per shard: shard id, machine, person, start time, status and notes. Update it whenever you start or finish a shard, so two machines never run the same jobs.
 
 ## Day-by-day plan, 12–20 Oct
+
+> **Revised:** the up-to-date, hour-by-hour version of this schedule is **PLAN.md §4**. In short: code freeze unchanged (Wed 14 Oct, 1 PM). Tier 1 runs on Colab Wed 13:15 to Thu evening. Tier 2 runs on the laptop Wed 14:00 to Thu morning. Tier 1 freeze stays Fri midnight but should be met a day early. The weekend is for writing, not runs. The checklists below are kept for reference; Monday's items are ticked.
 
 Code freezes Wednesday 14 Oct at 1 PM. Tier 1 freezes Friday 16 Oct at midnight, with Saturday's lab visit as its only overflow. Tier 2 runs on the A100 at the weekend while you write, and freezes Sunday 18 Oct in the evening. Tuesday 20 is buffer.
 
@@ -306,19 +357,19 @@ Bars are working spans; the dashed line is the code freeze, and no main-matrix r
 
 You:
 
-- [ ] Turn your working clone into the private repo and add Disha (GitHub section, Step 1)
-- [ ] Commit `setup_env.sh` with the exact install commands that worked on the laptop
-- [ ] Full `fern` run on the laptop: record minutes per run and peak VRAM
-- [ ] Ask the lab admin the questions in the A100 section: operating system, WSL2, USB, lab hours
-- [ ] Start the go-bag disk: rebuild extensions for 8.0 and 8.6, then `conda pack` and `wsl --export`
-- [ ] Read DropGaussian's official code and note the exact lines for the mask, compensation and schedule
+- [x] Turn your working clone into the private repo and add Disha (GitHub section, Step 1). *Done; currently public*
+- [x] Commit `setup_env.sh` with the exact install commands that worked on the laptop (PR #2)
+- [x] Full `fern` run on the laptop: record minutes per run and peak VRAM (7.5 min, 1663 MB; all 8 scenes reproduced)
+- [ ] Ask the lab admin the questions in the A100 section: operating system, WSL2, USB, lab hours (*A100 now optional*)
+- [ ] ~~Start the go-bag disk~~ *Reduced to a light go-bag, only if the lab is confirmed (PLAN.md W13)*
+- [x] Read DropGaussian's official code and note the exact lines for the mask, compensation and schedule (rule 3 above)
 
 Disha:
 
-- [ ] Accept the GitHub invite, clone, open in VS Code
-- [ ] Create the `sparse3dgs` Drive folder and share it; both add the shortcut to My Drive
-- [ ] Download LLFF, generate DPT depth once, upload `llff_with_depth.tar`
-- [ ] Get the Colab notebook working through Cell 6, with wheels cached on Drive
+- [x] Accept the GitHub invite, clone, open in VS Code
+- [x] Create the `sparse3dgs` Drive folder and share it; both add the shortcut to My Drive
+- [x] Download LLFF, generate DPT depth once, upload `llff_with_depth.tar` (md5 `0f6bd7bd…`)
+- [x] Get the Colab notebook working through Cell 6, with wheels cached on Drive (PR #1; T4 timing 4.9 min/run)
 
 Both:
 
@@ -410,6 +461,16 @@ Work nobody waits on fills the gaps: Disha writes `aggregate.py` against hand-ma
 
 ## Q3: Where to run the experiments
 
+> **Revised (12 Oct evening).** Measured: a T4 run takes **4.9 min**, so all of Tier 1 (120 runs, about 9.8 GPU-hours) fits on the two Colab accounts over Wed–Thu, about 5 h each. The new allocation:
+>
+> | Work | Machine | When |
+> | --- | --- | --- |
+> | Tier 1, seeds 0, 1, 2 | Colab T4, both accounts (`--shard 0/2` and `1/2`) | Wed 13:15 to Thu evening |
+> | Tier 2 (views 2/3/6/9, B–E, seed 0, 128 runs) | Laptop, one run at a time, about 7.5 min each | Wed 14:00 to Thu ~06:00 |
+> | Optional Tier 2b, overflow | A100 if the lab works out; otherwise Colab | Fri |
+>
+> Every Tier 1 seed then runs on the same GPU type, so the seed std is not mixed with GPU effects. The A100 is no longer on the critical path. The original reasoning is kept below.
+
 Use every machine at once: the laptop for coding and quick tests, two Colab accounts as the always-available runners that also cover nights, and the A100 during lab visits from Wednesday 14 Oct, weekends included. Work is split by whole seeds, so each comparison stays on one GPU type.
 
 | Machine | GPU | Use it for | Limits |
@@ -429,14 +490,16 @@ Use every machine at once: the laptop for coding and quick tests, two Colab acco
 
 ### Does a full run fit on your laptop?
 
-Find out today. Train `fern` for the full iteration count from `scripts/run_llff.sh`, with `nvidia-smi -l 1` running in a second terminal, and read `vram_peak_mb` at the end. If it runs out of memory or peaks above about 3.6 GB, the laptop is for development only.
+**Answered: yes.** A full fern run takes **7.5 min**. The training footprint is **1663 MB** over an 846 MB desktop baseline (2509 MB of 4096 MB peak), measured with `scripts/peak_vram.py`; under WSL, nvidia-smi can't show per-process memory. One run at a time only, since two would exceed 4 GB. Run long jobs in `tmux` or with `nohup`: a job started in a VS Code terminal dies when VS Code restarts.
 
 ### Two rules for fair comparisons
 
-- **One GPU type per comparison.** The 3DGS rasterizer is not bit-for-bit deterministic, and different GPUs drift further apart. All five variants of a given seed run on the same GPU type, and `metrics.json` records which.
+- **One GPU type per comparison.** The 3DGS rasterizer is not bit-for-bit deterministic (measured: fern, 1100 iterations, same seed twice gave 17.75 and 17.29 PSNR), and different GPUs drift further apart. All five variants of a given seed run on the same GPU type, and `metrics.json` records which.
 - **Efficiency numbers from a quiet GPU.** Training time, FPS and VRAM come from one dedicated run per variant with nothing else on the GPU (`shared_gpu: false`). Parallel runs on an A100 are for quality metrics only.
 
 ## Colab runbook
+
+> **Revised:** the real notebook is `notebooks/colab_runner.ipynb` in the repo (PR #1). Open it from GitHub: `https://colab.research.google.com/github/aayxsh23/dngs-dropout/blob/main/notebooks/colab_runner.ipynb`, or in Colab go to File → Open notebook → GitHub. Don't use the old copy on Drive. The cells below are the original sketch. Where they differ, the notebook is right: Colab is Python 3.13 / PyTorch 2.11 / CUDA 13; Cell 3b holds the build patches; Cell 4 builds **shencoder** too and keys wheels by source hash; Cell D generated the depth archive once; Cell 7b asserts the `v1.0-exp` tag.
 
 One notebook, `notebooks/colab_runner.ipynb`, run top to bottom at the start of every session. The first session compiles the CUDA extensions and saves them as wheels on Drive; every later session installs those wheels and reaches training in a few minutes.
 
@@ -506,13 +569,13 @@ Include `./gridencoder` (and `./shencoder`, if training imports it) only if that
 !ls /content/data/llff
 ```
 
-**Cell 7a (Disha, Tuesday): reproduce DNGaussian with the authors' own script.** Use the `upstream-baseline` tag in Cell 3. The skip check assumes `metrics.py` writes `results.json` into the output folder, as 3DGS-based code does; adjust it if yours differs.
+**Cell 7a (Disha, Tuesday): reproduce DNGaussian with the authors' own script.** Use the `upstream-baseline` tag in Cell 3. **(Revised)** `metrics.py` writes `results_eval.json`, not `results.json`.
 
 ```python
 SCENES = ['fern','flower','fortress','horns','leaves','orchids','room','trex']
 for s in SCENES:
     out = f'{ROOT}/outputs/repro_upstream/{s}'
-    if os.path.exists(f'{out}/results.json'):
+    if os.path.exists(f'{out}/results_eval.json'):
         continue
     !bash scripts/run_llff.sh /content/data/llff/{s} {out} 0
 ```
@@ -521,17 +584,22 @@ for s in SCENES:
 
 ```python
 SHARD = '0/2'   # you: 0/2, Disha: 1/2
+SEEDS = '0'     # revised: then '1', then '2' (all of Tier 1 runs on Colab)
 !python experiments/run_matrix.py --matrix experiments/matrix.yaml \
-    --data_root /content/data/llff --out_root {ROOT}/outputs --shard {SHARD} --seeds 0 \
-    2>&1 | tee -a {ROOT}/logs/colab_shard_{SHARD.replace('/', 'of')}.log
+    --data_root /content/data/llff --out_root {ROOT}/outputs --work_root /content/work \
+    --shard {SHARD} --seeds {SEEDS} \
+    2>&1 | tee -a {ROOT}/logs/colab_shard_{SHARD.replace('/', 'of')}_seed{SEEDS}.log
 ```
 
 ### Known build errors on newer compilers
 
 | Error message | Fix (commit it once, it is harmless on the laptop) |
 | --- | --- |
-| `FLT_MAX` is undefined, in simple-knn | Add `#include <float.h>` at the top of `submodules/simple-knn/simple_knn.cu` |
-| `uint32_t` or `uintptr_t` not declared, in the rasterizer | Add `#include <cstdint>` to `cuda_rasterizer/rasterizer_impl.h` |
+| `FLT_MAX` is undefined, in simple-knn | Add `#include <float.h>` at the top of `submodules/simple-knn/simple_knn.cu`. **Committed in PR #3** |
+| `uint32_t` or `uintptr_t` not declared, in the rasterizer | Add `#include <cstdint>` to `cuda_rasterizer/rasterizer_impl.h`. **Already present** in the vendored rasterizer |
+| gridencoder/shencoder fail with PyTorch ≥ 2.1 (C++17 required) | `-std=c++14` → `-std=c++17` in their `setup.py` and `backend.py`. **Committed in PR #3**; still builds on the laptop (nvcc 11.3, gcc 9) |
+| `_pickle.UnpicklingError` / `weights_only` when `render.py` loads `chkpnt_latest.pth` on PyTorch ≥ 2.6 | Use `utils.general_utils.load_checkpoint()` (**PR #3**). Don't add `weights_only=False` directly: PyTorch 1.12 on the laptop has no such argument and raises `TypeError` |
+| nvcc 11.3 rejects gcc 13, or `__s128` errors (laptop, Ubuntu 24.04) | gcc-9 wrapper on `PATH` and Linux 5.4 headers on `CPATH`; see `setup_env.sh` |
 | `np.float`, `np.int` or similar missing | Old NumPy aliases: replace with `float` / `int`, or `pip install "numpy<2"` and restart the runtime |
 | CUDA version mismatch between `nvcc` and PyTorch | Major versions must match; a minor-version warning is safe to ignore |
 
@@ -542,6 +610,8 @@ SHARD = '0/2'   # you: 0/2, Disha: 1/2
 - Never run two GPU notebooks on the same account at once.
 
 ## A100 lab runbook: physical access only
+
+> **Revised: the A100 is now optional** (see Q3). Send the admin questions anyway. Build only a light go-bag (git bundle, data tar, conda-pack), and only if access is confirmed. Uses, in order: (1) a **whole** seed that Colab can't finish; (2) optional Tier 2b. The runbook below stays valid for those cases, with the corrected step 1.
 
 The A100 has no remote access, runs only while you are sitting at it, and is available from Wednesday 14 Oct at the earliest, weekends included. So you prepare everything on your laptop, carry it on your 500 GB disk, set up in minutes, run whole seeds during each visit, stop cleanly before you leave, and let Colab cover the nights.
 
@@ -572,17 +642,16 @@ E:\transfer\
     results\                      everything you bring back, one folder per visit
 ```
 
-**1. Rebuild the extensions for both GPUs and put the CUDA compiler inside the env.** Your extensions were compiled for your laptop's architecture (8.6); the A100 is 8.0. Packing `nvcc` into the env means you can recompile on site without installing anything.
+**1. Rebuild the extensions for both GPUs (revised).** Your extensions were compiled for your laptop's architecture (8.6); the A100 is 8.0. The laptop env is PyTorch **1.12.1 built for CUDA 11.3**, so **do not** install a CUDA 11.8 toolkit into it. Build for both architectures with the laptop's system CUDA 11.3 (which supports sm_80). Then no compiler is needed on site. Use the build environment from `setup_env.sh` step 6, and include all four extensions:
 
 ```bash
 conda activate dngaussian
-conda install -y -c "nvidia/label/cuda-11.8.0" cuda-toolkit
-export TORCH_CUDA_ARCH_LIST="8.0;8.6"
+export TORCH_CUDA_ARCH_LIST="8.0;8.6" MAX_JOBS=2
 pip install --no-build-isolation --no-deps --force-reinstall \
-    ./submodules/diff-gaussian-rasterization ./submodules/simple-knn
-# also ./gridencoder if you installed it with pip during setup
-python -c "import diff_gaussian_rasterization, simple_knn; print('ok')"
+    ./submodules/diff-gaussian-rasterization ./submodules/simple-knn ./gridencoder ./shencoder
+(cd ~ && python -c "import torch, diff_gaussian_rasterization, _gridencoder, _shencoder; from simple_knn._C import distCUDA2; print('ok')")
 ```
+If an import fails on site with "no kernel image", recompiling there needs a CUDA 11.x toolkit on that machine; otherwise fall back to Colab.
 
 **2. Linux option: pack the env.** If `conda pack` refuses an editable package, reinstall that package without `-e` and pack again.
 
@@ -684,6 +753,8 @@ Runs per visit ≈ hours at the lab × 60 ÷ minutes per run × parallel slots. 
 
 `run_matrix.py` turns `matrix.yaml` into a fixed list of runs, gives each machine every N-th run, and skips any run that already has `metrics.json`. Any machine can therefore stop, crash or disconnect and restart without losing or duplicating work.
 
+> **Revised:** the sketches below are superseded by the spec in **PLAN.md W8**. The differences: it reads `results_eval.json` and writes `ssim_sk`; no spiral video; `render.py --skip_train --skip_test`; `metrics.py --model_paths`; flags `--seed --depth_scale 1 --drop_rate 0.2 --depth_render shared|clean`; `--work_root` for local-disk training on Colab; cleanup of checkpoints and TensorBoard; refuses to run off a tag; per-run `run.log`; failures don't stop the shard; `metrics.json` written last.
+
 ### `experiments/matrix.yaml`
 
 Copy the three commands (train, render, metrics) and all their flags from `scripts/run_llff.sh`, then replace the scene path, output path and GPU id with the placeholders shown. Only the training command gets the variant flags.
@@ -692,7 +763,7 @@ Copy the three commands (train, render, metrics) and all their flags from `scrip
 scenes: [fern, flower, fortress, horns, leaves, orchids, room, trex]
 seeds: [0, 1, 2]
 n_views: [3]
-drop: &P 0.0          # set to DropGaussian's default rate before the freeze
+drop: &P 0.2          # DropGaussian's gamma (official code: 0.2 * iteration / 10000); see PLAN.md W8 for the final file
 variants:
   A: {depth_scale: 0, drop_rate: 0,  depth_render: shared}
   B: {depth_scale: 1, drop_rate: 0,  depth_render: shared}
@@ -754,7 +825,7 @@ for nv, seed, var, scene in mine:
     else:
         if a.dry_run:
             continue
-        res = json.load(open(f"{out}/results.json"))   # from metrics.py; check its exact keys once
+        res = json.load(open(f"{out}/results_eval.json"))   # revised: metrics.py writes results_eval.json
         m = next(iter(res.values()))                      # 3DGS style: {"ours_<iter>": {"PSNR": ...}}
         extra = {}
         if os.path.exists(f"{out}/train_stats.json"):     # written by train_llff.py (your change)
@@ -773,6 +844,8 @@ Machines split work by whole seeds, so every variant comparison within a seed us
 A file called `STOP` in the repo folder lets running jobs finish but starts no new ones; that is how you leave the lab without losing a run. A run killed mid-way leaves no `metrics.json`, so its folder is cleared and it is redone next time.
 
 ### Compute budget
+
+> **Revised, measured:** m = **4.9 min** on a T4 (Disha, Monday) and 7.5 min on the laptop. Tier 1 = 120 × 4.9 ≈ **9.8 GPU-hours**, about 5 h per Colab account: **3 seeds, on Colab alone**. Tier 2 (128 runs) ≈ 16 h on the laptop. Variant E is **not** slower (no extra render); variant A is about 25 % faster (no depth passes); diagnostics add about 2–3 %. Full table: PLAN.md §9.
 
 Measure **m**, the minutes for one complete run (train, render, metrics) on a T4, during Monday's smoke test. Total GPU hours = runs × m ÷ 60. Tier 1 is 120 runs and Tier 2 is 72; variant E runs are slower because of the extra render.
 
@@ -797,14 +870,14 @@ A 15-minute call every evening at a fixed time, GitHub Issues for tasks, the run
 
 | Trigger | Check by | Fallback |
 | --- | --- | --- |
-| Laptop cannot finish a full `fern` run | Mon 12 Oct, night | Laptop is for development only; Colab and the A100 do the runs |
+| Laptop cannot finish a full `fern` run | Mon 12 Oct, night | ✅ Not triggered: 7.5 min, 1663 MB. The laptop runs Tier 2 |
 | Colab extensions will not build | Tue 13 Oct, noon | Apply the build-error fixes; screen-share debug together; Kaggle as backup |
-| Reproduction mean PSNR more than 1 dB below the paper's 19.12 | Tue 13 Oct, night | Check eval split, SSIM version and error tolerance; spend at most half a day, then continue with our own variant B as the reference and report the gap |
+| Reproduction mean PSNR more than 1 dB below the paper's 19.12 (✅ laptop: −0.39 dB) | Tue 13 Oct, night | Check eval split, SSIM version and error tolerance; spend at most half a day, then continue with our own variant B as the reference and report the gap |
 | Dropout and diagnostics not merged | Wed 14 Oct, 1 PM | Freeze may slip to 8 PM the same day, no later; cut to 2 seeds |
-| No lab access on Wednesday, or the go-bag environment fails on site | Wed 14 Oct | Colab takes seeds 1 and 2 from Thursday; cut to 2 seeds if a T4 run takes over 20 min; the A100 runs only Tier 2 at the weekend, if fixed by then |
-| The A100 cannot finish a whole seed in one lab day | Wed 14 Oct, after the throughput test | The A100 keeps seed 1; Colab takes seed 2 as well |
+| No lab access on Wednesday, or the go-bag environment fails on site | Wed 14 Oct | *Revised:* no effect. Tier 1 is on Colab, Tier 2 on the laptop |
+| Colab refuses GPUs or hits usage limits | Any session | *New:* switch account, then Kaggle (same T4). If a seed still can't finish on T4s, the laptop or A100 runs that **whole** seed, and the report says so |
 | One variant produces NaN or diverges | During the matrix | Rerun once; if it repeats on other scenes, it is a finding, so log it rather than hide it |
-| Tier 1 not finished | Fri 16 Oct, midnight | Saturday's lab visit finishes Tier 1 before any Tier 2; hard stop Saturday evening, then report what completed |
+| Tier 1 not finished | Thu 15 Oct 12:00 (fewer than 80 runs) / Fri midnight | Seeds 0–1 on Colab, seed 2 on the laptop after Tier 2, or cut to 2 seeds; hard stop Sat evening, then report what completed |
 | Tier 2 not finished | Sun 18 Oct, evening | Report the view counts that completed; Tier 2 is optional |
 | No measurable difference between variants | Thu 15 Oct | Still a valid result (redundancy); centre the report on the diagnostics |
 
@@ -832,10 +905,17 @@ The report is written Saturday 17 to Monday 19 Oct, with Related Work and Method
 3. Diagnostic curves: `loss_depth_used` against `loss_depth_clean` over iterations for D and E, plus `depth_var_masks`.
 4. Qualitative grid: 3 scenes × ground truth, B, C, D, E, showing RGB and depth.
 5. Failure cases: 2–3 scenes where combining hurt, with their depth maps.
-6. Efficiency table: training time, FPS, Gaussian count and peak VRAM per variant.
-7. Tier 2 only: PSNR against number of views (2, 3, 6, 9) for B, C and the better combination.
+6. Efficiency table: training time, FPS, Gaussian count, model size and peak VRAM per variant, **T4 runs only** (grouped by GPU).
+7. Tier 2 only: PSNR against number of views (2, 3, 6, 9) for **B, C, D and E** (laptop, seed 0).
 
-State these limitations plainly: the dropout rate was tuned on vanilla 3DGS; our initialization is random while DropGaussian's is SfM; one dataset; 2–3 seeds, split between T4 and A100 GPUs; timings from T4 GPUs.
+State these limitations plainly (revised):
+- The dropout rate was tuned on vanilla 3DGS, and the schedule was rescaled from 10000 to 6000 iterations.
+- Our initialization is random, while DropGaussian's is a COLMAP dense stereo cloud from the sparse views.
+- In D, compensation inside the constant-opacity hard-depth pass saturates at the rasterizer's alpha cap of 0.99.
+- One dataset; 3 seeds.
+- Tier 1 on T4 (PyTorch 2.11), Tier 2 on an RTX 3050 Ti (PyTorch 1.12).
+- Timings come from T4 GPUs.
+- The rasterizer is nondeterministic.
 
 ### Published LLFF numbers to start `reported_baselines.csv`
 
