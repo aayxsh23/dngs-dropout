@@ -36,3 +36,6 @@ build/
 __pycache__/
 .ipynb_checkpoints/
 STOP
+
+# personal Claude Code settings
+.claude/settings.local.json

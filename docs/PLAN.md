@@ -24,7 +24,7 @@ Update this table whenever something changes. It is the single place where statu
 
 | # | Item | Owner | State | Evidence or link |
 | --- | --- | --- | --- | --- |
-| 1 | Team repo, Disha added as collaborator | Aayush | ✅ Done | `github.com/aayxsh23/dngs-dropout` (currently **public**). Tag `upstream-baseline` = `81c3d83` |
+| 1 | Team repo, Disha added as collaborator | Aayush | ✅ Done | `github.com/aayxsh23/dngs-dropout`, **public** (was private briefly on 12 Oct evening; public again so the GitHub ruleset can enforce the merge gate). Tag `upstream-baseline` = `81c3d83` |
 | 2 | Drive folder `sparse3dgs` plus shortcuts | Disha, Aayush | ✅ Done | Both of us can reach `/content/drive/MyDrive/sparse3dgs` |
 | 3 | LLFF + DPT depth archive | Disha | ✅ Done | `sparse3dgs/data/llff_with_depth.tar`, 2.4 GB, md5 `0f6bd7bdae837ec58ad757c7c00b0561`. Per-scene counts match the laptop's data |
 | 4 | Colab notebook, cached extension wheels, `aggregate.py` | Disha | ✅ Merged (#1) | Wheels in `sparse3dgs/wheels/torch-2.11.0+cu130/` |
@@ -42,6 +42,7 @@ Update this table whenever something changes. It is the single place where statu
 | 16 | Formats and decisions agreed | Both | ⏳ Tonight's call | §3 |
 | 17 | T4 reproduction, 8 scenes (Cell 7a) | Disha | ⏳ Tue | W11 |
 | 18 | Related work, verified baseline numbers | Disha | 🔄 Started | `results/reported_baselines.csv` (not yet verified) |
+| 19 | Review/merge gate: CI `checks`, `scripts/check.sh`, GPU smoke, `pr-reviewer` agent, `pr-gate` skill, Bash hook, CODEOWNERS, ruleset script | Aayush | 🔄 PR #5 (gate class: needs Disha's approval) | AGENTS.md "Change workflow". After merge: `bash scripts/setup_repo_rules.sh --apply` turns on the server-side ruleset (the repo is public) |
 
 Pull requests:
 
@@ -331,7 +332,7 @@ steps:
 9. **Clean up before copying:** delete `events.out.tfevents*`. Delete `chkpnt_latest.pth` unless the seed is in `--keep_ckpt_seeds` (default `0`). Delete `train/` and `test/` if present. Keep `eval/` (about 3 MB, renders plus depth maps), `diag.csv`, the JSON files, `point_cloud/` for kept seeds, `input.ply`, `cfg_args`, `opt_args` and `run.log`.
 10. If `work_root != out_root`, copy `work` to `out` **and write `metrics.json` last**, so a half-copied run never counts as done.
 11. **Refuse to run unless HEAD is exactly at a tag** (`git describe --tags --exact-match`), unless `--allow_untagged` (smoke tests only). Record the tag as `code_tag`.
-12. `--dry_run` prints every command and the shard size without running anything.
+12. `--dry_run` prints every command and the shard size without running anything. **Import `torch` lazily** (only to read the GPU name in a real run), so `--dry_run` works without PyTorch: CI check 9 in `scripts/check.sh` runs it.
 13. At the end, print counts of done, skipped and failed runs, and the list of failures.
 14. `--shared_gpu` sets `shared_gpu: true` (A100 multi-slot only). Colab and the laptop leave it off.
 
@@ -340,7 +341,7 @@ steps:
 | Check | Who, when | How | Pass if |
 | --- | --- | --- | --- |
 | V1 dry run | Aayush, Tue evening | `run_matrix.py --matrix experiments/matrix.yaml --dry_run --data_root data/llff --out_root /tmp/x --allow_untagged`, then `--shard 0/2` and `1/2` | 120 runs listed (60 + 60), flags correct for each variant |
-| V2 smoke matrix | Aayush, Tue evening | `matrix_smoke.yaml` on the laptop, about 7 min for all 5 variants | All 5 `metrics.json` written; `diag.csv` passes the W4 sharp checks; cleanup policy applied; `config.json` has the right flags |
+| V2 smoke matrix | Aayush, Tue evening | `bash scripts/gpu_smoke.sh` (all 5 variants, fern, 1100 iterations), about 7 min; post its last line on the PR | All 5 `metrics.json` written; `diag.csv` passes the W4 sharp checks; cleanup policy applied; `config.json` has the right flags |
 | V3 regression | Disha, Wed morning | Colab, PR branch, variant B, fern and horns, full 6000 iterations | Within ±0.5 dB of her T4 7a numbers for the same scenes (nondeterminism is about ±0.3 dB) |
 | V4 eval determinism | Aayush, Tue evening | Run `render.py` twice on a variant D smoke model; `md5sum eval/ours_*/renders/*` | Identical files, which proves evaluation never samples a mask |
 | V5 first real runs | Aayush, Wed 17:00 | Read the first 2–3 real `diag.csv` files | Losses finite; Gaussian counts plausible (tens of thousands); `drop_rate_now` reaches 0.2 at iteration 6000 |

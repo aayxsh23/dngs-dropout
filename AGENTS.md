@@ -93,13 +93,63 @@ Experiment runner (being built, see PLAN W8): `python experiments/run_matrix.py 
 ## Git and ownership
 
 - `origin` is `github.com/aayxsh23/dngs-dropout` and `upstream` is Fictionarry/DNGaussian. Never push to upstream.
-- Work on a branch (`feat/`, `fix/`, `exp/`, `docs/`, `chore/`), open a PR, get a review from the other person, **squash and merge**. `main` must always train end to end.
+- Work on a branch (`feat/`, `fix/`, `exp/`, `docs/`, `chore/`), open a PR, and go through the **Change workflow** below. Squash-merge only. `main` must always train end to end.
 - Ownership, to avoid merge conflicts:
   - **Aayush:** `train_llff.py`, `render.py`, `gaussian_renderer/`, `arguments/`, `utils/`, `scene/`, `experiments/run_matrix.py`, `experiments/*.yaml`, `scripts/`.
   - **Disha:** `notebooks/`, `experiments/aggregate.py`, `experiments/plots/`, `experiments/fixtures/`, `results/`.
   - **Shared, one person at a time:** `README.md`, `docs/`, the report.
 - **Never commit** `data/`, `output/`, `outputs/`, checkpoints (`*.pth`, `*.pt`), point clouds (`*.ply`), archives, build products or tokens. `.gitignore` covers these; stage files by name (`git add <file>`) and check `git status` before committing.
-- An agent must not push, merge, tag or open PRs unless the human asked for it in this session.
+- An agent must not push, merge, tag or open PRs unless the human asked for it in this session. When asked to merge, it merges only through the Change workflow.
+
+## Change workflow (mandatory for every merge into `main`)
+
+Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.md`). Other agents and humans follow the same steps by hand. No unreviewed code, no unverified test result, no unresolved blocking finding, no merge before the final validation.
+
+**Risk class**, from the changed paths in `.github/CODEOWNERS`:
+
+| Class | Paths | Needs before merge |
+| --- | --- | --- |
+| **Routine** | everything not listed in CODEOWNERS (docs, notebooks, `aggregate.py`, plots, results) | CI `checks` green + agent review Approve on the head commit |
+| **Experiment** | training, rendering, evaluation, extensions, runner, `experiments/*.yaml` | the above + `GPU-SMOKE PASS <head sha>` comment from `scripts/gpu_smoke.sh` + approval from the **other** teammate. After `v1.0-exp`: also a new tag and a RUNLOG entry |
+| **Gate** | `.github/`, `.claude/`, `scripts/check.sh`, `scripts/gpu_smoke.sh`, `scripts/pr_ready.py`, `scripts/hooks/`, `scripts/setup_repo_rules.sh`, AGENTS/CLAUDE/GEMINI.md | the routine requirements + approval from the **other** teammate |
+
+**Agents never submit APPROVE reviews** (`gh pr review --approve` is blocked by the hook). Approvals are a human's decision; an agent posts its review report as a comment and sets the `agent-review` status.
+
+**Always name the repo:** this clone has an `upstream` remote (Fictionarry/DNGaussian), and plain `gh` commands can resolve to it. Pass `--repo aayxsh23/dngs-dropout` to every `gh pr` command and use `repos/aayxsh23/dngs-dropout/...` in `gh api` paths. `pr_ready.py` refuses any other repo.
+
+**Pipeline:**
+1. **Understand.** Read the goal and acceptance criteria and the code involved; classify the PR.
+2. **Implement and test.** Make the smallest change that meets the goal. Add a deterministic check to `scripts/check.sh` for any new invariant. Run `bash scripts/check.sh`. For the experiment class, also run `bash scripts/gpu_smoke.sh` on the clean head and post its last line.
+3. **Independent review** of the full diff by a separate reviewer (the `pr-reviewer` agent in `.claude/agents/`). The report gets severity-ranked findings and a recommendation: Approve, Request Changes or Blocked. Post it on the PR.
+4. **Remediate:** fix every blocking finding, then re-run step 2 in full and do a **new** review of the new head. At most 3 rounds, then escalate to a human.
+5. **Record and merge.** Only after an Approve:
+   - set the `agent-review` commit status on the reviewed head SHA,
+   - wait for CI (`gh pr checks <N> --repo aayxsh23/dngs-dropout --watch`),
+   - run `python3 scripts/pr_ready.py <N>`,
+   - and only if it prints ELIGIBLE, `gh pr merge <N> --repo aayxsh23/dngs-dropout --squash --delete-branch --match-head-commit <reviewed SHA>`. The SHA pin makes GitHub refuse the merge if anything was pushed after the review; the hook requires it.
+
+   Use `--auto` only while the server-side ruleset is active; `pr_ready.py` checks that. Report "merged" only when `gh pr view` shows MERGED. Never add a "Generated with Claude Code" footer to PR text.
+
+**Blocked, so stop and report, never work around:**
+- A check fails, or a result is missing or inconclusive.
+- A Critical or High finding is open.
+- A secret is exposed.
+- There are merge conflicts.
+- A required approval is missing.
+- A merge would need `--admin`, a push to `main`, or a change to the hook or CI.
+- A destructive or irreversible step needs a human's authorization.
+
+**Enforcement.** Agent instructions guide; they don't enforce. What actually enforces the gate:
+- **CI job `checks`** (`.github/workflows/ci.yml` runs `scripts/check.sh`). It reports on every PR, but nothing on GitHub stops a merge while it is red unless a ruleset exists.
+- **The Claude Code Bash hook** (`.claude/settings.json` → `scripts/hooks/guard_bash.py`). It blocks:
+  - pushes to `main` (explicit refspecs, `HEAD` or a bare push while on main, `--all`),
+  - `gh pr merge --admin`,
+  - `gh pr review --approve`,
+  - `gh api .../merge`,
+  - any `gh pr merge` that `scripts/pr_ready.py` rejects. `pr_ready.py` is taken from `origin/main` once it exists there.
+
+  The hook script and `.claude/settings.json` themselves are read from the checked-out branch. So branches cut before the gate landed (e.g. an old `feat/dropout`) have no hook: rebase them onto `main`. The hook guards against honest mistakes; it is not a sandbox (`bash -c`, `eval` or a script file can hide commands). It binds only Claude Code sessions in this repo.
+- **The GitHub ruleset on `main`** (`scripts/setup_repo_rules.sh --apply`): required checks `checks` + `agent-review`, code-owner review, no direct push or force-push. It enforces the gate server-side for everyone, humans included. Rulesets need a public repo (the repo is public again since 12 Oct night) or GitHub Pro, and an admin applies them once, after the gate PR is merged. The script stops without changing anything when rulesets are unavailable. Until it has run, nothing server-side stops a human (or the owner's token outside Claude Code) from merging a red PR: follow the workflow by hand and never merge a PR whose `checks` or `agent-review` isn't green.
 
 ## Practical gotchas
 
@@ -116,5 +166,5 @@ Experiment runner (being built, see PLAN W8): `python experiments/run_matrix.py 
 
 - Read `docs/PLAN.md` first. The status table at its top is the single place where progress is recorded, so update it when you finish something.
 - Write code that matches the surrounding style: argparse groups in `arguments/`, the same comment density, minimal diffs. Don't refactor upstream code you don't need to touch; it keeps our diff against DNGaussian reviewable.
-- Test changes with the 1100-iteration smoke test on `fern`. Then check that the defaults (variant B) still behave like upstream.
+- Test changes with `bash scripts/check.sh` (seconds, no GPU) and, for training code, `bash scripts/gpu_smoke.sh` (1100 iterations on `fern` per variant). Then check that the defaults (variant B) still behave like upstream.
 - When you change behaviour, say in the PR which variants it affects and how you tested it.
