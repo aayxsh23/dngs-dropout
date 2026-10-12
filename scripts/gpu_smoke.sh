@@ -15,19 +15,24 @@ PY=${DNGS_PY:-$HOME/miniconda3/envs/dngaussian/bin/python}
 [ -x "$PY" ] || PY=python
 SCENE=${SMOKE_SCENE:-data/llff/fern}
 
-if pgrep -f "train_llff.py|render.py|metrics.py" >/dev/null; then
+# Only real python processes count (not shells whose command text mentions these scripts).
+if pgrep -af "(train_llff|render|metrics)\.py" | awk '$2 ~ /python/ {found=1} END {exit !found}'; then
   echo "GPU-SMOKE FAIL: another training/render job is running (pgrep -af train_llff)"; exit 1
 fi
 [ -d "$SCENE/images" ] || { echo "GPU-SMOKE FAIL: $SCENE not found (extract llff_with_depth.tar into data/)"; exit 1; }
 
 SHA=$(git rev-parse HEAD)
 [ -z "$(git status --porcelain --untracked-files=no)" ] || SHA="$SHA-dirty"
-if grep -q "drop_rate" arguments/__init__.py; then ALL=(A B C D E); else ALL=(A B); fi
+# Use only the flags this commit supports (they arrive in stages on feat/dropout).
+HAS_DEPTH=$(grep -q "depth_scale" arguments/__init__.py && echo 1 || echo 0)
+HAS_DROP=$(grep -q "drop_rate" arguments/__init__.py && echo 1 || echo 0)
+SEED_FLAG=$(grep -q '"--seed"' train_llff.py && echo "--seed 0" || echo "")
+if [ "$HAS_DROP" = 1 ]; then ALL=(A B C D E); elif [ "$HAS_DEPTH" = 1 ]; then ALL=(A B); else ALL=(B); fi
 VARIANTS=("${@:-${ALL[@]}}")
 flags_for() {
   case $1 in
     A) echo "--depth_scale 0" ;;
-    B) echo "--depth_scale 1" ;;
+    B) [ "$HAS_DEPTH" = 1 ] && echo "--depth_scale 1" || echo "" ;;
     C) echo "--depth_scale 0 --drop_rate 0.2 --depth_render shared" ;;
     D) echo "--depth_scale 1 --drop_rate 0.2 --depth_render shared" ;;
     E) echo "--depth_scale 1 --drop_rate 0.2 --depth_render clean" ;;
@@ -37,14 +42,15 @@ COMMON="-r 8 --eval --n_sparse 3 --rand_pcd --iterations 1100 --test_iterations 
   --densify_grad_threshold 0.0013 --prune_threshold 0.01 --densify_until_iter 6000 --percent_dense 0.01
   --position_lr_init 0.016 --position_lr_final 0.00016 --position_lr_max_steps 5500 --position_lr_start 500
   --split_opacity_thresh 0.1 --error_tolerance 0.00025 --scaling_lr 0.003 --shape_pena 0.002 --opa_pena 0.001
-  --near 10 --seed 0"
+  --near 10 $SEED_FLAG"
 
 ROOT=output/smoke/${SHA:0:7}
 FAILS=()
 SUMMARY=()
 for v in "${VARIANTS[@]}"; do
   out=$ROOT/$v; rm -rf "$out"; mkdir -p "$out"
-  echo "== variant $v: $(flags_for "$v")"
+  if [ "$v" != B ] && [ "$HAS_DEPTH" = 0 ]; then echo "variant $v needs --depth_scale, which this commit lacks"; FAILS+=("$v:unsupported"); continue; fi
+  echo "== variant $v: $(flags_for "$v") $SEED_FLAG"
   # shellcheck disable=SC2046
   if ! "$PY" train_llff.py -s "$SCENE" --model_path "$out" $COMMON $(flags_for "$v") >"$out/smoke.log" 2>&1 \
      || ! "$PY" render.py -s "$SCENE" --model_path "$out" -r 8 --near 10 --skip_train --skip_test >>"$out/smoke.log" 2>&1 \
