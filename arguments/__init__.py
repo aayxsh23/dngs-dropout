@@ -93,6 +93,7 @@ class OptimizationParams(ParamGroup):
         self.split_opacity_thresh = 0.1
         self.soft_depth_start = 1000
         self.hard_depth_start = 0
+        self.depth_scale = 1.0  # multiplies every depth term; 0 disables depth regularization
 
         self.shape_pena = 0.001
         self.scale_pena = 0.001
