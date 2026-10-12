@@ -11,13 +11,14 @@ Writes to --tables:
     runs.csv            one row per finished run (everything that was found)
     per_scene_<n>v.csv  variant x scene, mean over seeds
     main_<n>v.csv/.md/.tex   variant x metric, mean ± std over seeds, published baselines below a rule
-    efficiency_<n>v.csv train time, fps, Gaussians, VRAM per variant, from quiet-GPU runs only
+    efficiency_<n>v.csv train time, fps, Gaussians, VRAM per GPU type and variant, from quiet-GPU runs only
     missing.txt         expected runs that have no metrics.json yet
 """
 import argparse, glob, json, os, re, sys
 import pandas as pd
 
 METRICS = ["psnr", "ssim", "lpips"]                     # lpips: lower is better
+OPTIONAL_METRICS = ["ssim_sk"]                          # sklearn SSIM; --ssim ssim_sk puts it in the main table
 EFFICIENCY = ["train_time_s", "fps", "n_gaussians", "model_size_mb", "vram_peak_mb"]
 SCENES = ["fern", "flower", "fortress", "horns", "leaves", "orchids", "room", "trex"]
 VARIANTS = ["A", "B", "C", "D", "E"]
@@ -69,8 +70,8 @@ def main_table(df):
         g = g[g["seed"].isin(complete)]
         row = {"variant": var, "n_seeds": len(complete)}
         if complete:
-            seed_means = g.groupby("seed")[[c for c in METRICS if c in g]].mean()
-            for c in METRICS:
+            seed_means = g.groupby("seed")[[c for c in METRICS + OPTIONAL_METRICS if c in g]].mean()
+            for c in METRICS + OPTIONAL_METRICS:
                 if c in seed_means:
                     row[c + "_mean"] = seed_means[c].mean()
                     row[c + "_std"] = seed_means[c].std(ddof=1) if len(complete) > 1 else float("nan")
@@ -78,12 +79,13 @@ def main_table(df):
     return pd.DataFrame(out).set_index("variant")
 
 
-def write_main(t, reported, path_base, digits=dict(psnr=2, ssim=3, lpips=3)):
+def write_main(t, reported, path_base, ssim="ssim", digits=dict(psnr=2, ssim=3, ssim_sk=3, lpips=3)):
     t.to_csv(path_base + ".csv")
+    shown = ["psnr", ssim, "lpips"]                     # papers report one SSIM, so reported rows use their "ssim"
     cols = ["PSNR ↑", "SSIM ↑", "LPIPS ↓", "seeds"]
     lines = []
     for var, r in t.iterrows():
-        lines.append([var] + [fmt(r.get(c + "_mean"), r.get(c + "_std"), digits[c]) for c in METRICS]
+        lines.append([var] + [fmt(r.get(c + "_mean"), r.get(c + "_std"), digits[c]) for c in shown]
                      + [str(int(r["n_seeds"]))])
     rep = []
     if reported is not None:
@@ -116,6 +118,8 @@ def main():
     ap.add_argument("--tables", default="results/tables")
     ap.add_argument("--reported", default="results/reported_baselines.csv")
     ap.add_argument("--seeds", type=int, nargs="*", default=[0, 1, 2], help="seeds expected, for missing.txt")
+    ap.add_argument("--ssim", choices=["ssim", "ssim_sk"], default="ssim",
+                    help="SSIM in the main table: ssim (3DGS) or ssim_sk (sklearn); runs.csv keeps both")
     a = ap.parse_args()
 
     os.makedirs(a.tables, exist_ok=True)
@@ -135,14 +139,18 @@ def main():
         per_scene.round(2).to_csv(os.path.join(a.tables, f"per_scene_{nv}v.csv"))
 
         t = main_table(g)
-        write_main(t, reported if nv == 3 else None, os.path.join(a.tables, f"main_{nv}v"))
-        print(f"\n== LLFF {nv}-view ==")
+        if a.ssim + "_mean" not in t:
+            print(f"WARNING no run has {a.ssim}; the SSIM column of main_{nv}v is empty", file=sys.stderr)
+        write_main(t, reported if nv == 3 else None, os.path.join(a.tables, f"main_{nv}v"), ssim=a.ssim)
+        print(f"\n== LLFF {nv}-view (SSIM = {a.ssim}) ==")
         print(open(os.path.join(a.tables, f"main_{nv}v.md"), encoding="utf-8").read())
 
-        quiet = g[g.get("shared_gpu", False) == False]          # efficiency only from a GPU nobody else used
+        # efficiency only from a GPU nobody else used, and never averaged across GPU types
+        quiet = g[g["shared_gpu"].fillna(False) == False] if "shared_gpu" in g else g
+        quiet = quiet.assign(gpu=quiet["gpu"].fillna("unknown") if "gpu" in quiet else "unknown")
         eff_cols = [c for c in EFFICIENCY if c in quiet]
         if eff_cols and not quiet.empty:
-            eff = quiet.groupby("variant")[eff_cols].mean()
+            eff = quiet.groupby(["gpu", "variant"])[eff_cols].mean()
             eff.round(2).to_csv(os.path.join(a.tables, f"efficiency_{nv}v.csv"))
             absent = sorted(set(EFFICIENCY) - set(eff_cols))
             if absent:
