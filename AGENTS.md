@@ -120,8 +120,8 @@ Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.
 **Pipeline:**
 1. **Understand.** Read the goal and acceptance criteria and the code involved; classify the PR.
 2. **Implement and test.** Make the smallest change that meets the goal. Add a deterministic check to `scripts/check.sh` for any new invariant. Run `bash scripts/check.sh`. For the experiment class, also run `bash scripts/gpu_smoke.sh` on the clean head and post its last line.
-3. **Independent review** of the full diff by a separate reviewer (the `pr-reviewer` agent in `.claude/agents/`). The report gets severity-ranked findings and a recommendation: Approve, Request Changes or Blocked. Post it on the PR.
-4. **Remediate:** fix every blocking finding, then re-run step 2 in full and do a **new** review of the new head. At most 3 rounds, then escalate to a human.
+3. **Independent review** by a separate reviewer (the `pr-reviewer` agent in `.claude/agents/`), fed one bundle file from `scripts/review_bundle.py`. Depth and model follow the risk class: docs-only PRs need no reviewer, routine code gets sonnet, experiment and gate get opus. The reviewer works to a tool budget and doesn't re-run what CI proved. The report gets severity-ranked findings and a recommendation: Approve, Request Changes or Blocked. Post it on the PR.
+4. **Remediate:** for each blocking finding, add a test that fails on the old code, then fix it. Lows go to a follow-up issue and don't trigger a re-review. Re-run step 2, then do a **delta** re-review (`review_bundle.py --since <reviewed sha>`), which checks only the fixes and new regressions. At most 3 review rounds in total, then escalate to a human.
 5. **Record and merge.** Only after an Approve:
    - set the `agent-review` commit status on the reviewed head SHA,
    - wait for CI (`gh pr checks <N> --repo aayxsh23/dngs-dropout --watch`),

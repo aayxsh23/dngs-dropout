@@ -28,16 +28,33 @@ Follow these stages in order. Never skip a stage because a previous run "probabl
 3. Make sure the PR body follows `.github/pull_request_template.md`.
 4. Wait for CI: `gh pr checks <N> -R $R --watch`. If CI fails, read the log (`gh run view <id> -R $R --log-failed`) and fix.
 
-## Stage C: Independent review
-Run the **pr-reviewer** subagent (`.claude/agents/pr-reviewer.md`) on the PR with the goal and acceptance criteria. If that agent type isn't available in this session, use a fresh general-purpose or code-reviewer subagent, and paste the pr-reviewer instructions into its prompt. Do not do the review in your own context: the point is independence from the implementation.
+## Stage C: Independent review (budgeted)
+Do not do the review in your own context: the point is independence from the implementation.
+
+1. **Pre-review self-check (author side, no subagent).** Before asking for a review, make sure each behaviour you changed has a deterministic test that would fail if it broke: a `check.sh` step, a hook `--selftest` case or a smoke assertion. Most re-review rounds come from regressions an author-side test would have caught.
+2. **Build the bundle:** `python3 scripts/review_bundle.py <N> --out "$TMPDIR/review_<N>.md"`. For a re-review, add `--since <last reviewed sha>` so it carries only the delta plus the previous report.
+3. **Pick the depth from the risk class** printed by the bundle script:
+
+   | Class | Reviewer | Model | Tool budget |
+   | --- | --- | --- | --- |
+   | routine, docs/results only | none: CI + `check.sh` suffice. Note "docs-only, no code review needed" in the report | — | — |
+   | routine with code | pr-reviewer | sonnet (default) | 8 |
+   | experiment | pr-reviewer | **opus** (`model: "opus"` on the Agent call) | 20 |
+   | gate | pr-reviewer | **opus** | 25 |
+   | any delta re-review | pr-reviewer, `delta` mode | sonnet | half of the above |
+
+4. **Invoke with this short prompt and nothing more.** The bundle and the agent file carry everything else; don't paste the diff, the rules or a list of things to hunt for.
+   > Review PR #`<N>` in **`<full|delta>`** mode. Bundle: `<path>`. Class: `<class>`. Follow `.claude/agents/pr-reviewer.md`, and return only its report.
+
+   If the `pr-reviewer` agent type isn't available, use a general-purpose agent with that prompt, plus "Read .claude/agents/pr-reviewer.md first".
 
 ## Stage D: Review report
 Post the reviewer's report as a PR comment, verbatim, plus a "Validation" line with the check.sh, CI and GPU-smoke results you observed yourself:
 `gh pr comment <N> -R $R --body-file <report.md>`. Keep the comment URL that prints.
 
-## Stage E: Remediate and re-review (loop, at most 3 rounds)
+## Stage E: Remediate and re-review (at most 3 review rounds in total, the first one included)
 - **Merge recommendation = Request Changes:**
-  - **Your own PR:** fix every merge-blocking finding. Add or extend a check in `scripts/check.sh`, or a smoke assertion, that would have caught it, where cheap. Commit and push. Then go back to Stage B (all of it), then a **new** Stage C on the new head that includes the previous findings to re-check.
+  - **Your own PR:** fix every merge-blocking finding. For each one, first add a test (`check.sh`, a hook self-test case or a smoke assertion) that fails on the old code, then fix it and see the test pass. Fix Lows only if it's trivial and safe; otherwise list them in a follow-up issue (`gh issue create -R $R`) and don't re-review for them. Commit and push. Then re-run Stage B, and do a **delta** Stage C (`--since <last reviewed sha>`), which is a fraction of the cost of a full review.
   - **Someone else's PR:** don't push to their branch unless asked. Post the report, then `gh pr review <N> -R $R --request-changes --body "<summary>"`, and stop.
 - **Blocked**, or still failing after 3 rounds: stop and report the blocker to the human. No merge.
 - **Approve,** with no merge-blocking findings left: continue.

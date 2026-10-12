@@ -40,7 +40,7 @@ if ruff_ check --no-cache --quiet --select E9,F63,F7,F82 --target-version py37 \
      --exclude submodules,dpt,lpipsPyTorch . ; then pass; else fail "ruff critical errors"; fi
 
 step "2. Python 3.7 compatibility of the training pipeline and gate scripts (vermin)"
-if out=$(vermin_ -q -t=3.7- --violations --no-tips --eval-annotations "${TRAIN_PATHS[@]}" scripts/pr_ready.py scripts/hooks/guard_bash.py 2>&1); then pass
+if out=$(vermin_ -q -t=3.7- --violations --no-tips --eval-annotations "${TRAIN_PATHS[@]}" scripts/pr_ready.py scripts/review_bundle.py scripts/hooks/guard_bash.py 2>&1); then pass
 else echo "$out"; fail "Python 3.7 incompatibility"; fi
 
 step "3. Checkpoints load only through utils.general_utils.load_checkpoint()"
@@ -125,7 +125,7 @@ EOF
 fi
 
 step "10. Merge-gate scripts: hook self-test and syntax"
-if python3 scripts/hooks/guard_bash.py --selftest >"$TMP/hook.txt" 2>&1 && python3 -m py_compile scripts/pr_ready.py; then pass
+if python3 scripts/hooks/guard_bash.py --selftest >"$TMP/hook.txt" 2>&1 && python3 -m py_compile scripts/pr_ready.py scripts/review_bundle.py; then pass
 else cat "$TMP/hook.txt"; fail "merge-gate scripts"; fi
 
 printf '\n== Summary\n'
