@@ -63,12 +63,12 @@ Monday's measurements change several assumptions in the playbook.
 | ID | Change | Reason |
 | --- | --- | --- |
 | **R1** | **All of Tier 1 (120 runs, seeds 0–2) runs on Colab T4s** with both accounts, not split between Colab and the A100. | A T4 run takes 4.9 min, so Tier 1 is about 9.8 GPU-hours: roughly 5 h per account over Wed–Thu. One GPU type for every Tier 1 run also means the seed-to-seed std is not mixed up with GPU differences. That is cleaner than the playbook's "seed 0 on T4, seeds 1–2 on A100". |
-| **R2** | **The laptop runs Tier 2** with `n_views` 2, 3, 6, 9; variants B, C, D and E; seed 0. That is 128 runs, about 16 h, Wed afternoon to Thu morning. | The laptop fits a full run (1663 MB). Including the 3-view point means the whole views curve comes from one GPU, and it doubles as a cross-GPU check against Tier 1 seed 0. |
+| **R2** | **Tier 2 also runs on Colab T4s**, after Tier 1: `n_views` 2, 6, 9; variants B, C, D, E; seed 0. That is 96 runs, about 7.8 GPU-hours, Thu to Fri morning. The 3-view point of the curve is Tier 1 seed 0, no rerun. **The laptop is not a runner**: it stays free for coding and writing. | Aayush can't give up the laptop for a 16 h block; a run at full GPU load makes it unusable. On T4s the whole views curve, including the 3-view point, comes from the same GPU type as Tier 1. That needs 32 fewer runs and gives no cross-GPU caveat. |
 | **R3** | **The A100 becomes optional.** Send the admin questions anyway. Build only a light go-bag (git bundle, data tar, conda-pack): about 1 h instead of a day. | Nothing on the critical path needs it any more. It remains the fallback if Colab refuses GPUs, and a bonus for the optional Tier 2b. |
 | **R4** | Variants D and E are defined on **DNGaussian's actual structure**: three separate rasterizations per iteration (hard depth, soft depth, photometric). D applies the dropout mask to all three; E applies it only to the photometric pass. | DNGaussian never computes its depth loss on the photometric render, so the playbook's "depth loss on the dropout render" has to mean "the depth passes also see the mask". **E costs no extra render**, since DNGaussian already renders depth separately. The playbook's rule 6 ("one extra render per iteration") does not apply. |
 | **R5** | The runner reads **`results_eval.json`** and writes `ssim_sk` as well. On Colab it trains on local disk and copies only small files to Drive. It deletes TensorBoard events everywhere, and checkpoints for every seed except 0. | `metrics.py` writes `results_eval.json`, not `results.json`. One run is 337 MB with spiral renders: 164 MB checkpoint plus 13 MB TensorBoard. 120 such runs would overflow 15 GB Drive quotas. |
 | **R6** | The **main table uses the 3DGS SSIM** (`SSIM`). `SSIM_sk` goes in the appendix. | Our reproduction gives 0.594 with 3DGS SSIM and 0.583 with sklearn, against the paper's 0.591. The paper's number matches the 3DGS implementation. |
-| **R7** | Tier 2 includes **both D and E**, so no second tag is needed. | Disha's suggestion. Only 32 more runs on the laptop. |
+| **R7** | Tier 2 includes **both D and E**, so no second tag is needed. | Disha's suggestion. Only 24 more runs. |
 | **R8** | Dropout: γ = 0.2, linear schedule r(t) = 0.2 · t / T with T = 6000 (our total iterations). | DropGaussian's official code uses `0.2 * (iteration/10000)`, and 10000 is their total. Scaling to our T keeps the published end-of-training rate. |
 
 ---
@@ -82,8 +82,8 @@ Each decision has a recommendation; the call confirms or changes it. Record the 
 | D1 | Drop rate and schedule | γ = 0.2, r = 0.2 · t / 6000 (R8) | Keep the literal `t/10000` (max 0.12) and state it |
 | D2 | SSIM in the main table | 3DGS `SSIM`, with `SSIM_sk` in the appendix; both in `metrics.json` (R6) | — |
 | D3 | Who produces `fps` and `model_size_mb` | Aayush (W5, W6) | — |
-| D4 | Tier 2 variants | B, C, D, E with `n_views` [2, 3, 6, 9], seed 0 (R2, R7) | Drop 3-view if the laptop is too slow |
-| D5 | Machine per seed | Tier 1, all seeds: Colab T4 (shards 0/2 and 1/2). Tier 2: laptop. A100: optional (R1–R3) | Playbook split: seed 0 Colab, seeds 1–2 A100 |
+| D4 | Tier 2 variants | B, C, D, E with `n_views` [2, 6, 9], seed 0; 3-view from Tier 1 seed 0 (R2, R7) | If Colab time runs short, drop 9-view first |
+| D5 | Machine per seed | Tier 1, all seeds, then Tier 2: Colab T4 (shards 0/2 and 1/2). Laptop: development only. A100: optional (R1–R3) | Playbook split: seed 0 Colab, seeds 1–2 A100 |
 | D6 | Definition of variant D | One mask per iteration, applied to all three training rasterizations (R4) | — |
 | D7 | Opacity penalty under dropout | `opa_pena` uses the **pre-dropout** opacity, so the regularizer is unchanged between variants | — |
 | D8 | Figure 1 (D vs E iteration diagram) | Aayush | — |
@@ -101,15 +101,15 @@ Each decision has a recommendation; the call confirms or changes it. Record the 
 | --- | --- | --- | --- |
 | **Mon 12** (tonight) | Call; admin questions; swap laptop data to the tar; start W2 | Call; review PR #3 and #2; fix `aggregate.py` bugs 1–2 | Decisions D1–D11 recorded |
 | **Tue 13** | W1 merges → W2–W7 (code) → W8 (runner) → W9 (laptop validation) → **PR by 22:00**; light go-bag if the lab is confirmed | Cell 7a T4 reproduction (8 scenes); plot scripts against the sample `diag.csv`; related work | Laptop smoke matrix passes every V2 check; T4 reproduction within 0.5 dB |
-| **Wed 14** | 09:00–12:30 fix review comments; **13:00 tag `v1.0-exp`**; 13:15 start Colab shard 0/2 seed 0; 14:00 start laptop Tier 2; Method section | 09:00–11:00 review the PR plus regression check (V3); 13:15 start Colab shard 1/2 seed 0, then seed 1 | First 10 runs have sensible metrics and diagnostics |
-| **Thu 15** | Colab seed 2 (shard 0/2); diagnostics analysis D vs E; draft the verdict; Experimental Setup | Colab seed 2 (shard 1/2); reruns; seed-0/1 tables; qualitative grid | All 120 Tier 1 runs done (target: Thu 22:00) |
-| **Fri 16** | Failure cases (W16); Tier 2 analysis; Figure 1; optional Tier 2b | Final tables (mean ± std); efficiency table; views plot; Introduction and Results text | **Tier 1 freeze 23:59** (plan to be done a day early) |
+| **Wed 14** | 09:00–12:30 fix review comments; **13:00 tag `v1.0-exp`**; 13:15 start Colab shard 0/2 seed 0, then seed 1; Method section | 09:00–11:00 review the PR plus regression check (V3); 13:15 start Colab shard 1/2 seed 0, then seed 1 | First 10 runs have sensible metrics and diagnostics |
+| **Thu 15** | Colab seed 2 (shard 0/2), then Tier 2 shard 0/2; diagnostics analysis D vs E; draft the verdict; Experimental Setup | Colab seed 2 (shard 1/2), then Tier 2 shard 1/2; reruns; seed-0/1 tables; qualitative grid | All 120 Tier 1 runs done (target: Thu ~14:00); Tier 2 started |
+| **Fri 16** | Tier 2 finishes on Colab in the morning; failure cases (W16); Tier 2 analysis; Figure 1; optional Tier 2b | Final tables (mean ± std); efficiency table; views plot; Introduction and Results text | **Tier 1 freeze 23:59** (plan to be done a day early) |
 | **Sat 17** | Full draft: Method, Setup, Diagnostics + verdict, Discussion | Full draft: Related Work, Introduction, Results | Every figure regenerates from a script |
 | **Sun 18** | Swap sections and review; arXiv check; abstract and conclusion together | Same | Complete draft |
 | **Mon 19** | Revise; README "how to reproduce"; tag `v1.0-report` | Revise; citations check | Submission-ready |
 | **Tue 20** | Buffer: read-through together, submit | Same | Submitted |
 
-**Critical path:** the dropout PR (Tue 22:00) → review and regression (Wed 11:00) → tag (Wed 13:00) → Colab seeds 0–2 (Wed 13:15 to Thu ~22:00) → tables, diagnostics and verdict (Fri) → writing. A slip in the code freeze delays everything after it. The playbook's fallback stands: the freeze may slip to Wed 20:00, no later.
+**Critical path:** the dropout PR (Tue 22:00) → review and regression (Wed 11:00) → tag (Wed 13:00) → Colab seeds 0–2 (Wed 13:15 to Thu ~14:00) → tables, diagnostics and verdict (Fri) → writing. Tier 2 (Colab, Thu afternoon to Fri morning) is off the critical path. A slip in the code freeze delays everything after it. The playbook's fallback stands: the freeze may slip to Wed 20:00, no later.
 
 ### 4.2 Hour by hour, the next 48 hours
 
@@ -143,8 +143,7 @@ Each decision has a recommendation; the call confirms or changes it. Record the 
 | 11:00–12:30 | Address comments; rerun V2 if the code changed | Re-review |
 | **13:00** | **Merge, tag `v1.0-exp`, push the tag** (W10) | — |
 | 13:15 | Colab account A: shard 0/2, seed 0 (W11). Tracker row → "running" | Colab account D: shard 1/2, seed 0. Tracker row → "running" |
-| 14:00 | Laptop: Tier 2 in tmux (W12.3) | — |
-| ~15:00 | When seed 0 finishes, start seed 1 on the same account | Same |
+| ~15:00 | When seed 0 finishes, start seed 1 on the same account (`SEEDS = '1'`) | Same |
 | 17:00–21:30 | Check the first finished `diag.csv` files (W9 checks on real runs); Method section | `aggregate.py` on the first runs; first tables |
 | 21:30 | Call: gate "first 10 runs sensible" | Call |
 
@@ -315,7 +314,7 @@ steps:
   - "python render.py -s {scene_dir} --model_path {work} -r 8 --near 10 --skip_train --skip_test"
   - "python metrics.py --model_paths {work}"
 ```
-- **`experiments/matrix_tier2.yaml`:** the same, with `n_views: [2, 3, 6, 9]`, `seeds: [0]`, variants B, C, D, E only.
+- **`experiments/matrix_tier2.yaml`:** the same, with `n_views: [2, 6, 9]`, `seeds: [0]`, variants B, C, D, E only. The 3-view point comes from Tier 1 seed 0, on the same T4 GPU type. The runner orders runs by `n_views`, so 2-view finishes first and 9-view can be dropped if time runs out.
 - **`experiments/matrix_smoke.yaml`:** `scenes: [fern]`, `seeds: [0]`, all five variants, `--iterations 1100 --test_iterations 1100` in `train_flags`. Used by V2 and to produce the sample `diag.csv` for Disha.
 
 **`experiments/run_matrix.py`**, behaviour (start from the playbook sketch and change the following):
@@ -372,6 +371,7 @@ SEEDS = '0'     # then '1', then '2'
 - **Tracker:** one row per (account, seed) with start time, status and notes. Set it to "running" when you start and "done" or "failed: …" when it ends.
 - **Disconnects:** rerun Cells 1–6, then 7b. Finished runs are skipped; only the run in progress is lost.
 - **Expected duration:** 20 runs per shard per seed × about 5 min ≈ 1.7 h. Variant A is faster (no depth passes).
+- **Order on each account:** seed 0 → seed 1 → seed 2 (Tier 1), then Tier 2. Tier 2 uses the same cell with `--matrix experiments/matrix_tier2.yaml --seeds 0`, the same `SHARD`, and a log name ending `_tier2`. That is 48 runs per account, about 3.9 h; 2-view runs first, 9-view last.
 - Never run two GPU sessions on one account at the same time. Keep the tab active.
 
 ### W12. Laptop operations (Aayush)
@@ -385,18 +385,12 @@ mv data/llff data/llff_laptopdepth          # keep the old one until the matrix 
 tar -xf llff_with_depth.tar -C data/        # creates data/llff/
 ls data/llff/fern/depth_maps | head -3
 ```
-**W12.2 Make long runs survive:**
+**W12.2 Make long runs survive (only relevant for the overnight overflow in W12.3):**
 - Windows power settings: never sleep when plugged in; lid close does nothing.
-- Run inside `tmux` (`sudo apt install tmux`, then `tmux new -s tier2`; detach with Ctrl-b d, reattach with `tmux attach -t tier2`).
+- Run inside `tmux` (`sudo apt install tmux`, then `tmux new -s runs`; detach with Ctrl-b d, reattach with `tmux attach -t runs`).
 - Keep one Windows Terminal tab running `wsl` open, so WSL doesn't shut the distro down when VS Code closes.
 
-**W12.3 Tier 2 (Wed 14:00, after the tag):**
-```bash
-git fetch --tags && git checkout v1.0-exp
-python experiments/run_matrix.py --matrix experiments/matrix_tier2.yaml --data_root data/llff \
-    --out_root outputs --seeds 0 2>&1 | tee -a logs/laptop_tier2.log
-```
-About 128 × 7.5 min ≈ 16 h, so it finishes around Thu 06:00. Afterwards, copy `outputs/llff_{2,3,6,9}v` to `sparse3dgs/outputs/laptop/` on Drive. The folders are already slim after cleanup; use the browser or `rclone`. Record the run in the tracker.
+**W12.3 The laptop is not a runner (revised).** A full-load training run makes the laptop unusable, so Tier 1 and Tier 2 both run on Colab. The laptop does smoke tests (minutes), V2/V4 validation and the writing. **Emergency overflow only, overnight only, and only if Aayush chooses:** if Colab can't finish a block, the laptop can run a **whole block** (a whole Tier 1 seed: 40 × 7.5 min ≈ 5 h; or a whole Tier 2 view count: 32 × 7.5 min ≈ 4 h) while he sleeps. Start it with `touch STOP` ready for the morning; the runner then finishes the current run and stops. Record in the report which block ran on which GPU.
 
 ### W13. A100 lab (optional; Aayush)
 
@@ -445,7 +439,7 @@ These rules are written down **before** any Tier 1 result exists. Change them on
 | F3 | Qualitative grid: 3 scenes × [GT, B, C, D, E], RGB row and depth row, seed 0 | Disha | `experiments/plots/qual_grid.py` → `fig_qual.pdf` | `eval/ours_6000/{gt,renders,depth}` | Fri |
 | F4 | Failure cases: 2–3 scenes where combining hurt, RGB + depth (W16) | Aayush picks, Disha renders | `qual_grid.py --scenes …` | per-scene Δ from T3 | Fri |
 | T4 | Efficiency: train time, FPS, Gaussian count, model size, peak VRAM per variant, **T4 runs only** | Disha | `aggregate.py` (fixed to group by GPU) → `efficiency_3v.tex` | `metrics.json`, `shared_gpu == false` | Fri |
-| F5 | PSNR vs number of views (2, 3, 6, 9) for B, C, D, E (laptop, seed 0) | Disha | `experiments/plots/views.py` → `fig_views.pdf` | Tier 2 outputs | Fri |
+| F5 | PSNR vs number of views (2, 3, 6, 9) for B, C, D, E (T4, seed 0; the 3-view point is Tier 1 seed 0) | Disha | `experiments/plots/views.py` → `fig_views.pdf` | Tier 2 outputs + `llff_3v` seed 0 | Fri evening |
 
 Every figure must regenerate from its script; no hand edits. Scripts take `--out_root` and write to `results/figures/`.
 
@@ -466,7 +460,7 @@ Overleaf if the course wants LaTeX; otherwise one shared doc. Never edit the sam
 | Introduction | Disha | Fri | The cross-family question is open (DNGaussian++ stays within depth regularization) |
 | Related work | Disha | Thu | Sparse-view NeRF, sparse-view 3DGS, depth priors (DNGaussian, DNGaussian++, FSGS), dropout-style regularization (DropGaussian, DropoutGS, CoR-GS) |
 | Method | Aayush | Fri | Factorial design A–E; the three passes; the dropout port (official code, schedule rescaled 10000 → 6000); D vs E (R4); the alpha clamp in the hard-depth pass; `opa_pena` on pre-dropout opacity; F1 |
-| Experimental setup | Aayush | Fri | LLFF 3-view, eval split (every 8th image), resolution `-r 8`; metrics: PSNR, **3DGS SSIM** (sklearn in the appendix), **LPIPS (VGG)**; seeds; T4 (Tier 1) vs RTX 3050 Ti (Tier 2); minutes per run; DPT_Hybrid depth from one archive |
+| Experimental setup | Aayush | Fri | LLFF 3-view, eval split (every 8th image), resolution `-r 8`; metrics: PSNR, **3DGS SSIM** (sklearn in the appendix), **LPIPS (VGG)**; seeds; all runs on Colab T4 (PyTorch 2.11); minutes per run; DPT_Hybrid depth from one archive |
 | Results | Disha | Sat | T1–T4, F3, F5 |
 | Diagnostics and verdict | Aayush | Sat | F2; the §6 rules applied |
 | Discussion, failure cases, limitations | Both | Sat | F4 and the limitations below |
@@ -475,7 +469,7 @@ Overleaf if the course wants LaTeX; otherwise one shared doc. Never edit the sam
 - The dropout rate was tuned on vanilla 3DGS, and the schedule was rescaled to 6000 iterations.
 - **Initialization:** DropGaussian builds its initial point cloud from the sparse views with COLMAP (SfM, `patch_match_stereo` and `stereo_fusion`), while DNGaussian and our variants start from random points. Variant C is therefore not expected to reach DropGaussian's published 20.76 PSNR.
 - One dataset (LLFF); 3 seeds; 8 scenes.
-- Tier 1 and Tier 2 ran on different GPUs and PyTorch versions (2.11 on the T4, 1.12 on the laptop).
+- All runs on one GPU type (T4), and Tier 2 has one seed only.
 - The rasterizer is nondeterministic.
 - Hyperparameters are DNGaussian's 3-view settings at every view count.
 
@@ -499,8 +493,8 @@ Overleaf if the course wants LaTeX; otherwise one shared doc. Never edit the sam
 | The dropout PR is not ready by Tue 22:00 | Tue 18:00 progress check | Cut W6 (FPS) and W7 (race fix; only matters for parallel slots) to after the freeze as `v1.1-exp`, since they don't change training. The freeze may slip to Wed 20:00, no later |
 | V3 regression fails (B differs from 7a by more than 0.5 dB) | Wed 11:00 | Diff `train_llff.py` against `upstream-baseline`. The usual suspect is a flag default. Spend at most 2 h, then freeze with the fix |
 | Colab refuses a GPU or hits a usage limit | Any session | Switch to the other account. Then Kaggle Notebooks (same T4 GPU type, weekly quota; change the paths in Cells 2 and 6). If a seed still can't finish on T4s, the laptop or the A100 runs **that whole seed**, and the report says so |
-| Colab is too slow for 3 seeds | Thu 12:00, if fewer than 80 runs are done | Finish seeds 0 and 1 on Colab; the laptop runs seed 2 after Tier 2 (about 5 h); or cut to 2 seeds |
-| Laptop Tier 2 interrupted | Thu morning | The runner resumes. Rerun the same command; only the run in progress is lost. If it is too far behind, drop `n_views` 9 |
+| Colab is too slow for 3 seeds | Thu 12:00, if fewer than 80 runs are done | Tier 1 seed 2 goes before any Tier 2. If it still won't fit: cut to 2 seeds, or (Aayush's choice) the laptop runs seed 2 overnight Thu (W12.3) |
+| Tier 2 doesn't fit on Colab | Fri 12:00 | Drop 9-view, then 6-view (Tier 2 is optional). Or the A100 takes all of Tier 2, with 3-view included so the curve is one GPU |
 | A variant gives NaN or diverges | `run.log`, `diag.csv` | Rerun once. If it repeats on other scenes, it is a finding: report it, don't hide it |
 | Drive quota fills | Drive storage page | The cleanup policy keeps runs small (§9). Delete seed-0 checkpoints of scenes not used in figures |
 | Data mismatch | md5 check in W12.1 and Cell 6 | Never train on data whose md5 doesn't match |
@@ -516,11 +510,11 @@ Overleaf if the course wants LaTeX; otherwise one shared doc. Never edit the sam
 | Tier 1, seed 0 | 40 | ~4.9 (T4) | 3.3 | Colab, 2 accounts | Wed 13:15–~15:00 |
 | Tier 1, seed 1 | 40 | ~4.9 | 3.3 | Colab, 2 accounts | Wed ~15:00–~17:00 |
 | Tier 1, seed 2 | 40 | ~4.9 | 3.3 | Colab, 2 accounts | Thu morning |
-| Tier 2 | 128 | ~7.5 (laptop) | 16 | Laptop | Wed 14:00–Thu ~06:00 |
+| Tier 2 (views 2, 6, 9) | 96 | ~4.9 (T4) | 7.8 | Colab, 2 accounts | Thu ~14:00–Fri ~10:00 |
 | V3 regression | 2 | 4.9 | 0.2 | Colab (Disha) | Wed morning |
 | Tier 2b (optional) | 32 | 4.9 | 2.6 | Colab or A100 | Fri |
 
-Each Colab account runs 60 Tier 1 runs, about 5 h of GPU time over two days. The minutes per run come from upstream DNGaussian. Variant A is about 25 % faster (no depth passes); diagnostics add about 2–3 %.
+Each Colab account runs 60 Tier 1 runs plus 48 Tier 2 runs: about **8.8 GPU-hours over Wed–Fri** (about 3.4 h Wed, 4 h Thu, 1.4 h Fri). If free-tier limits bite, Kaggle is the next T4 source (§8). The laptop runs nothing long. The minutes per run come from upstream DNGaussian. Variant A is about 25 % faster (no depth passes); diagnostics add about 2–3 %.
 
 **Storage per run after cleanup:** about 4 MB (`eval/` 3.4 MB plus JSON/CSV) for seeds 1–2, and about 170 MB for seed 0 with checkpoint and point cloud. Tier 1 on Drive ≈ 40 × 170 MB + 80 × 4 MB ≈ 7 GB, split across the two writing accounts. If quota is tight, run seed 0 with `--keep_ckpt_seeds` empty and re-train the 2–3 figure scenes later if needed.
 

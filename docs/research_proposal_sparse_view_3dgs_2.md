@@ -5,7 +5,7 @@ Oct 12, 2026 · @Aayush · **revised Mon 12 Oct evening** after the first measur
 > **What changed in this revision.** The first measurements and a close reading of the DNGaussian and DropGaussian code changed several assumptions. Sections that changed are marked **(revised)**. The hour-by-hour schedule, the full specs and the current status now live in [PLAN.md](PLAN.md); where the two disagree, PLAN.md wins.
 >
 > - **Measured:** Colab T4 **4.9 min/run**; laptop **7.5 min/run** with a **1663 MB** training footprint (it fits); laptop reproduction **18.73 / 0.594 / 0.297** against the paper's 19.12 / 0.591 / 0.294.
-> - **Machines:** all of Tier 1 runs on Colab T4s (about 9.8 GPU-hours in total). Tier 2 runs on the laptop. The A100 is optional.
+> - **Machines:** Tier 1 and then Tier 2 run on Colab T4s (about 9.8 + 7.8 GPU-hours, split over two accounts, Wed–Fri). The laptop is for development only; a full-load run makes it unusable. The A100 is optional.
 > - **Variants:** DNGaussian renders depth in **two separate passes** (hard and soft) before the photometric pass, each with its own optimizer step. So D means "the dropout mask also hits the depth passes", and E costs **no extra render**.
 > - **Dropout:** the official code is `torch.nn.Dropout(p=0.2*iteration/10000)` applied to a ones vector, then multiplied into opacity. We use γ = 0.2 with the schedule rescaled to our 6000 iterations.
 > - **Files:** `metrics.py` writes **`results_eval.json`** (not `results.json`) and renders go to **`eval/`** (not `test/`). Training also needs **shencoder**. Checkpoints must load through `load_checkpoint()`, because the laptop runs **PyTorch 1.12 / Python 3.7** and Colab runs PyTorch 2.11 / Python 3.13.
@@ -20,12 +20,12 @@ Three decisions make 8 days workable:
 
 - **One codebase for every variant.** We add dropout and diagnostics to our own copy of DNGaussian behind command-line flags. Every variant is then the same code with different flags, which is both faster to build and a cleaner controlled experiment.
 - **Parallel work from day one.** We agree the file formats today, so Disha can write the analysis scripts while you write the training code.
-- **Hard scope tiers (revised).** Tier 1 is the report and runs on Colab T4s. Tier 2 runs on the laptop from Wednesday afternoon, in parallel with Tier 1. Tier 3 is cut and replaced with published numbers.
+- **Hard scope tiers (revised).** Tier 1 is the report and runs on Colab T4s. Tier 2 runs on the same Colab accounts once Tier 1 is done. Tier 3 is cut and replaced with published numbers.
 
 | Tier | What it covers | Training runs | Rule |
 | --- | --- | --- | --- |
 | 1 Must | LLFF 3-view, variants A–E, 8 scenes, 3 seeds (2 minimum), diagnostics, tables, qualitative and failure-case figures | 120 | Non-negotiable. All on Colab T4 (one GPU type) |
-| 2 Should | View sparsity **2, 3, 6, 9** for variants **B, C, D and E**, 8 scenes, seed 0 | **128** | **Laptop**, Wed 14:00 to Thu ~06:00. The 3-view point keeps the whole curve on one GPU |
+| 2 Should | View sparsity **2, 6, 9** for variants **B, C, D and E**, 8 scenes, seed 0; the 3-view point is Tier 1 seed 0 | **96** | **Colab T4**, after Tier 1: Thu afternoon to Fri morning. Same GPU type as Tier 1, so the whole curve is comparable. Drop 9-view first if short of time |
 | 2b Could | D and E at γ ∈ {0.1, 0.3}, 3-view, seed 0 | 32 | Only if Tier 1 is complete by Thu night (Colab or A100) |
 | 3 Cut | Blender 8-view, DTU, Mip-NeRF 360, re-running DropGaussian, DropoutGS, FSGS, CoR-GS, FreeNeRF, SparseNeRF | 0 | Use numbers from their papers, labelled "reported" |
 
@@ -295,7 +295,7 @@ git push origin v1.0-exp
 
 ```text
 experiments/matrix.yaml        variants, scenes, seeds (you)
-experiments/matrix_tier2.yaml  views 2/3/6/9, variants B-E, seed 0 (you)
+experiments/matrix_tier2.yaml  views 2/6/9, variants B-E, seed 0; 3-view reused from Tier 1 (you)
 experiments/matrix_smoke.yaml  fern, 1100 iterations, all variants: pre-freeze check (you)
 experiments/run_matrix.py      resumable runner (you)
 experiments/stats.py           paired comparisons and verdict rules (Disha)
@@ -328,7 +328,7 @@ sparse3dgs/
     data/llff_with_depth.manifest.json   md5 0f6bd7bdae837ec58ad757c7c00b0561 and per-scene counts
     wheels/torch-<version>-src-<hash>/   compiled CUDA extension wheels for Colab, keyed by source hash
     outputs/llff_3v/<variant>/<scene>/seed<k>/   Tier 1 (Colab)
-    outputs/laptop/llff_{2,3,6,9}v/...          Tier 2 (laptop), copied up after the runs
+    outputs/llff_2v/  llff_6v/  llff_9v/        Tier 2 (Colab), same layout as llff_3v
     outputs/repro_upstream/<scene>/              T4 reproduction at upstream-baseline (Cell 7a)
     logs/                        one log file per shard
     run_tracker                  Google Sheet: who runs which shard where
@@ -345,7 +345,7 @@ The run tracker sheet has one row per shard: shard id, machine, person, start ti
 
 ## Day-by-day plan, 12–20 Oct
 
-> **Revised:** the up-to-date, hour-by-hour version of this schedule is **PLAN.md §4**. In short: code freeze unchanged (Wed 14 Oct, 1 PM). Tier 1 runs on Colab Wed 13:15 to Thu evening. Tier 2 runs on the laptop Wed 14:00 to Thu morning. Tier 1 freeze stays Fri midnight but should be met a day early. The weekend is for writing, not runs. The checklists below are kept for reference; Monday's items are ticked.
+> **Revised:** the up-to-date, hour-by-hour version of this schedule is **PLAN.md §4**. In short: code freeze unchanged (Wed 14 Oct, 1 PM). Tier 1 runs on Colab Wed 13:15 to Thu ~14:00; Tier 2 follows on Colab, Thu afternoon to Fri morning. The laptop runs nothing long. Tier 1 freeze stays Fri midnight but should be met a day early. The weekend is for writing, not runs. The checklists below are kept for reference; Monday's items are ticked.
 
 Code freezes Wednesday 14 Oct at 1 PM. Tier 1 freezes Friday 16 Oct at midnight, with Saturday's lab visit as its only overflow. Tier 2 runs on the A100 at the weekend while you write, and freezes Sunday 18 Oct in the evening. Tuesday 20 is buffer.
 
@@ -466,7 +466,8 @@ Work nobody waits on fills the gaps: Disha writes `aggregate.py` against hand-ma
 > | Work | Machine | When |
 > | --- | --- | --- |
 > | Tier 1, seeds 0, 1, 2 | Colab T4, both accounts (`--shard 0/2` and `1/2`) | Wed 13:15 to Thu evening |
-> | Tier 2 (views 2/3/6/9, B–E, seed 0, 128 runs) | Laptop, one run at a time, about 7.5 min each | Wed 14:00 to Thu ~06:00 |
+> | Tier 2 (views 2/6/9, B–E, seed 0, 96 runs) | Colab T4, both accounts, after Tier 1 | Thu ~14:00 to Fri ~10:00 |
+> | Development, smoke tests, writing | Laptop: never long runs, it becomes unusable under full GPU load | Throughout |
 > | Optional Tier 2b, overflow | A100 if the lab works out; otherwise Colab | Fri |
 >
 > Every Tier 1 seed then runs on the same GPU type, so the seed std is not mixed with GPU effects. The A100 is no longer on the critical path. The original reasoning is kept below.
@@ -845,7 +846,7 @@ A file called `STOP` in the repo folder lets running jobs finish but starts no n
 
 ### Compute budget
 
-> **Revised, measured:** m = **4.9 min** on a T4 (Disha, Monday) and 7.5 min on the laptop. Tier 1 = 120 × 4.9 ≈ **9.8 GPU-hours**, about 5 h per Colab account: **3 seeds, on Colab alone**. Tier 2 (128 runs) ≈ 16 h on the laptop. Variant E is **not** slower (no extra render); variant A is about 25 % faster (no depth passes); diagnostics add about 2–3 %. Full table: PLAN.md §9.
+> **Revised, measured:** m = **4.9 min** on a T4 (Disha, Monday) and 7.5 min on the laptop. Tier 1 = 120 × 4.9 ≈ **9.8 GPU-hours**, about 5 h per Colab account: **3 seeds, on Colab alone**. Tier 2 (96 runs) ≈ 7.8 GPU-hours, also on Colab, so each account does about 8.8 h over Wed–Fri. Variant E is **not** slower (no extra render); variant A is about 25 % faster (no depth passes); diagnostics add about 2–3 %. Full table: PLAN.md §9.
 
 Measure **m**, the minutes for one complete run (train, render, metrics) on a T4, during Monday's smoke test. Total GPU hours = runs × m ÷ 60. Tier 1 is 120 runs and Tier 2 is 72; variant E runs are slower because of the extra render.
 
@@ -870,14 +871,14 @@ A 15-minute call every evening at a fixed time, GitHub Issues for tasks, the run
 
 | Trigger | Check by | Fallback |
 | --- | --- | --- |
-| Laptop cannot finish a full `fern` run | Mon 12 Oct, night | ✅ Not triggered: 7.5 min, 1663 MB. The laptop runs Tier 2 |
+| Laptop cannot finish a full `fern` run | Mon 12 Oct, night | ✅ Not triggered: 7.5 min, 1663 MB. But the laptop is unusable under load, so it stays a development machine; emergency overnight overflow only (PLAN.md W12.3) |
 | Colab extensions will not build | Tue 13 Oct, noon | Apply the build-error fixes; screen-share debug together; Kaggle as backup |
 | Reproduction mean PSNR more than 1 dB below the paper's 19.12 (✅ laptop: −0.39 dB) | Tue 13 Oct, night | Check eval split, SSIM version and error tolerance; spend at most half a day, then continue with our own variant B as the reference and report the gap |
 | Dropout and diagnostics not merged | Wed 14 Oct, 1 PM | Freeze may slip to 8 PM the same day, no later; cut to 2 seeds |
-| No lab access on Wednesday, or the go-bag environment fails on site | Wed 14 Oct | *Revised:* no effect. Tier 1 is on Colab, Tier 2 on the laptop |
+| No lab access on Wednesday, or the go-bag environment fails on site | Wed 14 Oct | *Revised:* no effect. Tier 1 and Tier 2 are both on Colab |
 | Colab refuses GPUs or hits usage limits | Any session | *New:* switch account, then Kaggle (same T4). If a seed still can't finish on T4s, the laptop or A100 runs that **whole** seed, and the report says so |
 | One variant produces NaN or diverges | During the matrix | Rerun once; if it repeats on other scenes, it is a finding, so log it rather than hide it |
-| Tier 1 not finished | Thu 15 Oct 12:00 (fewer than 80 runs) / Fri midnight | Seeds 0–1 on Colab, seed 2 on the laptop after Tier 2, or cut to 2 seeds; hard stop Sat evening, then report what completed |
+| Tier 1 not finished | Thu 15 Oct 12:00 (fewer than 80 runs) / Fri midnight | Tier 1 seed 2 goes before any Tier 2; else cut to 2 seeds, or the laptop runs seed 2 overnight if Aayush chooses; hard stop Sat evening, then report what completed |
 | Tier 2 not finished | Sun 18 Oct, evening | Report the view counts that completed; Tier 2 is optional |
 | No measurable difference between variants | Thu 15 Oct | Still a valid result (redundancy); centre the report on the diagnostics |
 
@@ -906,14 +907,14 @@ The report is written Saturday 17 to Monday 19 Oct, with Related Work and Method
 4. Qualitative grid: 3 scenes × ground truth, B, C, D, E, showing RGB and depth.
 5. Failure cases: 2–3 scenes where combining hurt, with their depth maps.
 6. Efficiency table: training time, FPS, Gaussian count, model size and peak VRAM per variant, **T4 runs only** (grouped by GPU).
-7. Tier 2 only: PSNR against number of views (2, 3, 6, 9) for **B, C, D and E** (laptop, seed 0).
+7. Tier 2 only: PSNR against number of views (2, 3, 6, 9) for **B, C, D and E** (T4, seed 0; 3-view from Tier 1).
 
 State these limitations plainly (revised):
 - The dropout rate was tuned on vanilla 3DGS, and the schedule was rescaled from 10000 to 6000 iterations.
 - Our initialization is random, while DropGaussian's is a COLMAP dense stereo cloud from the sparse views.
 - In D, compensation inside the constant-opacity hard-depth pass saturates at the rasterizer's alpha cap of 0.99.
 - One dataset; 3 seeds.
-- Tier 1 on T4 (PyTorch 2.11), Tier 2 on an RTX 3050 Ti (PyTorch 1.12).
+- Tier 2 has one seed.
 - Timings come from T4 GPUs.
 - The rasterizer is nondeterministic.
 
