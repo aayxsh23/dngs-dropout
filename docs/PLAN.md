@@ -27,14 +27,14 @@ Update this table whenever something changes. It is the single place where statu
 | 1 | Team repo, Disha added as collaborator | Aayush | ✅ Done | `github.com/aayxsh23/dngs-dropout` (currently **public**). Tag `upstream-baseline` = `81c3d83` |
 | 2 | Drive folder `sparse3dgs` plus shortcuts | Disha, Aayush | ✅ Done | Both of us can reach `/content/drive/MyDrive/sparse3dgs` |
 | 3 | LLFF + DPT depth archive | Disha | ✅ Done | `sparse3dgs/data/llff_with_depth.tar`, 2.4 GB, md5 `0f6bd7bdae837ec58ad757c7c00b0561`. Per-scene counts match the laptop's data |
-| 4 | Colab notebook, cached extension wheels | Disha | ✅ Works, in PR #1 | Wheels in `sparse3dgs/wheels/torch-2.11.0+cu130/` |
+| 4 | Colab notebook, cached extension wheels, `aggregate.py` | Disha | ✅ Merged (#1) | Wheels in `sparse3dgs/wheels/torch-2.11.0+cu130/` |
 | 5 | Colab T4 timing, fern | Disha | ✅ Done | **4.9 min/run** (train 4.4 + render/metrics 0.5). PSNR 20.80, SSIM 0.674, SSIM_sk 0.669, LPIPS 0.257 |
-| 6 | Laptop environment, `setup_env.sh` | Aayush | ✅ Works, in PR #2 | Python 3.7.13, PyTorch 1.12.1, CUDA 11.3 |
+| 6 | Laptop environment, `setup_env.sh` | Aayush | ✅ Merged (#2) | Python 3.7.13, PyTorch 1.12.1, CUDA 11.3 |
 | 7 | Laptop reproduction, 8 scenes | Aayush | ✅ Done | Mean **18.73 PSNR / 0.594 SSIM / 0.297 LPIPS** vs paper 19.12 / 0.591 / 0.294 (−0.39 dB, inside the 0.5 dB gate). See §10 |
 | 8 | Laptop timing and VRAM | Aayush | ✅ Done | 7.5 min/run. Training footprint **1663 MB** (2509 MB whole-GPU peak of 4096) |
-| 9 | Build and load fixes (`float.h`, C++17, `load_checkpoint`) | Aayush | 🔄 PR #3 open | Tested on the laptop |
+| 9 | Build and load fixes (`float.h`, C++17, `load_checkpoint`) | Aayush | ✅ Merged (#3) | Tested on the laptop; Colab check pending (next session) |
 | 10 | `--seed`, `--depth_scale`, `config.json`, `scripts/peak_vram.py` | Aayush | ✅ On branch `feat/dropout` (pushed, no PR yet) | 1100-iteration smoke tests pass |
-| 11 | Review of PR #1 | Aayush | ✅ Posted | Two bugs in `aggregate.py` (GPU mixing in the efficiency table, `KeyError` when `shared_gpu` is absent) |
+| 11 | Review of PR #1 | Aayush | ✅ Done | Disha fixed all 5 points in `222b818` (per-GPU efficiency table, no `KeyError`, optional `ssim_sk`, wheel cache keyed by source hash, tag assert in 7b); re-tested and merged |
 | 12 | Dropout port, `--depth_render`, diagnostics, stats | Aayush | ⏳ Tue | W2–W7 |
 | 13 | `run_matrix.py`, `matrix.yaml`, `matrix_tier2.yaml` | Aayush | ⏳ Tue | W8 |
 | 14 | Questions to the lab admin | Aayush | ⏳ Not sent | §5 W13 |
@@ -43,14 +43,16 @@ Update this table whenever something changes. It is the single place where statu
 | 17 | T4 reproduction, 8 scenes (Cell 7a) | Disha | ⏳ Tue | W11 |
 | 18 | Related work, verified baseline numbers | Disha | 🔄 Started | `results/reported_baselines.csv` (not yet verified) |
 
-Open pull requests:
+Pull requests:
 
-| PR | Branch | What it does | Who reviews | Merge order |
-| --- | --- | --- | --- | --- |
-| #3 | `fix/colab-build` | `float.h`, C++17, version-safe `load_checkpoint()` | Disha | 1st |
-| #2 | `chore/setup-env` | `setup_env.sh`, `pip_freeze_laptop.txt` | Disha | 2nd |
-| #1 | `feat/colab-and-aggregate` | Colab notebook, `aggregate.py`, results starters | Aayush (comments posted) | 3rd, after bugs 1–2 are fixed or filed as an issue |
-| (this) | `docs/plan-and-agent-guides` | This plan, the playbook, AGENTS/CLAUDE/GEMINI/Copilot guides | Disha | Any time |
+| PR | What it does | State |
+| --- | --- | --- |
+| #3 | `float.h`, C++17, version-safe `load_checkpoint()` | ✅ Merged Mon night, before Disha's review: **Disha to read it post-merge** |
+| #2 | `setup_env.sh`, `pip_freeze_laptop.txt` | ✅ Merged Mon night, before Disha's review: Disha to skim post-merge |
+| #1 | Colab notebook, `aggregate.py`, results starters | ✅ Reviewed by Aayush, fixes in `222b818`, approved and merged |
+| #4 | This plan, the revised playbook, AGENTS/CLAUDE/GEMINI/Copilot guides | ⏳ Open: Disha reviews (§2, §3, §4.2, §6), then squash-merge |
+
+Next PR: `feat/dropout` → `main` (Tue 22:00).
 
 ---
 
@@ -115,15 +117,15 @@ Each decision has a recommendation; the call confirms or changes it. Record the 
 
 | Time | Aayush | Disha |
 | --- | --- | --- |
-| now–21:30 | Send the admin questions (W13). Start downloading `llff_with_depth.tar` to the laptop (W12.1) | Review PRs #3 and #2 (read-through is enough) |
+| now–21:30 | Send the admin questions (W13). Start downloading `llff_with_depth.tar` to the laptop (W12.1) | Read #3 and #2 post-merge; review #4 (this plan: §2, §3, §4.2, §6) |
 | 21:30–22:00 | **Call:** §3 decisions; the formats in W4–W8 | **Call** |
-| 22:00–late | Swap the laptop data and verify the md5 (W12.1). Rebase `feat/dropout` on `main` once #3 is merged. Start W2 (renderer changes) | Fix `aggregate.py` bugs 1–2 in PR #1; merge #1 once Aayush approves |
+| 22:00–late | Swap the laptop data and verify the md5 (W12.1). Start W2 (renderer changes) | Fresh Colab session opened from GitHub at `main`: check that Cells 1–6 still work after #3 (one wheel rebuild expected) |
 
 **Tue 13 Oct**
 
 | Time | Aayush | Disha |
 | --- | --- | --- |
-| 09:00–09:30 | W1: merge #3, #2, #1 (after approvals); `git pull`; rebase `feat/dropout` | Start Colab Cell 7a (T4 reproduction at `upstream-baseline`, about 40 min) |
+| 09:00–09:30 | W1 is done except #4; `git pull` | Start Colab Cell 7a (T4 reproduction at `upstream-baseline`, about 40 min) |
 | 09:30–12:30 | W2 dropout port + W3 E mode; smoke-test each | Related work; verify `reported_baselines.csv` rows against each paper |
 | 12:30–15:00 | W4 `diag.csv`, W5 `train_stats.json`, W6 `render_stats.json`, W7 point-cloud race fix | 7a table vs paper; post it to the channel |
 | 15:00 | **Push a sample `diag.csv`** from a smoke run to the channel | — |
@@ -152,7 +154,7 @@ Each decision has a recommendation; the call confirms or changes it. Record the 
 
 ## 5. Workstreams: what to build and how
 
-### W1. Merge the open PRs (Aayush, Tue 09:00)
+### W1. Merge the open PRs (#1–#3 ✅ merged Mon night; #4 waits for Disha's review)
 
 ```bash
 # after each PR is approved on GitHub: Squash and merge (web UI), then locally:
