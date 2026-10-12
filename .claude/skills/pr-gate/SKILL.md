@@ -54,13 +54,14 @@ Post the reviewer's report as a PR comment, verbatim, plus a "Validation" line w
    - a human approval is still needed (experiment and gate classes),
    - CI failed,
    - the PR is stacked on a non-main base.
-3. If ELIGIBLE: `gh pr merge <N> -R $R --squash --delete-branch`. The Bash hook re-runs the gate (from `origin/main`) before letting this through. Use `--auto` only if `pr_ready.py <N> --auto` reports that GitHub enforces the checks: that needs a ruleset, which needs a public repo or GitHub Pro.
+3. If ELIGIBLE: `gh pr merge <N> -R $R --squash --delete-branch --match-head-commit $SHA`, with the SHA you reviewed. The Bash hook re-runs the gate for exactly that SHA before letting this through, and GitHub refuses the merge if the head moved. Use `--auto` only if `pr_ready.py <N> --auto` reports that GitHub enforces the checks, which needs the ruleset from `scripts/setup_repo_rules.sh`.
 4. Confirm. Only report "merged" if `gh pr view <N> -R $R --json state,mergedAt` shows `MERGED`.
 5. If the command is denied (by the hook, by Claude Code permissions or by GitHub), do not look for another route. Report exactly what blocked it.
 
 ## Never
 - `gh pr merge --admin`, pushing to `main`, force-pushing `main`, or disabling or editing the hook or CI to get a merge through.
-- `gh pr review --approve`. Agents never approve; humans do.
+- `gh pr review --approve`, or approving or merging through `gh api`. Agents never approve; humans do.
+- A "🤖 Generated with Claude Code" footer, or any similar line, in a PR description, comment or report (hard rule).
 - Treating a missing CI result, an unavailable reviewer or absent command output as a pass.
 - Approving or merging changes to the gate itself (class "gate") without the other teammate's approval.
 - Putting tokens or secrets in comments, statuses or logs.

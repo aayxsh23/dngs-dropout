@@ -48,15 +48,17 @@ def origin_repo(root):
 
 
 def parse_codeowners(text):
-    """[(pattern, section)]; section from the '# [experiment]' / '# [gate]' markers."""
-    rules, section = [], None
+    """([(pattern, section)], {owner logins}); section from the '# [experiment]' / '# [gate]' markers."""
+    rules, owners, section = [], set(), None
     for line in text.splitlines():
         s = line.strip()
         if s.startswith("# [") and "]" in s:
             section = s[3:s.index("]")]
         elif s and not s.startswith("#"):
-            rules.append((s.split()[0], section or "protected"))
-    return rules
+            parts = s.split()
+            rules.append((parts[0], section or "protected"))
+            owners.update(p.lstrip("@").lower() for p in parts[1:] if p.startswith("@"))
+    return rules, owners
 
 
 def matches(pattern, path):
@@ -91,7 +93,7 @@ def codeowners_rules(root, base, head_sha):
                              text=True, timeout=15)
         if out.returncode == 0:
             sets.append(parse_codeowners(out.stdout))
-    return sets
+    return [r for r, _ in sets], set().union(*[o for _, o in sets]) if sets else set()
 
 
 def server_requires_ci(repo, root):
@@ -107,7 +109,10 @@ def server_requires_ci(repo, root):
     return False
 
 
-def evaluate(pr, repo, auto, root):
+RANK = {"SUCCESS": 0, "NEUTRAL": 0, "SKIPPED": 0}  # anything else (pending, failure) ranks worse
+
+
+def evaluate(pr, repo, auto, root, expect_head=None):
     fields = ("number,state,isDraft,baseRefName,headRefOid,mergeable,author,reviews,files,changedFiles,"
               "statusCheckRollup,comments,title")
     blockers, notes = [], []
@@ -117,10 +122,12 @@ def evaluate(pr, repo, auto, root):
             break
         time.sleep(2)
     head, author = d["headRefOid"], d["author"]["login"]
+    if expect_head and not head.startswith(expect_head):
+        blockers.append("head is %s, not the reviewed %s: a newer push needs its own review" % (head[:7], expect_head[:7]))
     files = [f["path"] for f in d["files"]]
     if len(files) < d["changedFiles"]:  # gh lists at most 100 files; get them all
         files = run(["gh", "api", "--paginate", "repos/%s/pulls/%s/files" % (repo, d["number"]),
-                     "--jq", ".[].filename"], root, timeout=40).split()
+                     "--jq", ".[].filename"], root, timeout=40).splitlines()
         if len(files) < d["changedFiles"]:
             blockers.append("could list only %d of %d changed files" % (len(files), d["changedFiles"]))
     notes.append("%s PR #%d '%s' head %s by %s, %d files" % (repo, d["number"], d["title"], head[:7], author, len(files)))
@@ -145,8 +152,9 @@ def evaluate(pr, repo, auto, root):
     for c in d["statusCheckRollup"] or []:
         if c.get("__typename") == "CheckRun":
             name, state = c.get("name"), (c.get("conclusion") or c.get("status") or "").upper()
-            if name == CI_CHECK:
-                ci = state
+            if name == CI_CHECK:  # several runs named "checks": the worst one decides
+                if ci is None or RANK.get(state, 2 if state not in PENDING else 1) > RANK.get(ci, 2 if ci not in PENDING else 1):
+                    ci = state
             elif state not in ("SUCCESS", "NEUTRAL", "SKIPPED", "") and state not in PENDING:
                 blockers.append("check '%s' is %s" % (name, state))
         elif c.get("__typename") == "StatusContext" and c.get("context") == REVIEW_STATUS:
@@ -173,7 +181,7 @@ def evaluate(pr, repo, auto, root):
         if r["state"] == "CHANGES_REQUESTED":
             blockers.append("%s requested changes" % who)
 
-    rule_sets = codeowners_rules(root, d["baseRefName"], head)
+    rule_sets, owners = codeowners_rules(root, d["baseRefName"], head)
     if not rule_sets:
         blockers.append("could not read .github/CODEOWNERS from the base or the head; cannot classify the change")
     hit = classify(files, rule_sets)
@@ -181,8 +189,8 @@ def evaluate(pr, repo, auto, root):
         for section, fs in sorted(hit.items()):
             fs = sorted(fs)
             notes.append("%s paths touched: %s" % (section, ", ".join(fs[:6]) + (" ..." if len(fs) > 6 else "")))
-        approved = [who for who, r in latest.items() if who != author and r["state"] == "APPROVED"
-                    and (r.get("commit") or {}).get("oid") == head]
+        approved = [who for who, r in latest.items() if who != author and who.lower() in owners
+                    and r["state"] == "APPROVED" and (r.get("commit") or {}).get("oid") == head]
         if not approved:
             blockers.append("protected paths changed: needs an APPROVED review on %s from the other teammate "
                             "(a code owner who is not the author)" % head[:7])
@@ -204,6 +212,7 @@ def main():
     ap.add_argument("--repo", default=None, help="owner/name; must be the origin repo (default: origin)")
     ap.add_argument("--auto", action="store_true", help="checking for `gh pr merge --auto`")
     ap.add_argument("--root", default=None, help="repository checkout (default: the git toplevel of the cwd)")
+    ap.add_argument("--expect-head", default=None, help="the head SHA that was reviewed (gh pr merge --match-head-commit)")
     a = ap.parse_args()
     pr = a.pr.rstrip("/").split("/")[-1]
     try:
@@ -217,7 +226,7 @@ def main():
             if out.stdout.strip().lower() != repo.lower():
                 raise RuntimeError("gh's default repo is '%s', not origin %s: add `--repo %s` to the merge command"
                                    % (out.stdout.strip() or "unset", repo, repo))
-        blockers, notes = evaluate(pr, repo, a.auto, root)
+        blockers, notes = evaluate(pr, repo, a.auto, root, a.expect_head)
     except Exception as e:  # cannot establish eligibility = blocked
         print("BLOCKED: could not evaluate PR %s: %s" % (pr, e))
         return 1

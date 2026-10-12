@@ -24,7 +24,7 @@ Update this table whenever something changes. It is the single place where statu
 
 | # | Item | Owner | State | Evidence or link |
 | --- | --- | --- | --- | --- |
-| 1 | Team repo, Disha added as collaborator | Aayush | ✅ Done | `github.com/aayxsh23/dngs-dropout`, **private** since 12 Oct evening (D10). Colab clones need `GH_TOKEN`. Tag `upstream-baseline` = `81c3d83` |
+| 1 | Team repo, Disha added as collaborator | Aayush | ✅ Done | `github.com/aayxsh23/dngs-dropout`, **public** (was private briefly on 12 Oct evening; public again so the GitHub ruleset can enforce the merge gate). Tag `upstream-baseline` = `81c3d83` |
 | 2 | Drive folder `sparse3dgs` plus shortcuts | Disha, Aayush | ✅ Done | Both of us can reach `/content/drive/MyDrive/sparse3dgs` |
 | 3 | LLFF + DPT depth archive | Disha | ✅ Done | `sparse3dgs/data/llff_with_depth.tar`, 2.4 GB, md5 `0f6bd7bdae837ec58ad757c7c00b0561`. Per-scene counts match the laptop's data |
 | 4 | Colab notebook, cached extension wheels, `aggregate.py` | Disha | ✅ Merged (#1) | Wheels in `sparse3dgs/wheels/torch-2.11.0+cu130/` |
@@ -42,7 +42,7 @@ Update this table whenever something changes. It is the single place where statu
 | 16 | Formats and decisions agreed | Both | ⏳ Tonight's call | §3 |
 | 17 | T4 reproduction, 8 scenes (Cell 7a) | Disha | ⏳ Tue | W11 |
 | 18 | Related work, verified baseline numbers | Disha | 🔄 Started | `results/reported_baselines.csv` (not yet verified) |
-| 19 | Review/merge gate: CI `checks`, `scripts/check.sh`, GPU smoke, `pr-reviewer` agent, `pr-gate` skill, Bash hook, CODEOWNERS, ruleset script | Aayush | 🔄 PR #5 (gate class: needs Disha's approval) | AGENTS.md "Change workflow". Server-side ruleset unavailable while the repo is private on GitHub Free; the gate is CI + hook + `pr_ready.py` |
+| 19 | Review/merge gate: CI `checks`, `scripts/check.sh`, GPU smoke, `pr-reviewer` agent, `pr-gate` skill, Bash hook, CODEOWNERS, ruleset script | Aayush | 🔄 PR #5 (gate class: needs Disha's approval) | AGENTS.md "Change workflow". After merge: `bash scripts/setup_repo_rules.sh --apply` turns on the server-side ruleset (the repo is public) |
 
 Pull requests:
 

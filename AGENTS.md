@@ -126,9 +126,9 @@ Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.
    - set the `agent-review` commit status on the reviewed head SHA,
    - wait for CI (`gh pr checks <N> --repo aayxsh23/dngs-dropout --watch`),
    - run `python3 scripts/pr_ready.py <N>`,
-   - and only if it prints ELIGIBLE, `gh pr merge <N> --repo aayxsh23/dngs-dropout --squash --delete-branch`.
+   - and only if it prints ELIGIBLE, `gh pr merge <N> --repo aayxsh23/dngs-dropout --squash --delete-branch --match-head-commit <reviewed SHA>`. The SHA pin makes GitHub refuse the merge if anything was pushed after the review; the hook requires it.
 
-   Use `--auto` only once a server-side ruleset exists; `pr_ready.py` checks that. Report "merged" only when `gh pr view` shows MERGED.
+   Use `--auto` only while the server-side ruleset is active; `pr_ready.py` checks that. Report "merged" only when `gh pr view` shows MERGED. Never add a "Generated with Claude Code" footer to PR text.
 
 **Blocked, so stop and report, never work around:**
 - A check fails, or a result is missing or inconclusive.
@@ -146,10 +146,10 @@ Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.
   - `gh pr merge --admin`,
   - `gh pr review --approve`,
   - `gh api .../merge`,
-  - any `gh pr merge` that `scripts/pr_ready.py` rejects. The hook runs `pr_ready.py` from `origin/main`, so a PR can't weaken its own gate.
+  - any `gh pr merge` that `scripts/pr_ready.py` rejects. `pr_ready.py` is taken from `origin/main` once it exists there.
 
-  It guards against honest mistakes; it is not a sandbox (`bash -c`, `eval` and backticks can hide commands). It binds only Claude Code sessions in this repo.
-- **The GitHub ruleset on `main`** (`scripts/setup_repo_rules.sh`): required checks `checks` + `agent-review`, code-owner review, no direct push or force-push. **It is not active.** Rulesets need a public repo or GitHub Pro, and this repo is private on GitHub Free. Until then, nothing server-side stops a human (or the owner's token outside Claude Code) from merging a red PR. Humans: follow the workflow by hand and never merge a PR whose `checks` or `agent-review` isn't green.
+  The hook script and `.claude/settings.json` themselves are read from the checked-out branch. So branches cut before the gate landed (e.g. an old `feat/dropout`) have no hook: rebase them onto `main`. The hook guards against honest mistakes; it is not a sandbox (`bash -c`, `eval` or a script file can hide commands). It binds only Claude Code sessions in this repo.
+- **The GitHub ruleset on `main`** (`scripts/setup_repo_rules.sh --apply`): required checks `checks` + `agent-review`, code-owner review, no direct push or force-push. It enforces the gate server-side for everyone, humans included. Rulesets need a public repo (the repo is public again since 12 Oct night) or GitHub Pro, and an admin applies them once, after the gate PR is merged. The script stops without changing anything when rulesets are unavailable. Until it has run, nothing server-side stops a human (or the owner's token outside Claude Code) from merging a red PR: follow the workflow by hand and never merge a PR whose `checks` or `agent-review` isn't green.
 
 ## Practical gotchas
 

@@ -1,5 +1,6 @@
 # Paths whose changes need a human approval from the OTHER teammate before merge.
-# GitHub enforces this through the main-branch ruleset ("require review from code owners");
+# GitHub enforces this once scripts/setup_repo_rules.sh --apply has created the main-branch ruleset
+# ("require review from code owners"); until then scripts/pr_ready.py enforces it for agents;
 # a PR author's own approval never counts, so listing both owners means "the other person".
 # scripts/pr_ready.py reads this file too: the [experiment] / [gate] section markers below
 # decide which extra evidence it demands. Keep the markers and use only simple patterns
