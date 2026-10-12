@@ -21,3 +21,18 @@ data/dtu/*
 data/llff/*
 data/nerf_synthetic/*
 !*.gitkeep
+# team repo additions
+data/
+output/
+outputs/
+*.ply
+*.pth
+*.pt
+*.tar
+*.zip
+build/
+*.egg-info/
+*.so
+__pycache__/
+.ipynb_checkpoints/
+STOP
