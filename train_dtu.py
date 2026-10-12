@@ -20,7 +20,7 @@ from utils.loss_utils import l1_loss, patch_norm_mse_loss, patch_norm_mse_loss_g
 from gaussian_renderer import render, render_for_depth, render_for_opa   # , network_gui
 import sys
 from scene import Scene, GaussianModel
-from utils.general_utils import safe_state
+from utils.general_utils import safe_state, load_checkpoint
 import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
@@ -42,7 +42,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
     if checkpoint:
-        (model_params, _) = torch.load(checkpoint)
+        (model_params, _) = load_checkpoint(checkpoint)
         gaussians.load_shape(model_params, opt)
 
     bg_color = [1, 1, 1] if dataset.white_background else [0, 0, 0]

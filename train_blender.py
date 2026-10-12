@@ -23,7 +23,7 @@ from gaussian_renderer import render_sh, render_for_depth_sh   # , network_gui
 import sys
 from scene import Scene, GaussianModel,  GaussianModelSH
 
-from utils.general_utils import safe_state
+from utils.general_utils import safe_state, load_checkpoint
 import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
@@ -47,7 +47,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     if checkpoint:
         # (model_params, first_iter) = torch.load(checkpoint)
         # gaussians.restore(model_params, opt)
-        (model_params, _) = torch.load(checkpoint)
+        (model_params, _) = load_checkpoint(checkpoint)
         gaussians.load_shape(model_params, opt)
 
     bg_color = [1, 1, 1] if dataset.white_background else [0, 0, 0]
@@ -246,7 +246,7 @@ def training_sh(dataset, opt, pipe, testing_iterations, saving_iterations, check
     if checkpoint:
         # (model_params, first_iter) = torch.load(checkpoint)
         # gaussians.restore(model_params, opt)
-        (model_params, _) = torch.load(checkpoint)
+        (model_params, _) = load_checkpoint(checkpoint)
         gaussians.load_shape(model_params, opt)
 
     bg_color = [1, 1, 1] if dataset.white_background else [0, 0, 0]

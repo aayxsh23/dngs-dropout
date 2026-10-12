@@ -11,6 +11,7 @@
 
 import torch
 import sys
+import inspect
 from datetime import datetime
 import numpy as np
 import random
@@ -113,6 +114,16 @@ def build_scaling_rotation(s, r):
 
     L = R @ L
     return L
+
+def load_checkpoint(path):
+    """torch.load for DNGaussian checkpoints on any PyTorch version.
+
+    PyTorch >= 2.6 defaults to weights_only=True, which rejects these checkpoints (they hold
+    numpy scalars). PyTorch < 1.13 has no weights_only argument at all, so only pass it when it exists.
+    """
+    if "weights_only" in inspect.signature(torch.load).parameters:
+        return torch.load(path, weights_only=False)
+    return torch.load(path)
 
 def safe_state(silent):
     old_f = sys.stdout
