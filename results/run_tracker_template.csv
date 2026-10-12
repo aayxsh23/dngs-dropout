@@ -1,0 +1,6 @@
+shard_id,machine,person,matrix_file,seeds,code_tag,start_time,status,notes
+colab-0of2-seed0,Colab T4 (Aayush),Aayush,experiments/matrix.yaml,0,v1.0-exp,,not started,
+colab-1of2-seed0,Colab T4 (Disha),Disha,experiments/matrix.yaml,0,v1.0-exp,,not started,
+a100-seed1,A100 lab,Aayush,experiments/matrix.yaml,1,v1.0-exp,,not started,
+a100-seed2,A100 lab,Aayush,experiments/matrix.yaml,2,v1.0-exp,,not started,
+repro-upstream,Colab T4 (Disha),Disha,scripts/run_llff.sh,0,upstream-baseline,,not started,Tue 13 Oct reproduction
