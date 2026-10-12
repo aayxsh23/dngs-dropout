@@ -11,6 +11,9 @@ cd "$(git rev-parse --show-toplevel)"
 
 FAILED=()
 SKIPPED=()
+GREP_ERR=0
+# git grep: exit 1 means "no match"; anything above 1 is an error and must not read as a pass.
+gg() { local rc; git grep "$@"; rc=$?; if [ "$rc" -gt 1 ]; then echo "git grep error (exit $rc): $*" >&2; GREP_ERR=1; fi; return 0; }
 step() { printf '\n== %s\n' "$1"; }
 pass() { echo "PASS"; }
 fail() { echo "FAIL: $1"; FAILED+=("$1"); }
@@ -41,24 +44,37 @@ if out=$(vermin_ -q -t=3.7- --violations --no-tips --eval-annotations "${TRAIN_P
 else echo "$out"; fail "Python 3.7 incompatibility"; fi
 
 step "3. Checkpoints load only through utils.general_utils.load_checkpoint()"
-hits=$(git grep -nE '^[^#]*\btorch\.load\(' -- '*.py' ':!submodules' ':!dpt' ':!lpipsPyTorch' ':!utils/general_utils.py' || true)
-if [ -z "$hits" ]; then pass; else echo "$hits"; fail "direct torch.load()"; fi
+GREP_ERR=0
+hits=$(gg -nE '^[^#]*\btorch\.load\(' -- '*.py' ':!submodules' ':!dpt' ':!lpipsPyTorch' ':!utils/general_utils.py')
+if [ -z "$hits" ] && [ $GREP_ERR -eq 0 ]; then pass; else echo "$hits"; fail "direct torch.load()"; fi
 
 step "4. No dropout in evaluation paths; render functions default to no dropout"
-hits=$(git grep -nE 'drop_comp|drop_rate|Dropout' -- "${EVAL_PATHS[@]}" || true)
-bad_defs=$(grep -nE '^\s*def .*drop_comp' gaussian_renderer/__init__.py 2>/dev/null | grep -v 'drop_comp=None' || true)
-if [ -z "$hits$bad_defs" ]; then pass
+GREP_ERR=0
+hits=$(gg -nE 'drop_comp|drop_rate|Dropout' -- "${EVAL_PATHS[@]}")
+bad_defs=$(grep -nE '^\s*def .*drop_comp' gaussian_renderer/__init__.py | grep -v 'drop_comp=None')
+if [ -z "$hits$bad_defs" ] && [ $GREP_ERR -eq 0 ]; then pass
 else echo "$hits"; echo "$bad_defs"; fail "dropout reachable from evaluation"; fi
 
 step "5. Repository hygiene: no data, outputs, checkpoints, archives or files > 5 MB"
-hyg=$(git ls-files | grep -E '^(data|output|outputs)/' | grep -v '\.gitkeep$' || true)
-hyg+=$(git ls-files | grep -E '\.(pth|pt|ckpt|ply|tar|zip|npy|npz|pfm|tfevents)$|events\.out\.tfevents' || true)
-big=$(git ls-files -z | xargs -0 -I{} sh -c 'test -f "{}" && s=$(wc -c < "{}") && [ "$s" -gt 5242880 ] && echo "{} ($s bytes)"' || true)
-if [ -z "$hyg$big" ]; then pass; else echo "$hyg"; echo "$big"; fail "forbidden or oversized files tracked"; fi
+if hyg=$(git ls-files -z | python3 -c '
+import os, re, sys
+bad = []
+for f in sys.stdin.buffer.read().decode("utf-8", "replace").split("\0"):
+    if not f:
+        continue
+    if re.match(r"(data|output|outputs)/", f) and not f.endswith(".gitkeep"):
+        bad.append(f + "  (data/output folder)")
+    elif re.search(r"\.(pth|pt|ckpt|ply|tar|zip|npy|npz|pfm)$|events\.out\.tfevents", f):
+        bad.append(f + "  (checkpoint/data/archive type)")
+    elif os.path.isfile(f) and os.path.getsize(f) > 5 * 1024 * 1024:
+        bad.append("%s  (%d bytes > 5 MB)" % (f, os.path.getsize(f)))
+print("\n".join(bad))
+sys.exit(1 if bad else 0)'); then pass; else echo "$hyg"; fail "forbidden or oversized files tracked"; fi
 
 step "6. No credentials in tracked files"
-secrets=$(git grep -nIE 'ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,}|gho_[A-Za-z0-9]{36}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|sk-ant-[A-Za-z0-9_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----' -- . ':!scripts/check.sh' || true)
-if [ -z "$secrets" ]; then pass; else echo "$secrets" | cut -c1-120; fail "possible secret committed"; fi
+GREP_ERR=0
+secrets=$(gg -nIE 'ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,}|gho_[A-Za-z0-9]{36}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|sk-ant-[A-Za-z0-9_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----' -- . ':!scripts/check.sh')
+if [ -z "$secrets" ] && [ $GREP_ERR -eq 0 ]; then pass; else echo "$secrets" | cut -c1-120; fail "possible secret committed"; fi
 
 step "7. Notebooks: valid JSON, outputs cleared"
 nb_bad=""

@@ -22,7 +22,7 @@ fi
 [ -d "$SCENE/images" ] || { echo "GPU-SMOKE FAIL: $SCENE not found (extract llff_with_depth.tar into data/)"; exit 1; }
 
 SHA=$(git rev-parse HEAD)
-[ -z "$(git status --porcelain --untracked-files=no)" ] || SHA="$SHA-dirty"
+[ -z "$(git status --porcelain)" ] || SHA="$SHA-dirty"   # untracked non-ignored files count as dirty too
 # Use only the flags this commit supports (they arrive in stages on feat/dropout).
 HAS_DEPTH=$(grep -q "depth_scale" arguments/__init__.py && echo 1 || echo 0)
 HAS_DROP=$(grep -q "drop_rate" arguments/__init__.py && echo 1 || echo 0)

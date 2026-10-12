@@ -111,14 +111,24 @@ Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.
 | --- | --- | --- |
 | **Routine** | everything not listed in CODEOWNERS (docs, notebooks, `aggregate.py`, plots, results) | CI `checks` green + agent review Approve on the head commit |
 | **Experiment** | training, rendering, evaluation, extensions, runner, `experiments/*.yaml` | the above + `GPU-SMOKE PASS <head sha>` comment from `scripts/gpu_smoke.sh` + approval from the **other** teammate. After `v1.0-exp`: also a new tag and a RUNLOG entry |
-| **Gate** | `.github/`, `.claude/`, `scripts/check.sh`, `scripts/gpu_smoke.sh`, `scripts/pr_ready.py`, `scripts/hooks/`, agent instruction files | the routine requirements + approval from the **other** teammate. An agent never approves its own gate |
+| **Gate** | `.github/`, `.claude/`, `scripts/check.sh`, `scripts/gpu_smoke.sh`, `scripts/pr_ready.py`, `scripts/hooks/`, `scripts/setup_repo_rules.sh`, AGENTS/CLAUDE/GEMINI.md | the routine requirements + approval from the **other** teammate |
+
+**Agents never submit APPROVE reviews** (`gh pr review --approve` is blocked by the hook). Approvals are a human's decision; an agent posts its review report as a comment and sets the `agent-review` status.
+
+**Always name the repo:** this clone has an `upstream` remote (Fictionarry/DNGaussian), and plain `gh` commands can resolve to it. Pass `--repo aayxsh23/dngs-dropout` to every `gh pr` command and use `repos/aayxsh23/dngs-dropout/...` in `gh api` paths. `pr_ready.py` refuses any other repo.
 
 **Pipeline:**
 1. **Understand.** Read the goal and acceptance criteria and the code involved; classify the PR.
 2. **Implement and test.** Make the smallest change that meets the goal. Add a deterministic check to `scripts/check.sh` for any new invariant. Run `bash scripts/check.sh`. For the experiment class, also run `bash scripts/gpu_smoke.sh` on the clean head and post its last line.
 3. **Independent review** of the full diff by a separate reviewer (the `pr-reviewer` agent in `.claude/agents/`). The report gets severity-ranked findings and a recommendation: Approve, Request Changes or Blocked. Post it on the PR.
 4. **Remediate:** fix every blocking finding, then re-run step 2 in full and do a **new** review of the new head. At most 3 rounds, then escalate to a human.
-5. **Record and merge.** Only after an Approve: set the `agent-review` commit status on the reviewed head SHA, run `python3 scripts/pr_ready.py <N> --auto`, and if it prints ELIGIBLE, `gh pr merge <N> --squash --delete-branch --auto`. Report "merged" only when `gh pr view` shows MERGED.
+5. **Record and merge.** Only after an Approve:
+   - set the `agent-review` commit status on the reviewed head SHA,
+   - wait for CI (`gh pr checks <N> --repo aayxsh23/dngs-dropout --watch`),
+   - run `python3 scripts/pr_ready.py <N>`,
+   - and only if it prints ELIGIBLE, `gh pr merge <N> --repo aayxsh23/dngs-dropout --squash --delete-branch`.
+
+   Use `--auto` only once a server-side ruleset exists; `pr_ready.py` checks that. Report "merged" only when `gh pr view` shows MERGED.
 
 **Blocked, so stop and report, never work around:**
 - A check fails, or a result is missing or inconclusive.
@@ -129,10 +139,17 @@ Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.
 - A merge would need `--admin`, a push to `main`, or a change to the hook or CI.
 - A destructive or irreversible step needs a human's authorization.
 
-**Enforcement.** Agent instructions guide; they don't enforce. The real gates are:
-- the CI job `checks` (`.github/workflows/ci.yml` runs `scripts/check.sh`),
-- the Claude Code Bash hook (`.claude/settings.json` → `scripts/hooks/guard_bash.py`): blocks pushes to `main`, `gh pr merge --admin`, and any `gh pr merge` that `scripts/pr_ready.py` rejects,
-- the GitHub ruleset on `main` (`scripts/setup_repo_rules.sh`): required checks `checks` and `agent-review`, code-owner review, no force-push.
+**Enforcement.** Agent instructions guide; they don't enforce. What actually enforces the gate:
+- **CI job `checks`** (`.github/workflows/ci.yml` runs `scripts/check.sh`). It reports on every PR, but nothing on GitHub stops a merge while it is red unless a ruleset exists.
+- **The Claude Code Bash hook** (`.claude/settings.json` → `scripts/hooks/guard_bash.py`). It blocks:
+  - pushes to `main` (explicit refspecs, `HEAD` or a bare push while on main, `--all`),
+  - `gh pr merge --admin`,
+  - `gh pr review --approve`,
+  - `gh api .../merge`,
+  - any `gh pr merge` that `scripts/pr_ready.py` rejects. The hook runs `pr_ready.py` from `origin/main`, so a PR can't weaken its own gate.
+
+  It guards against honest mistakes; it is not a sandbox (`bash -c`, `eval` and backticks can hide commands). It binds only Claude Code sessions in this repo.
+- **The GitHub ruleset on `main`** (`scripts/setup_repo_rules.sh`): required checks `checks` + `agent-review`, code-owner review, no direct push or force-push. **It is not active.** Rulesets need a public repo or GitHub Pro, and this repo is private on GitHub Free. Until then, nothing server-side stops a human (or the owner's token outside Claude Code) from merging a red PR. Humans: follow the workflow by hand and never merge a PR whose `checks` or `agent-review` isn't green.
 
 ## Practical gotchas
 

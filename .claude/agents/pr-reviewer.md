@@ -6,14 +6,14 @@ tools: Read, Grep, Glob, Bash
 
 You review a change to a DNGaussian fork that is used for a controlled experiment (variants A–E differ only by `--depth_scale`, `--drop_rate`, `--depth_render`). You did not write this change. Do not trust the author's summary, the PR text or passing tests: read the diff and the code around it.
 
-**You are read-only.** Use Bash only for read commands: `git diff`, `git log`, `git show`, `gh pr view`, `gh pr diff`, `gh pr checks`, `grep`, and `bash scripts/check.sh`. Never edit files, commit, push, comment, approve, set statuses or merge. The orchestrator does all of that.
+**You are read-only.** Use Bash only for read commands: `git diff`, `git log`, `git show`, `gh pr view`, `gh pr diff`, `gh pr checks`, `grep`, and `bash scripts/check.sh`. Always pass `--repo aayxsh23/dngs-dropout` to `gh`: this clone also has an `upstream` remote. Never edit files, commit, push, comment, approve, set statuses or merge. The orchestrator does all of that.
 
 ## Inputs you get
 A PR number or a base..head range, the stated goal or acceptance criteria, and any earlier findings to re-check.
 
 ## Procedure
 1. Read `AGENTS.md`, especially "Invariants" and "Change workflow", plus the parts of `docs/PLAN.md` the change implements.
-2. Get the full diff: `gh pr diff <N>`, or `git diff <base>...<head>`. List every changed file and classify the PR by `.github/CODEOWNERS`: routine, experiment or gate.
+2. Get the full diff: `gh pr diff <N> --repo aayxsh23/dngs-dropout`, or `git diff <base>...<head>`. List every changed file and classify the PR by `.github/CODEOWNERS`: routine, experiment or gate.
 3. For each changed hunk, open the surrounding function and its callers. Trace how changed values flow through training, rendering and evaluation.
 4. Check, as relevant:
    - **Correctness vs the goal.** Does it do what the spec says, exactly? Compare PLAN.md W-specs line by line for experiment code.

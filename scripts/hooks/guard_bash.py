@@ -3,22 +3,27 @@
 
 Reads the hook JSON on stdin. Exit 0 lets the command run; exit 2 blocks it and the message on
 stderr goes back to the agent. Blocks:
-  - `gh pr merge` unless scripts/pr_ready.py says the PR is eligible (with --auto: CI may be pending)
-  - `gh pr merge --admin` (bypasses repository rules), always
-  - `git push` that targets main, or force-pushes main
-Only real command words count: text inside quotes or heredoc bodies (commit messages, docs being
-written) is ignored. Self-test without network: python3 scripts/hooks/guard_bash.py --selftest
+  - `gh pr merge` unless scripts/pr_ready.py (taken from origin/main when it exists there) says the PR
+    is eligible; `--admin` always
+  - `gh pr review --approve` (approvals are for humans) and `gh api .../pulls/N/merge`
+  - `git push` that targets main: explicit refspecs, HEAD/@ or a bare push while on main, --all/--mirror
+Only real command words count: quoted text and heredoc bodies (commit messages, docs being written)
+are ignored. The tokenizer is self-contained, so behaviour does not depend on the Python version
+(the laptop's python3 is 3.7). It is a guard against honest mistakes, not a sandbox: `bash -c`,
+`eval` or backticks can hide a command. The CI checks and human approvals remain the backstop.
+Self-test without network: python3 scripts/hooks/guard_bash.py --selftest
 """
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PR_READY = os.path.join(os.path.dirname(HERE), "pr_ready.py")
-SEPARATORS = {";", "&&", "||", "|", "&", "(", ")", "|&", ";;"}
+REPO_ROOT = os.path.dirname(os.path.dirname(HERE))
+PR_READY_LOCAL = os.path.join(REPO_ROOT, "scripts", "pr_ready.py")
+GIT_GLOBAL_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
+GH_FLAGS_WITH_VALUE = {"-R", "--repo"}
 
 
 def strip_heredocs(cmd):
@@ -35,91 +40,225 @@ def strip_heredocs(cmd):
 
 
 def segments(cmd):
-    """Yield the word lists of simple commands, with quoted strings kept as single words."""
-    text = strip_heredocs(cmd).replace("\\\n", " ")
-    for line in text.split("\n"):
-        lex = shlex.shlex(line, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        lex.commenters = "#"
-        try:
-            tokens = list(lex)
-        except ValueError:  # unbalanced quotes: fall back to plain words
-            tokens = line.split()
-        words = []
-        for t in tokens:
-            if t in SEPARATORS:
-                if words:
-                    yield words
-                words = []
-            else:
-                words.append(t)
+    """Split into simple commands (lists of words). Separators outside quotes: newline ; & | ( ) `
+    and $( . Quoted text, even multi-line, stays inside one word."""
+    text = strip_heredocs(cmd)
+    segs, words, cur, has_word = [], [], [], False
+    quote, i = None, 0
+
+    def end_word():
+        nonlocal cur, has_word
+        if has_word:
+            words.append("".join(cur))
+        cur, has_word = [], False
+
+    def end_seg():
+        nonlocal words
+        end_word()
         if words:
-            yield words
+            segs.append(words)
+        words = []
+
+    while i < len(text):
+        ch = text[i]
+        if quote:
+            if ch == "\\" and quote == '"' and i + 1 < len(text):
+                cur.append(text[i + 1]); i += 2; continue
+            if ch == quote:
+                quote = None
+            else:
+                cur.append(ch)
+            i += 1
+            continue
+        if ch == "\\" and i + 1 < len(text):
+            if text[i + 1] != "\n":
+                cur.append(text[i + 1]); has_word = True
+            i += 2
+            continue
+        if ch in "'\"":
+            quote, has_word = ch, True
+        elif ch == "#" and not has_word:
+            while i < len(text) and text[i] != "\n":
+                i += 1
+            continue
+        elif ch == "$" and text[i + 1:i + 2] == "(":
+            end_seg(); i += 2; continue
+        elif ch in "\n;&|()`":
+            end_seg()
+        elif ch in " \t":
+            end_word()
+        else:
+            cur.append(ch); has_word = True
+        i += 1
+    end_seg()
+    return segs
 
 
-def sub_after(words, seq):
-    """If words contains the consecutive sequence seq (e.g. gh pr merge), return the words after it."""
-    n = len(seq)
-    for i in range(len(words) - n + 1):
-        if words[i:i + n] == seq:
-            return words[i + n:]
+def find_cmd(words, name):
+    """Index of the word that invokes `name` (any path, e.g. ~/.local/bin/gh), or None."""
+    for i, w in enumerate(words):
+        if os.path.basename(w) == name:
+            return i
     return None
 
 
-def decide(cmd, online=True):
+def gh_sub(words, sub, action):
+    """For `gh [flags] <sub> [flags] <action> args`, return (args, repo) or None."""
+    i = find_cmd(words, "gh")
+    if i is None:
+        return None
+    rest, repo, path, j = words[i + 1:], None, [], 0
+    while j < len(rest) and len(path) < 2:
+        w = rest[j]
+        if w in GH_FLAGS_WITH_VALUE and j + 1 < len(rest):
+            repo = rest[j + 1]; j += 2; continue
+        if w.startswith("--repo="):
+            repo = w.split("=", 1)[1]
+        elif not w.startswith("-"):
+            path.append(w)
+        j += 1
+    if path != [sub, action]:
+        return None
+    args = rest[j:]
+    for k, w in enumerate(args):
+        if w in GH_FLAGS_WITH_VALUE and k + 1 < len(args):
+            repo = args[k + 1]
+        elif w.startswith("--repo="):
+            repo = w.split("=", 1)[1]
+    return args, repo
+
+
+def git_push_args(words):
+    """Args after `git [global options] push`, or None."""
+    i = find_cmd(words, "git")
+    if i is None:
+        return None
+    j = i + 1
+    while j < len(words) and words[j].startswith("-"):
+        j += 2 if words[j] in GIT_GLOBAL_WITH_VALUE else 1
+    if j < len(words) and words[j] == "push":
+        return words[j + 1:]
+    return None
+
+
+def current_branch():
+    out = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, timeout=10)
+    return out.stdout.strip()
+
+
+def run_pr_ready(pr, repo, auto):
+    """Run the gate logic from origin/main when it exists there, so a PR can't weaken its own gate."""
+    base = subprocess.run(["git", "show", "origin/main:scripts/pr_ready.py"], capture_output=True, text=True,
+                          cwd=REPO_ROOT, timeout=15)
+    args = [pr] + (["--repo", repo] if repo else []) + (["--auto"] if auto else [])
+    if base.returncode == 0:
+        return subprocess.run([sys.executable, "-", "--root", REPO_ROOT] + args, input=base.stdout,
+                              capture_output=True, text=True, cwd=REPO_ROOT, timeout=75)
+    return subprocess.run([sys.executable, PR_READY_LOCAL] + args, capture_output=True, text=True,
+                          cwd=REPO_ROOT, timeout=75)
+
+
+def decide(cmd, online=True, branch=None):
     """Return None to allow, or a reason string to block."""
+    to_main = False  # a `git checkout/switch main` earlier in the same command
     for words in segments(cmd):
-        args = sub_after(words, ["gh", "pr", "merge"])
-        if args is not None:
+        gi = find_cmd(words, "git")
+        if gi is not None and words[gi + 1:gi + 2] in (["checkout"], ["switch"]) and "main" in words[gi + 2:]:
+            to_main = True
+
+        merge = gh_sub(words, "pr", "merge")
+        if merge is not None:
+            args, repo = merge
             if "--admin" in args:
                 return "gh pr merge --admin bypasses the repository rules; never use it (AGENTS.md, Change workflow)."
             if not online:
                 return "merge-needs-gate"
             pr = next((w for w in args if not w.startswith("-") and (w.isdigit() or "/pull/" in w)), None)
             if pr is None:
-                return ("gh pr merge without an explicit PR number: name the PR (`gh pr merge <N> --squash ...`) "
-                        "so the gate can check it.")
-            check = [sys.executable, PR_READY, pr] + (["--auto"] if "--auto" in args else [])
-            out = subprocess.run(check, capture_output=True, text=True)
+                return ("gh pr merge without an explicit PR number: name the PR "
+                        "(`gh pr merge <N> --repo <owner/name> --squash --delete-branch`) so the gate can check it.")
+            out = run_pr_ready(pr, repo, "--auto" in args)
             if out.returncode != 0:
                 return "Merge gate refused PR %s:\n%s%s" % (pr, out.stdout, out.stderr)
-        args = sub_after(words, ["git", "push"])
-        if args is not None:
-            refs = [w for w in args if not w.startswith("-")][1:]  # first positional is the remote
-            hits_main = any(r in ("main", "+main") or r.endswith(":main") or r.endswith(":refs/heads/main")
-                            for r in refs)
-            if not refs and online:  # bare `git push` pushes the current branch
-                cur = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True)
-                hits_main = cur.stdout.strip() == "main"
-            if hits_main:
-                return "Pushing to main is not allowed: push a branch and open a PR (AGENTS.md, Change workflow)."
+
+        review = gh_sub(words, "pr", "review")
+        if review is not None and any(w in ("--approve", "-a") for w in review[0]):
+            return ("Agents never submit APPROVE reviews: approvals of experiment and gate changes must come from "
+                    "the other teammate (AGENTS.md, Change workflow). Post the review report as a comment instead.")
+        api_i = find_cmd(words, "gh")
+        if api_i is not None and words[api_i + 1:api_i + 2] == ["api"] and any(
+                re.search(r"pulls/\d+/merge\b", w) for w in words[api_i + 2:]):
+            return "Merging through `gh api .../pulls/N/merge` skips the gate; use `gh pr merge` via the pr-gate skill."
+
+        push = git_push_args(words)
+        if push is not None:
+            if any(w in ("--all", "--mirror") for w in push):
+                return "git push --all/--mirror would push main; push one branch and open a PR."
+            refs = [w for w in push if not w.startswith("-")][1:]  # first positional is the remote
+            cur = branch if branch is not None else (current_branch() if online else "")
+            if to_main:
+                cur = "main"
+            if not refs:
+                refs = [cur]
+            for r in refs:
+                r = r.lstrip("+")
+                src, _, dst = r.partition(":")
+                dst = dst or src
+                if dst in ("HEAD", "@"):
+                    dst = cur
+                if dst in ("main", "refs/heads/main"):
+                    return "Pushing to main is not allowed: push a branch and open a PR (AGENTS.md, Change workflow)."
     return None
 
 
 def selftest():
-    cases = [
-        ("ls -la", None),
-        ("git push -u origin feat/dropout", None),
-        ("git push --force-with-lease origin feat/dropout", None),
-        ("git push origin main", "block"),
-        ("git push origin HEAD:main", "block"),
-        ("git checkout main && git push -f origin +main", "block"),
-        ("cd x; git push origin main 2>&1 | tail -2", "block"),
-        ("gh pr merge 5 --squash --admin", "block"),
-        ("gh pr merge 5 --squash", "merge-needs-gate"),
-        ("echo hi; gh pr merge --squash", "merge-needs-gate"),
-        ("gh pr view 5 --json state", None),
-        ("git commit -m 'never run gh pr merge --admin or git push origin main'", None),
-        ("echo \"docs: gh pr merge 5\" > notes.md", None),
-        ("python3 - <<'EOF'\nprint('gh pr merge 5 --admin')\nsubprocess.run('git push origin main')\nEOF\nls", None),
-        ("cat > f.md <<EOF\ngit push origin main\nEOF\ngit push origin main", "block"),
+    B = "block"
+    cases = [  # (command, expectation, current branch)
+        ("ls -la", None, "feat/x"),
+        ("git push -u origin feat/dropout", None, "feat/x"),
+        ("git push --force-with-lease origin feat/dropout", None, "feat/x"),
+        ("git push origin HEAD", None, "feat/x"),
+        ("git push", None, "feat/x"),
+        ("git push origin main", B, "feat/x"),
+        ("git push origin HEAD:main", B, "feat/x"),
+        ("git push origin refs/heads/main", B, "feat/x"),
+        ("git checkout main && git push -f origin +main", B, "feat/x"),
+        ("git checkout main && git push", B, "feat/x"),
+        ("cd x; git push origin main 2>&1 | tail -2", B, "feat/x"),
+        ("git push origin HEAD", B, "main"),
+        ("git push -u origin HEAD", B, "main"),
+        ("git push", B, "main"),
+        ("git -C /repo push origin main", B, "feat/x"),
+        ("git -c core.x=1 push origin main", B, "feat/x"),
+        ("git push --all origin", B, "feat/x"),
+        ("gh pr merge 5 --squash --admin", B, "feat/x"),
+        ("echo done;gh pr merge 12 --admin", B, "feat/x"),
+        ("(gh pr merge 5 --admin)", B, "feat/x"),
+        ("gh pr merge 5 --squash", "merge-needs-gate", "feat/x"),
+        ("cd repo&&gh pr merge 12", "merge-needs-gate", "feat/x"),
+        ("out=$(gh pr merge 12 --squash --auto 2>&1)", "merge-needs-gate", "feat/x"),
+        ("~/.local/bin/gh pr merge 12", "merge-needs-gate", "feat/x"),
+        ("gh -R o/r pr merge 5", "merge-needs-gate", "feat/x"),
+        ("gh pr -R o/r merge 5", "merge-needs-gate", "feat/x"),
+        ("gh pr review 7 --approve", B, "feat/x"),
+        ("gh pr review 7 --comment -b ok", None, "feat/x"),
+        ("gh api -X PUT repos/o/r/pulls/5/merge", B, "feat/x"),
+        ("gh pr view 5 --json state", None, "feat/x"),
+        ("git commit -m 'never run gh pr merge --admin or git push origin main'", None, "feat/x"),
+        ("git commit -m \"line one\ngh pr merge 5 --admin\ngit push origin main\"", None, "feat/x"),
+        ("echo \"docs: gh pr merge 5\" > notes.md", None, "feat/x"),
+        ("python3 - <<'EOF'\nprint('gh pr merge 5 --admin')\nsubprocess.run('git push origin main')\nEOF\nls", None, "feat/x"),
+        ("cat > f.md <<EOF\ngit push origin main\nEOF\ngit push origin main", B, "feat/x"),
+        ("grep -n 'push' x # git push origin main", None, "feat/x"),
     ]
     bad = 0
-    for cmd, want in cases:
-        got = decide(cmd, online=False)
-        ok = (got is None) if want is None else (got == want if want == "merge-needs-gate" else got is not None)
-        print(("ok   " if ok else "FAIL ") + repr(cmd)[:70] + " -> " + ("allow" if got is None else got[:50]))
+    for cmd, want, br in cases:
+        got = decide(cmd, online=False, branch=br)
+        ok = (got is None) if want is None else (got == want if want == "merge-needs-gate"
+                                                  else got is not None and got != "merge-needs-gate")
+        print(("ok   " if ok else "FAIL ") + repr(cmd)[:72] + " [" + br + "] -> " + ("allow" if got is None else got[:44]))
         bad += not ok
+    print("%d/%d cases ok (python %s)" % (len(cases) - bad, len(cases), sys.version.split()[0]))
     return 1 if bad else 0
 
 
@@ -132,7 +271,14 @@ def main():
         return 0  # not a hook invocation we understand; don't interfere
     if data.get("tool_name") != "Bash":
         return 0
-    reason = decide((data.get("tool_input") or {}).get("command") or "")
+    cmd = (data.get("tool_input") or {}).get("command") or ""
+    try:
+        reason = decide(cmd)
+    except Exception as e:  # fail closed only for the commands this hook guards
+        if re.search(r"\bgh\b.*\b(merge|review)\b|\bgit\b.*\bpush\b", cmd, re.S):
+            reason = "Merge/push gate could not evaluate this command (%s: %s); blocked to be safe." % (type(e).__name__, e)
+        else:
+            return 0
     if reason:
         sys.stderr.write(reason + "\n")
         return 2
