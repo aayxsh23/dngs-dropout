@@ -16,7 +16,7 @@ from tqdm import tqdm
 from os import makedirs
 from gaussian_renderer import render
 import torchvision
-from utils.general_utils import safe_state
+from utils.general_utils import safe_state, load_checkpoint
 from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args
 from gaussian_renderer import GaussianModel
@@ -131,7 +131,7 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_test : bool, near : int):
     with torch.no_grad():
         gaussians = GaussianModel(dataset.sh_degree)
-        (model_params, _) = torch.load(os.path.join(dataset.model_path, "chkpnt_latest.pth"))
+        (model_params, _) = load_checkpoint(os.path.join(dataset.model_path, "chkpnt_latest.pth"))
         gaussians.restore(model_params)
         gaussians.neural_renderer.keep_sigma=True
 
