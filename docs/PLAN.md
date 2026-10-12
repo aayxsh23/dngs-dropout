@@ -27,7 +27,7 @@ Update this table whenever something changes. It is the single place where statu
 | 1 | Team repo, Disha added as collaborator | Aayush | ✅ Done | `github.com/aayxsh23/dngs-dropout`, **public** (was private briefly on 12 Oct evening; public again so the GitHub ruleset can enforce the merge gate). Tag `upstream-baseline` = `81c3d83` |
 | 2 | Drive folder `sparse3dgs` plus shortcuts | Disha, Aayush | ✅ Done | Both of us can reach `/content/drive/MyDrive/sparse3dgs` |
 | 3 | LLFF + DPT depth archive | Disha | ✅ Done | `sparse3dgs/data/llff_with_depth.tar`, 2.4 GB, md5 `0f6bd7bdae837ec58ad757c7c00b0561`. Per-scene counts match the laptop's data |
-| 4 | Colab notebook, cached extension wheels, `aggregate.py` | Disha | ✅ Merged (#1) | Wheels in `sparse3dgs/wheels/torch-2.11.0+cu130/` |
+| 4 | Colab notebook, cached extension wheels, `aggregate.py` | Disha | ✅ Merged (#1); Colab check at `main` passed 12 Oct night (`load_checkpoint()` works on PyTorch 2.11) | Wheels in `sparse3dgs/wheels/torch-2.11.0+cu130-src-41eefa2f/` (keyed by source hash) |
 | 5 | Colab T4 timing, fern | Disha | ✅ Done | **4.9 min/run** (train 4.4 + render/metrics 0.5). PSNR 20.80, SSIM 0.674, SSIM_sk 0.669, LPIPS 0.257 |
 | 6 | Laptop environment, `setup_env.sh` | Aayush | ✅ Merged (#2) | Python 3.7.13, PyTorch 1.12.1, CUDA 11.3 |
 | 7 | Laptop reproduction, 8 scenes | Aayush | ✅ Done | Mean **18.73 PSNR / 0.594 SSIM / 0.297 LPIPS** vs paper 19.12 / 0.591 / 0.294 (−0.39 dB, inside the 0.5 dB gate). See §10 |
@@ -100,7 +100,7 @@ Each decision has a recommendation; the call confirms or changes it. Record the 
 
 | Day | Aayush | Disha | Gate (checked at the evening call) |
 | --- | --- | --- | --- |
-| **Mon 12** (tonight) | Call; admin questions; swap laptop data to the tar; start W2 | Call; review PR #3 and #2; fix `aggregate.py` bugs 1–2 | Decisions D1–D11 recorded |
+| **Mon 12** (tonight) | Call; admin questions; ✅ laptop data swapped to the tar (md5 verified); start W2 | Call; ✅ read #3 and #2; ✅ `aggregate.py` fixes merged in #1; ✅ Colab check at `main` | Decisions D1–D11 recorded |
 | **Tue 13** | W1 merges → W2–W7 (code) → W8 (runner) → W9 (laptop validation) → **PR by 22:00**; light go-bag if the lab is confirmed | Cell 7a T4 reproduction (8 scenes); plot scripts against the sample `diag.csv`; related work | Laptop smoke matrix passes every V2 check; T4 reproduction within 0.5 dB |
 | **Wed 14** | 09:00–12:30 fix review comments; **13:00 tag `v1.0-exp`**; 13:15 start Colab shard 0/2 seed 0, then seed 1; Method section; **~23:30 laptop night 1: Tier 2, 2- and 3-view** | 09:00–11:00 review the PR plus regression check (V3); 13:15 start Colab shard 1/2 seed 0, then seed 1 | First 10 runs have sensible metrics and diagnostics |
 | **Thu 15** | ~07:30 `touch STOP` on the laptop; Colab seed 2 (shard 0/2); diagnostics analysis D vs E; draft the verdict; Experimental Setup; **~23:30 laptop night 2: Tier 2, 6- and 9-view** | Colab seed 2 (shard 1/2); reruns; seed-0/1 tables; qualitative grid | All 120 Tier 1 runs done (target: Thu ~14:00); Tier 2 2v/3v done |
@@ -342,7 +342,7 @@ steps:
 | --- | --- | --- | --- |
 | V1 dry run | Aayush, Tue evening | `run_matrix.py --matrix experiments/matrix.yaml --dry_run --data_root data/llff --out_root /tmp/x --allow_untagged`, then `--shard 0/2` and `1/2` | 120 runs listed (60 + 60), flags correct for each variant |
 | V2 smoke matrix | Aayush, Tue evening | `bash scripts/gpu_smoke.sh` (all 5 variants, fern, 1100 iterations), about 7 min; post its last line on the PR | All 5 `metrics.json` written; `diag.csv` passes the W4 sharp checks; cleanup policy applied; `config.json` has the right flags |
-| V3 regression | Disha, Wed morning | Colab, PR branch, variant B, fern and horns, full 6000 iterations | Within ±0.5 dB of her T4 7a numbers for the same scenes (nondeterminism is about ±0.3 dB) |
+| V3 regression | Disha, Wed morning | Colab, PR branch, variant B, fern and horns, full 6000 iterations | The **mean of fern and horns** is within ±0.5 dB of the mean of her T4 7a numbers for the same scenes. A single run can miss on noise (same-seed spread 0.46 dB, RUNLOG), so if it fails, **rerun once** before debugging |
 | V4 eval determinism | Aayush, Tue evening | Run `render.py` twice on a variant D smoke model; `md5sum eval/ours_*/renders/*` | Identical files, which proves evaluation never samples a mask |
 | V5 first real runs | Aayush, Wed 17:00 | Read the first 2–3 real `diag.csv` files | Losses finite; Gaussian counts plausible (tens of thousands); `drop_rate_now` reaches 0.2 at iteration 6000 |
 
@@ -435,10 +435,21 @@ These rules are written down **before** any Tier 1 result exists. Change them on
 
 **Comparisons:** B vs A (does depth help?), C vs A (does dropout help?), D vs best(B, C), E vs best(B, C), E vs D (does decoupling help?). Here best(B, C) is whichever has the higher mean PSNR.
 
+**Interaction contrast** (the standard 2×2 test; Disha's suggestion, 12 Oct). Per scene:
+- I_D = (D − C) − (B − A): does depth help *more or less* when dropout is on?
+- I_E = (E − C) − (B − A): the same for the decoupled variant.
+
+Report each with a 95% t-interval over the 8 scenes, plus wins out of 8.
+- I > 0: super-additive.
+- I ≈ 0: additive (the two act independently).
+- I < 0: sub-additive.
+
+The contrast separates "the combination is worse" from "dropout simply hurts on its own". The simple paired differences above can't.
+
 **Verdict** (PSNR is primary; SSIM and LPIPS must not contradict it):
-- **Complementary:** D or E beats best(B, C) with a 95% CI above 0, and SSIM/LPIPS are not significantly worse.
-- **Redundant:** both CIs for D − best(B, C) and E − best(B, C) contain 0.
-- **Interfering:** D − best(B, C) has a CI below 0, or D − B has a CI below 0.
+- **Complementary:** D or E beats best(B, C) with a 95% CI above 0, its interaction contrast is not significantly negative (CI not entirely below 0), and SSIM/LPIPS are not significantly worse.
+- **Redundant:** both CIs for D − best(B, C) and E − best(B, C) contain 0. Sub-additive (I < 0) but not harmful.
+- **Interfering:** I_D has a CI below 0 **and** D − best(B, C) has a CI below 0. Depth helps less under dropout, enough to make the combination worse than the better single regularizer. If dropout merely hurts on its own (C < A) while I_D ≈ 0, that is **not** interference.
 - **Mechanism (the report's key evidence):** in D, the mean of `loss_depth_used − loss_depth_clean` over iterations ≥ 1000 is positive across scenes (CI above 0), and larger than in C. If in addition E − D has a CI above 0, the **interference runs through depth supervision**.
 - If no difference is detectable, that is still a valid result (redundancy). The report then centres on the diagnostics.
 
@@ -455,7 +466,7 @@ These rules are written down **before** any Tier 1 result exists. Change them on
 | F1 | One iteration of D vs E: three passes, where the mask applies, which loss goes where | Aayush | draw.io or TikZ → `results/figures/fig1_iteration.pdf` | §5 W2/W3 | Fri |
 | T1 | Main table: LLFF 3-view, A–E mean ± std over seeds; published baselines below a rule labelled "reported" | Disha | `aggregate.py` → `results/tables/main_3v.tex` | all `metrics.json`, `reported_baselines.csv` | Fri |
 | T2 | Per-scene PSNR (appendix) | Disha | `aggregate.py` → `per_scene_3v.csv` | — | Fri |
-| T3 | Paired comparisons with CIs (§6) | Disha | `experiments/stats.py` → `results/tables/paired.tex` | `runs.csv` | Fri |
+| T3 | Paired comparisons and interaction contrasts I_D, I_E with CIs (§6) | Disha | `experiments/stats.py` → `results/tables/paired.tex` | `runs.csv` | Fri |
 | F2 | Diagnostic curves: `loss_depth_used − loss_depth_clean` vs iteration for C, D, E (mean ± std over scenes); `depth_var_masks` vs iteration for A–E | Disha (script), Aayush (interpretation) | `experiments/plots/diag_curves.py` → `fig_diag.pdf` | all `diag.csv` | Thu night |
 | F3 | Qualitative grid: 3 scenes × [GT, B, C, D, E], RGB row and depth row, seed 0 | Disha | `experiments/plots/qual_grid.py` → `fig_qual.pdf` | `eval/ours_6000/{gt,renders,depth}` | Fri |
 | F4 | Failure cases: 2–3 scenes where combining hurt, RGB + depth (W16) | Aayush picks, Disha renders | `qual_grid.py --scenes …` | per-scene Δ from T3 | Fri |
@@ -512,8 +523,8 @@ Overleaf if the course wants LaTeX; otherwise one shared doc. Never edit the sam
 | Risk | Detect by | Fallback |
 | --- | --- | --- |
 | The dropout PR is not ready by Tue 22:00 | Tue 18:00 progress check | Cut W6 (FPS) and W7 (race fix; only matters for parallel slots) to after the freeze as `v1.1-exp`, since they don't change training. The freeze may slip to Wed 20:00, no later |
-| V3 regression fails (B differs from 7a by more than 0.5 dB) | Wed 11:00 | Diff `train_llff.py` against `upstream-baseline`. The usual suspect is a flag default. Spend at most 2 h, then freeze with the fix |
-| Colab refuses a GPU or hits a usage limit | Any session | Switch to the other account. Then Kaggle Notebooks (same T4 GPU type, weekly quota; change the paths in Cells 2 and 6). If a seed still can't finish on T4s, the laptop or the A100 runs **that whole seed**, and the report says so |
+| V3 regression fails (the fern+horns mean of B differs from 7a by more than 0.5 dB, after one rerun) | Wed 11:00 | Diff `train_llff.py` against `upstream-baseline`. The usual suspect is a flag default. Spend at most 2 h, then freeze with the fix |
+| Colab refuses a GPU or hits a usage limit (Wed is about 3.4 GPU-h per free account) | Any session | Switch to the other account. Then Kaggle Notebooks: same T4 GPU type, weekly quota, change the paths in Cells 2 and 6. **Disha tests one Kaggle smoke run on Tue**, so it's ready before Wednesday. If a seed still can't finish on T4s, the laptop or the A100 runs **that whole seed**, and the report says so |
 | Colab is too slow for 3 seeds | Thu 12:00, if fewer than 80 runs are done | Laptop night 2 runs Tier 1 seed 2 as a whole block (W12.3), and Tier 2 keeps 2- and 3-view only. Last resort: cut to 2 seeds |
 | Tier 2 doesn't finish in two nights | Fri 07:30 | Drop 9-view (Tier 2 is optional), or run the rest on Fri night. Or the A100 takes the remainder, if available |
 | A variant gives NaN or diverges | `run.log`, `diag.csv` | Rerun once. If it repeats on other scenes, it is a finding: report it, don't hide it |
