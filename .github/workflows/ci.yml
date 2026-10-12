@@ -1,0 +1,30 @@
+name: CI
+
+# Deterministic checks for every PR and every push to main. The job name "checks" is the
+# required status in the main-branch ruleset (scripts/setup_repo_rules.sh) and in scripts/pr_ready.py.
+# GPU behaviour cannot be tested here; it is covered by scripts/gpu_smoke.sh evidence on the PR.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install check tools
+        run: pip install "ruff==0.6.9" "vermin==1.6.0" "pandas>=2,<3" "pyyaml>=6"
+      - name: Run scripts/check.sh
+        run: bash scripts/check.sh

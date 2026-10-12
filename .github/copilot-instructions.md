@@ -8,3 +8,4 @@ The full agent guide is [AGENTS.md](../AGENTS.md), and the current plan is [docs
 - `metrics.py` writes `results_eval.json` (keys `PSNR`, `SSIM`, `SSIM_sk`, `LPIPS` under `ours_<iter>`). The per-run output files and their keys are frozen: add keys, never rename them.
 - Don't edit the vendored CUDA sources (`submodules/`, `gridencoder/`, `shencoder/`) unless the task is a build fix.
 - Never commit data, outputs, checkpoints, `.ply` files or tokens.
+- Every merge goes through AGENTS.md "Change workflow": `scripts/check.sh` (CI job `checks`), the GPU smoke test for experiment code, an independent review, then `scripts/pr_ready.py`. Protected paths are in `.github/CODEOWNERS`.

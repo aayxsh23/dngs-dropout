@@ -1,0 +1,38 @@
+# Paths whose changes need a human approval from the OTHER teammate before merge.
+# GitHub enforces this through the main-branch ruleset ("require review from code owners");
+# a PR author's own approval never counts, so listing both owners means "the other person".
+# scripts/pr_ready.py reads this file too: the [experiment] / [gate] section markers below
+# decide which extra evidence it demands. Keep the markers and use only simple patterns
+# (/file, /dir/, /dir/*.ext).
+
+# [experiment] training, rendering, evaluation and experiment configuration.
+# Also needs a GPU smoke test on the PR head (scripts/gpu_smoke.sh) before merge.
+/train_llff.py                @aayxsh23 @DishaSingghh
+/render.py                    @aayxsh23 @DishaSingghh
+/metrics.py                   @aayxsh23 @DishaSingghh
+/spiral.py                    @aayxsh23 @DishaSingghh
+/gaussian_renderer/           @aayxsh23 @DishaSingghh
+/arguments/                   @aayxsh23 @DishaSingghh
+/scene/                       @aayxsh23 @DishaSingghh
+/utils/                       @aayxsh23 @DishaSingghh
+/submodules/                  @aayxsh23 @DishaSingghh
+/gridencoder/                 @aayxsh23 @DishaSingghh
+/shencoder/                   @aayxsh23 @DishaSingghh
+/lpipsPyTorch/                @aayxsh23 @DishaSingghh
+/dpt/                         @aayxsh23 @DishaSingghh
+/experiments/run_matrix.py    @aayxsh23 @DishaSingghh
+/experiments/*.yaml           @aayxsh23 @DishaSingghh
+/scripts/run_llff.sh          @aayxsh23 @DishaSingghh
+
+# [gate] the review/merge machinery and agent instructions. An agent must never be
+# the only reviewer of changes to its own gate.
+/.github/                     @aayxsh23 @DishaSingghh
+/.claude/                     @aayxsh23 @DishaSingghh
+/scripts/check.sh             @aayxsh23 @DishaSingghh
+/scripts/gpu_smoke.sh         @aayxsh23 @DishaSingghh
+/scripts/pr_ready.py          @aayxsh23 @DishaSingghh
+/scripts/hooks/               @aayxsh23 @DishaSingghh
+/scripts/setup_repo_rules.sh  @aayxsh23 @DishaSingghh
+/AGENTS.md                    @aayxsh23 @DishaSingghh
+/CLAUDE.md                    @aayxsh23 @DishaSingghh
+/GEMINI.md                    @aayxsh23 @DishaSingghh
