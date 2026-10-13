@@ -11,6 +11,7 @@ Panel (b): X − B per scene, paired, mean with 95% t-interval, for C, D and E: 
 At each view count only scenes that have all the plotted variants are used, so every point is paired.
 
 Writes <figures>/fig_views.pdf and .png and <tables>/views_summary.csv.
+Needs matplotlib >= 3.3 (Colab, or any Python >= 3.8 environment), not the laptop's Python 3.7 training env.
 """
 import argparse, os, sys
 import pandas as pd
@@ -94,7 +95,7 @@ def main():
     style.end_labels(ax1, items1)
     style.end_labels(ax2, items2)
     handles, labels = ax1.get_legend_handles_labels()
-    fig.legend(handles, labels, loc="outside lower center", ncol=len(handles), frameon=False)
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.0), ncol=len(handles), frameon=False)
     style.save(fig, a.figures, a.name)
 
 

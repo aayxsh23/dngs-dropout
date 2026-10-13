@@ -78,10 +78,12 @@ def sign(r):
 def scene_means(runs, n_views, metrics):
     g = runs[runs["n_views"] == n_views]
     seeds = g.groupby(["scene", "variant"])["seed"].nunique().unstack("variant")
-    uneven = seeds[seeds.nunique(axis=1) > 1]
-    if not uneven.empty:
-        print("WARNING these scenes have different numbers of seeds per variant (means still taken):\n"
-              + uneven.to_string(), file=sys.stderr)
+    for m in metrics:                                   # a run can lack one metric, so count per metric
+        sm = g[g[m].notna()].groupby(["scene", "variant"])["seed"].nunique().unstack("variant")
+        uneven = sm[sm.nunique(axis=1) > 1]
+        if not uneven.empty:
+            print(f"WARNING {m}: these scenes have different numbers of seeds per variant (means still taken):\n"
+                  + uneven.to_string(), file=sys.stderr)
     return g.groupby(["variant", "scene"])[metrics].mean(), seeds
 
 
@@ -117,12 +119,13 @@ def write_tables(res, comps, metrics, n_scenes, base):
     open(base + ".tex", "w", encoding="utf-8").write("\n".join(tex) + "\n")
 
 
-def mechanism(diag_summary, n_views):
+def mechanism(diag_summary, n_views, scenes):
     """PLAN §6 mechanism test on diag_curves.py's per-scene summary. Returns (lines of text, whether it holds)."""
     s = pd.read_csv(diag_summary)
     if "n_views" in s:
         s = s[s["n_views"] == n_views]
     gap = s.pivot_table(index="scene", columns="variant", values="gap_mean", aggfunc="mean")
+    gap = gap[gap.index.isin(scenes)]                   # the same scenes as the PSNR comparisons
     out = []
     if "D" not in gap:
         return ["  no diag.csv summary for D yet"], False
@@ -166,15 +169,17 @@ def verdict(res, best, mech):
                      f"{'not significantly worse' if guards_ok else 'significantly worse'});"
                      f" interfering rule {'MET' if interf[X] else 'not met'}")
 
+    # every rule that is met is reported: "D interferes and E is complementary" is a result in itself
+    labels = []
     if comp["D"] or comp["E"]:
-        v = "COMPLEMENTARY (via " + " and ".join(X for X in "DE" if comp[X]) + ")"
-    elif interf["D"]:
-        v = "INTERFERING (D)" + (" and E" if interf["E"] else "")
-    elif sign(r("D-best")) == "0" and sign(r("E-best")) == "0":
-        v = "REDUNDANT (neither combination differs detectably from best(B, C))"
-    else:
-        v = "NOT COVERED by the §6 rules: describe the pattern above instead of forcing a label"
-    lines += ["", "VERDICT: " + v]
+        labels.append("COMPLEMENTARY (via " + " and ".join(X for X in "DE" if comp[X]) + ")")
+    if interf["D"] or interf["E"]:
+        labels.append("INTERFERING (" + " and ".join(X for X in "DE" if interf[X]) + ")")
+    if not labels and sign(r("D-best")) == "0" and sign(r("E-best")) == "0":
+        labels.append("REDUNDANT (neither combination differs detectably from best(B, C))")
+    if not labels:
+        labels.append("NOT COVERED by the §6 rules: describe the pattern above instead of forcing a label")
+    lines += ["", "VERDICT: " + "; ".join(labels)]
 
     if sign(r("C-A")) == "-" and sign(r("I_D")) == "0":
         lines.append("Note: dropout hurts on its own (C − A CI below 0) while I_D ≈ 0. By §6 that is NOT interference.")
@@ -184,7 +189,9 @@ def verdict(res, best, mech):
         mtext, holds = mech
         lines += ["", "Mechanism (diag.csv):"] + mtext
         if holds and sign(r("E-D")) == "+":
-            lines.append("  → and E − D CI above 0: the interference runs through depth supervision.")
+            lines.append("  → and E − D CI above 0: " + ("the interference runs through depth supervision."
+                         if interf["D"] else "the depth signal is where dropout costs D (no interference "
+                                            "verdict, so this is the mechanism of a smaller effect)."))
     lines += ["", "Power caveat: run-to-run noise is about 0.3–0.5 dB per run; differences much below "
                   "about 0.2 dB are unlikely to be resolvable with 8 scenes."]
     return lines
@@ -236,7 +243,7 @@ def main():
     write_tables(res, comps, metrics, len(complete), base)
     pd.DataFrame(per_scene).round(3).to_csv(os.path.join(a.tables, f"paired_per_scene_{a.n_views}v.csv"))
 
-    mech = mechanism(a.diag_summary, a.n_views) if a.diag_summary else None
+    mech = mechanism(a.diag_summary, a.n_views, complete) if a.diag_summary else None
     lines = verdict(res, best, mech)
     open(os.path.join(a.tables, f"verdict_{a.n_views}v.txt"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
     print(open(base + ".md", encoding="utf-8").read())

@@ -468,7 +468,7 @@ The contrast separates "the combination is worse" from "dropout simply hurts on 
 | F1 | One iteration of D vs E: three passes, where the mask applies, which loss goes where | Aayush | draw.io or TikZ → `results/figures/fig1_iteration.pdf` | §5 W2/W3 | Fri |
 | T1 | Main table: LLFF 3-view, A–E mean ± std over seeds; published baselines below a rule labelled "reported" | Disha | `aggregate.py` → `results/tables/main_3v.tex` | all `metrics.json`, `reported_baselines.csv` | Fri |
 | T2 | Per-scene PSNR (appendix) | Disha | `aggregate.py` → `per_scene_3v.csv` | — | Fri |
-| T3 | Paired comparisons and interaction contrasts I_D, I_E with CIs (§6) | Disha | `experiments/stats.py` → `results/tables/paired.tex` | `runs.csv` | Fri |
+| T3 | Paired comparisons and interaction contrasts I_D, I_E with CIs (§6) | Disha | `experiments/stats.py` → `results/tables/paired_3v.tex` (+ `verdict_3v.txt`) | `runs.csv` | Fri |
 | F2 | Diagnostic curves: `loss_depth_used − loss_depth_clean` vs iteration for C, D, E (mean ± std over scenes); `depth_var_masks` vs iteration for A–E | Disha (script), Aayush (interpretation) | `experiments/plots/diag_curves.py` → `fig_diag.pdf` | all `diag.csv` | Thu night |
 | F3 | Qualitative grid: 3 scenes × [GT, B, C, D, E], RGB row and depth row, seed 0 | Disha | `experiments/plots/qual_grid.py` → `fig_qual.pdf` | `eval/ours_6000/{gt,renders,depth}` | Fri |
 | F4 | Failure cases: 2–3 scenes where combining hurt, RGB + depth (W16) | Aayush picks, Disha renders | `qual_grid.py --scenes …` | per-scene Δ from T3 | Fri |
