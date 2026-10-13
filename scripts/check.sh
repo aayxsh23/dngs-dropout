@@ -128,6 +128,35 @@ step "10. Merge-gate scripts: hook self-test and syntax"
 if python3 scripts/hooks/guard_bash.py --selftest >"$TMP/hook.txt" 2>&1 && python3 -m py_compile scripts/pr_ready.py scripts/review_bundle.py; then pass
 else cat "$TMP/hook.txt"; fail "merge-gate scripts"; fi
 
+step "11. review_bundle.py shows notebook code cells and small CSVs to the reviewer"
+if python3 - "$TMP/rb" >"$TMP/rb.txt" 2>&1 <<'EOF'; then pass; else cat "$TMP/rb.txt"; fail "review_bundle notebook/CSV diffs"; fi
+import json, os, subprocess, sys
+sys.path.insert(0, "scripts")
+from review_bundle import MAX_CSV_LINES, file_diff
+d = sys.argv[1]
+os.makedirs(d)
+def git(*a):
+    return subprocess.run(["git", "-C", d, "-c", "user.name=t", "-c", "user.email=t@t"] + list(a),
+                          check=True, capture_output=True, text=True).stdout.strip()
+def commit(shard, cell, big):
+    nb = {"cells": [{"cell_type": "markdown", "source": ["## 7b"]},
+                    {"cell_type": "code", "source": ["SHARD = '%s'\n" % shard, "run(SHARD)"], "outputs": []}], "nbformat": 4}
+    open(os.path.join(d, "runner.ipynb"), "w").write(json.dumps(nb))
+    open(os.path.join(d, "small.csv"), "w").write("method,psnr\nDNGaussian,%s\n" % cell)
+    open(os.path.join(d, "big.csv"), "w").write("".join("%d,%s\n" % (i, big) for i in range(MAX_CSV_LINES + 1)))
+    git("add", "-A")
+    git("commit", "-q", "-m", shard)
+    return git("rev-parse", "HEAD")
+git("init", "-q")
+a, b = commit("0/2", "19.12", "x"), commit("1/2", "19.21", "y")
+nb = "\n".join(file_diff(d, a, b, "runner.ipynb"))
+assert "-SHARD = '0/2'" in nb and "+SHARD = '1/2'" in nb and "# ---- cell 1" in nb, nb
+assert "outputs" not in nb and "## 7b" not in nb, nb
+assert "+DNGaussian,19.21" in "\n".join(file_diff(d, a, b, "small.csv"))
+assert file_diff(d, a, b, "big.csv") is None
+print("ok")
+EOF
+
 printf '\n== Summary\n'
 [ ${#SKIPPED[@]} -gt 0 ] && echo "Skipped locally: ${SKIPPED[*]}"
 if [ ${#FAILED[@]} -gt 0 ]; then
