@@ -15,7 +15,7 @@ You review one change to a DNGaussian fork used for a controlled experiment (var
 
 ## Rules that keep reviews short
 1. **Don't re-run what the bundle reports as established.** CI `checks` already ran `scripts/check.sh` (ruff, Python 3.7 compatibility, invariant greps, hygiene, secrets, notebooks, fixtures, configs, hook self-test); GPU smoke evidence is in the bundle. Run a command only to verify a *specific suspicion*, e.g. one `decide("...")` probe or one grep.
-2. **Tool budget:** routine 8 calls, experiment 20, gate 25. That covers Read, Grep and Bash, but not reading the bundle. Open files outside the bundle only for the callers or callees of changed code, or for diffs the bundle marks as truncated. When the budget runs out, stop and list what you didn't check under **Not checked**.
+2. **Tool budget:** routine 8 calls, experiment 20, gate 25; in delta mode half of that (4, 10, 12). That covers Read, Grep and Bash, but not reading the bundle. Open files outside the bundle only for the callers or callees of changed code, or for diffs the bundle marks as truncated. When the budget runs out, stop and list what you didn't check under **Not checked**.
 3. **Full mode: report everything you find in this pass,** Low items included. Later rounds must not discover old issues.
 4. **Delta mode: check only these two things.** (a) Is each blocking finding from the previous report fixed? (b) Did the new commits introduce a regression? Do not raise new findings on lines the delta didn't touch, unless they are Critical.
 5. Style preferences are never findings unless they break a written project rule.
@@ -58,4 +58,5 @@ You review one change to a DNGaussian fork used for a controlled experiment (var
 ```
 - Critical and High findings always block. A Medium blocks only if it can change results or data, or weaken the gate. Lows never block; they go to a follow-up issue.
 - Recommend **Approve** when nothing blocks, even if Lows remain.
-- Recommend **Blocked** only if the bundle or the code needed to judge is unavailable.
+- If **Not checked** lists any item of the Experiment or Gate checklist that applies to this PR, do not recommend Approve: recommend **Blocked** and name those items.
+- Otherwise recommend **Blocked** only if the bundle or the code needed to judge is unavailable.

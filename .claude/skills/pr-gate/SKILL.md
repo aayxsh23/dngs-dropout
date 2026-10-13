@@ -37,11 +37,11 @@ Do not do the review in your own context: the point is independence from the imp
 
    | Class | Reviewer | Model | Tool budget |
    | --- | --- | --- | --- |
-   | routine, docs/results only | none: CI + `check.sh` suffice. Note "docs-only, no code review needed" in the report | — | — |
+   | docs-only (the bundle prints it: every file is under `docs/` or ends in `.md`, none in CODEOWNERS) | none: CI + `check.sh` suffice. Note "docs-only, no code review needed" in the report | — | — |
    | routine with code | pr-reviewer | sonnet (default) | 8 |
    | experiment | pr-reviewer | **opus** (`model: "opus"` on the Agent call) | 20 |
    | gate | pr-reviewer | **opus** | 25 |
-   | any delta re-review | pr-reviewer, `delta` mode | sonnet | half of the above |
+   | any delta re-review | pr-reviewer, `delta` mode | sonnet | half: routine 4, experiment 10, gate 12 |
 
 4. **Invoke with this short prompt and nothing more.** The bundle and the agent file carry everything else; don't paste the diff, the rules or a list of things to hunt for.
    > Review PR #`<N>` in **`<full|delta>`** mode. Bundle: `<path>`. Class: `<class>`. Follow `.claude/agents/pr-reviewer.md`, and return only its report.
@@ -66,6 +66,7 @@ Post the reviewer's report as a PR comment, verbatim, plus a "Validation" line w
    gh api -X POST repos/$R/statuses/$SHA -f state=success -f context=agent-review \
      -f description="pr-gate: Approve, 0 blocking findings" -f target_url=<report comment URL>
    ```
+   For a **docs-only** PR (no reviewer), use `description="pr-gate: docs-only, no code review needed"` instead. Only the class the bundle printed qualifies; a missing or failed reviewer is never docs-only.
    Any later push changes the head SHA, which removes this approval automatically. The review must then be redone.
 2. Wait for CI to finish (`gh pr checks <N> -R $R --watch`), then check eligibility: `python3 scripts/pr_ready.py <N>`. If it says BLOCKED, report the listed blockers and stop. Typical blockers:
    - a human approval is still needed (experiment and gate classes),

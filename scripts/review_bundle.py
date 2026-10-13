@@ -9,7 +9,10 @@ Contents: PR metadata and risk class (from CODEOWNERS), the goal (PR body), CI /
 GPU-smoke evidence on the head, the previous pr-gate report (re-reviews), the changed-file list,
 and the diff, capped per file and in total so the bundle stays small. Truncated files are listed;
 the reviewer opens them with Read only if needed. Notebooks appear as a diff of their code-cell
-sources; CSVs appear when they have at most MAX_CSV_LINES lines. Python 3.7 compatible.
+sources; CSVs appear when they have at most MAX_CSV_LINES lines.
+
+Fails closed (non-zero exit, no bundle): CODEOWNERS unreadable, changed files not all listed, or a
+--since re-review with no pr-gate report for that SHA from a code owner. Python 3.7 compatible.
 """
 import argparse
 import difflib
@@ -20,10 +23,12 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pr_ready import CI_CHECK, REVIEW_STATUS, SMOKE_MARK, classify, codeowners_rules, gh_json, origin_repo, run  # noqa: E402
+from pr_ready import (CI_CHECK, PENDING, RANK, REVIEW_STATUS, SMOKE_MARK, classify, codeowners_rules,  # noqa: E402
+                      gh_json, origin_repo, run)
 
-# Files whose diff is noise for review (generated, vendored, binary): listed, not shown.
-SKIP_DIFF = re.compile(r"(^submodules/|\.lock$|lock\.yml$|^pip_freeze|\.svg$|\.png$)")
+# Files whose diff is noise for review (lockfiles, binaries): listed, not shown. Vendored CUDA/C++ under
+# submodules/ is shown (capped like any file): it is experiment-class code.
+SKIP_DIFF = re.compile(r"(\.lock$|lock\.yml$|^pip_freeze|\.svg$|\.png$)")
 # Notebooks are shown as a diff of their code-cell sources (outputs are cleared, check.sh step 7).
 # CSVs are shown when small (hand-edited tables such as reported_baselines.csv), skipped when large.
 MAX_CSV_LINES = 200
@@ -65,6 +70,53 @@ def file_diff(root, a, b, path):
     return run(["git", "diff", "-U3", a, b, "--", path], root).splitlines()
 
 
+DOCS_ONLY = re.compile(r"(^docs/|\.md$)")
+
+
+class BundleError(Exception):
+    pass
+
+
+def risk_class(files, rule_sets):
+    """CODEOWNERS class, or "docs-only" (every file under docs/ or *.md, none protected: no reviewer needed).
+    No readable CODEOWNERS means the class can't be known: fail closed."""
+    if not rule_sets:
+        raise BundleError("no readable .github/CODEOWNERS on the base or the head: can't classify")
+    hit = classify(files, rule_sets)
+    if hit:
+        return "+".join(sorted(hit))
+    if files and all(DOCS_ONLY.search(f) for f in files):
+        return "docs-only"
+    return "routine"
+
+
+def worst_ci(rollup):
+    """State of the CI check; with several runs the worst one decides (as in pr_ready.py)."""
+    ci = None
+    for c in rollup or []:
+        if c.get("__typename") == "CheckRun" and c.get("name") == CI_CHECK:
+            state = (c.get("conclusion") or c.get("status") or "?").upper()
+            if ci is None or RANK.get(state, 2 if state not in PENDING else 1) > RANK.get(ci, 2 if ci not in PENDING else 1):
+                ci = state
+    return ci or "missing"
+
+
+def smoke_line(bodies, head):
+    return next((ln.strip() for b in bodies for ln in b.splitlines() if (SMOKE_MARK + " " + head) in ln), "none for head")
+
+
+def previous_report(comments, since, allowed):
+    """The last pr-gate report for exactly the `since` commit, posted by a code owner or the repo owner."""
+    found = None
+    for c in comments or []:
+        body = (c.get("body") or "").lstrip()
+        login = ((c.get("author") or {}).get("login") or "").lower()
+        first = body.splitlines()[0] if body else ""
+        if login in allowed and first.startswith("### pr-gate review") and ("@ %s" % since[:7]) in first:
+            found = body
+    return found
+
+
 def section(title, body):
     return "## %s\n%s\n" % (title, body.rstrip() + "\n")
 
@@ -77,25 +129,39 @@ def main():
     ap.add_argument("--max-lines", type=int, default=1200, help="total diff lines in the bundle")
     ap.add_argument("--max-file-lines", type=int, default=250, help="diff lines per file")
     a = ap.parse_args()
+    try:
+        return build(a)
+    except BundleError as e:
+        print("review_bundle: %s. No bundle written; fix this before any review." % e, file=sys.stderr)
+        return 2
+
+
+def build(a):
     root = run(["git", "rev-parse", "--show-toplevel"], os.getcwd()).strip()
     repo = origin_repo(root)
     d = gh_json(["pr", "view", a.pr, "--repo", repo, "--json",
                  "number,title,body,author,baseRefName,headRefOid,files,statusCheckRollup,comments,changedFiles"], root)
     head, base = d["headRefOid"], d["baseRefName"]
-    rules, _ = codeowners_rules(root, base, head)
+    rules, owners = codeowners_rules(root, base, head)
     files = [f["path"] for f in d["files"]]
-    hit = classify(files, rules)
-    cls = "+".join(sorted(hit)) if hit else "routine"
+    if len(files) < d["changedFiles"]:  # gh lists at most 100 files; get them all (as pr_ready.py does)
+        files = run(["gh", "api", "--paginate", "repos/%s/pulls/%s/files" % (repo, d["number"]),
+                     "--jq", ".[].filename"], root, timeout=40).splitlines()
+        if len(files) < d["changedFiles"]:
+            raise BundleError("could list only %d of %d changed files" % (len(files), d["changedFiles"]))
+    cls = risk_class(files, rules)
 
-    ci, status = "missing", "missing"
+    status = "missing"
     for c in d["statusCheckRollup"] or []:
-        if c.get("__typename") == "CheckRun" and c.get("name") == CI_CHECK:
-            ci = (c.get("conclusion") or c.get("status") or "?").upper()
-        elif c.get("__typename") == "StatusContext" and c.get("context") == REVIEW_STATUS:
+        if c.get("__typename") == "StatusContext" and c.get("context") == REVIEW_STATUS:
             status = (c.get("state") or "?").upper()
     bodies = [c.get("body") or "" for c in d["comments"] or []]
-    smoke = next((b.strip().splitlines()[-1] for b in bodies if (SMOKE_MARK + " " + head) in b), "none for head")
-    prev = [b for b in bodies if b.lstrip().startswith("### pr-gate review")]
+    prev = None
+    if a.since:
+        prev = previous_report(d["comments"], a.since, owners | {repo.split("/")[0].lower()})
+        if prev is None:
+            raise BundleError("--since %s: no '### pr-gate review ... @ %s' comment from a code owner on this PR"
+                              % (a.since[:7], a.since[:7]))
 
     mode = "DELTA re-review since %s" % a.since[:7] if a.since else "FULL review"
     out = ["# Review bundle: %s PR #%d @ %s (%s)\n" % (repo, d["number"], head[:7], mode)]
@@ -107,14 +173,15 @@ def main():
     ])))
     out.append(section("Evidence already established (do not re-run)", "\n".join([
         "- CI `%s` on head: %s (runs scripts/check.sh: ruff, vermin py3.7, invariant greps, hygiene, secrets,"
-        " notebooks, aggregate fixtures, configs, hook self-test)" % (CI_CHECK, ci),
+        " notebooks, aggregate fixtures, configs, hook self-test, review_bundle self-test)" % (CI_CHECK, worst_ci(d["statusCheckRollup"])),
         "- `%s` status on head: %s" % (REVIEW_STATUS, status),
-        "- GPU smoke: %s" % smoke,
+        "- GPU smoke: %s" % smoke_line(bodies, head),
     ])))
-    goal = (d["body"] or "").strip()
-    out.append(section("Goal / acceptance criteria (PR body, truncated)", "\n".join(goal.splitlines()[:40]) or "(empty: ask the author)"))
-    if a.since and prev:
-        out.append(section("Previous pr-gate report (verify its blocking findings)", "\n".join(prev[-1].splitlines()[:60])))
+    goal = (d["body"] or "").strip().splitlines()
+    quoted = ["> " + ln for ln in goal[:40]] + (["> (%d more lines not shown)" % (len(goal) - 40)] if len(goal) > 40 else [])
+    out.append(section("Goal / acceptance criteria (PR body, quoted)", "\n".join(quoted) or "(empty: ask the author)"))
+    if prev:
+        out.append(section("Previous pr-gate report (verify its blocking findings)", "\n".join(prev.splitlines()[:60])))
 
     if a.since:
         subprocess.run(["git", "fetch", "-q", "origin", head], cwd=root, capture_output=True, timeout=60)
@@ -149,7 +216,7 @@ def main():
     out.append(section("Diff", "\n\n".join(shown) or "(no reviewable diff)"))
     if truncated or skipped:
         out.append(section("Not fully shown (Read these only if your checklist needs them)",
-                           "\n".join(["- " + t for t in truncated] + ["- %s (generated/vendored/binary or a CSV over %d lines: skipped)" % (s, MAX_CSV_LINES) for s in skipped])))
+                           "\n".join(["- " + t for t in truncated] + ["- %s (lockfile/binary or a CSV over %d lines: skipped)" % (s, MAX_CSV_LINES) for s in skipped])))
     text = "\n".join(out)
     if a.out:
         open(a.out, "w", encoding="utf-8").write(text)
