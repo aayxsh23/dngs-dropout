@@ -7,3 +7,4 @@ One line per event: what ran where, problems, reruns, decisions. Newest at the b
 - 12 Oct · Colab-Disha · `llff_with_depth.tar` uploaded, md5 0f6bd7bdae837ec58ad757c7c00b0561. This is the canonical depth for all machines
 - 12 Oct · Colab-Disha · Smoke/timing fern on T4: 4.9 min/run; PSNR 20.80, SSIM 0.674, SSIM_sk 0.669, LPIPS 0.257
 - 12 Oct · laptop/Aayush · Same-seed nondeterminism check (fern, 1100 it): PSNR 17.75 vs 17.29
+- 13 Oct · Aayush · Decisions D1–D11 (PLAN §3) recorded. All recommendations accepted except D1: keep DropGaussian's official schedule verbatim, r = 0.2 · t / 10000, not rescaled to our 6000 iterations, so the rate peaks at 0.12 (Disha to confirm). D10 settled: repo stays public
