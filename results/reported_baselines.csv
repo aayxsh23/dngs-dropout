@@ -1,8 +1,8 @@
 method,psnr,ssim,lpips,psnr_6v,psnr_9v,source,verified_against_own_paper
-DropGaussian,20.76,0.713,0.200,24.74,26.21,"DropGaussian CVPR 2025 comparison table (slides)",no
-CoR-GS,20.45,0.712,0.196,24.49,26.06,"DropGaussian CVPR 2025 comparison table (slides)",no
-FSGS,20.43,0.682,0.248,24.09,25.31,"DropGaussian CVPR 2025 comparison table (slides)",no
-SparseNeRF,19.86,0.624,0.328,,,"DropGaussian CVPR 2025 comparison table (slides)",no
-FreeNeRF,19.63,0.612,0.308,23.73,25.13,"DropGaussian CVPR 2025 comparison table (slides)",no
-3DGS,19.22,0.649,0.229,23.80,25.44,"DropGaussian CVPR 2025 comparison table (slides)",no
-DNGaussian,19.12,0.591,0.294,22.18,23.17,"DropGaussian CVPR 2025 comparison table (slides)",no
+DropGaussian,20.76,0.713,0.200,24.74,26.21,"DropGaussian CVPR 2025 Tab. 1 (arXiv 2504.00773)",yes
+CoR-GS,20.45,0.712,0.196,24.49,26.06,"CoR-GS ECCV 2024 Tab. 1 (arXiv 2405.12110)",yes
+FSGS,20.31,0.652,0.288,24.55,25.89,"FSGS ECCV 2024 Tab. 1 (3v); arXiv v2 Tab. 6 (6v/9v; ECCV has no 6/9-view table). DropGaussian/CoR-GS Tab. 1 use superseded v1 values 20.43/0.682/0.248",yes
+SparseNeRF,19.86,0.624,0.328,,,"SparseNeRF ICCV 2023 Tab. 1 (arXiv 2303.16196); 3-view only",yes
+FreeNeRF,19.63,0.612,0.308,23.73,25.13,"FreeNeRF CVPR 2023 Tab. 3 (arXiv 2303.07418)",yes
+3DGS,19.22,0.649,0.229,23.80,25.44,"CoR-GS ECCV 2024 Tab. 1 (CoR-GS's own re-run of vanilla 3DGS; no 3DGS few-shot paper). DNGaussian Tab. 1 re-run gives 15.52",no
+DNGaussian,19.12,0.591,0.294,22.18,23.17,"DNGaussian CVPR 2024 Tab. 1 (3v) + supp. Tab. 11 (6v/9v) (arXiv 2403.06912); SSIM is scikit-image, LPIPS VGG",yes
