@@ -127,6 +127,10 @@ def mechanism(diag_summary, n_views, scenes):
     gap = s.pivot_table(index="scene", columns="variant", values="gap_mean", aggfunc="mean")
     gap = gap[gap.index.isin(scenes)]                   # the same scenes as the PSNR comparisons
     out = []
+    if "checks_ok" in s and not s["checks_ok"].astype(bool).all():
+        bad = s[~s["checks_ok"].astype(bool)]
+        return ["  diag.csv sharp checks FAILED for " + ", ".join(bad["variant"] + "/" + bad["scene"])
+                + ": fix those runs; no mechanism conclusion until then"], False
     if "D" not in gap:
         return ["  no diag.csv summary for D yet"], False
     d = paired(gap["D"])
@@ -135,7 +139,7 @@ def mechanism(diag_summary, n_views, scenes):
     dc = None
     if "C" in gap:
         dc = paired(gap["D"] - gap["C"])
-        out.append(f"  gap(D) − gap(C), paired by scene: {fmt_ci(dc, 4)}, CI sign {sign(dc)}")
+        out.append(f"  gap(D) − gap(C), paired by scene: {fmt_ci(dc, 4)}, CI sign {sign(dc)}, n = {dc['n']}")
     holds = sign(d) == "+" and dc is not None and sign(dc) == "+"
     out.append("  → dropout perturbs the depth signal in D, more than in C: " + ("YES" if holds else "not shown"))
     return out, holds
@@ -173,8 +177,10 @@ def verdict(res, best, mech):
     labels = []
     if comp["D"] or comp["E"]:
         labels.append("COMPLEMENTARY (via " + " and ".join(X for X in "DE" if comp[X]) + ")")
-    if interf["D"] or interf["E"]:
-        labels.append("INTERFERING (" + " and ".join(X for X in "DE" if interf[X]) + ")")
+    if interf["D"]:
+        labels.append("INTERFERING (D)")
+    if interf["E"]:                                     # §6 defines interference for D; E is the same rule by analogy
+        labels.append("INTERFERING (E, by analogy with the §6 rule for D)")
     if not labels and sign(r("D-best")) == "0" and sign(r("E-best")) == "0":
         labels.append("REDUNDANT (neither combination differs detectably from best(B, C))")
     if not labels:
