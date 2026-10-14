@@ -41,9 +41,9 @@ Update this table whenever something changes. It is the single place where statu
 | 15 | Go-bag disk | Aayush | ⏸ Reduced to a light version (R3) | W13 |
 | 16 | Formats and decisions agreed | Both | ✅ Decided 13 Oct | §3, RUNLOG. D1 changed: official schedule `0.2 · t / 10000` verbatim (peaks at 0.12). D10: repo stays public |
 | 17 | T4 reproduction, 8 scenes (Cell 7a) | Disha | ✅ Done 13 Oct | Mean **18.93 PSNR / 0.595 SSIM / 0.294 LPIPS** vs paper 19.12 / 0.591 / 0.294 (−0.19 dB). Per scene: fern 21.08, flower 19.22, fortress 20.44, horns 18.61, leaves 16.64, orchids 14.90, room 20.35, trex 20.16. V3 baseline (mean of fern and horns) = **19.85** |
-| 18 | Related work, verified baseline numbers | Disha | 🔄 Started | `results/reported_baselines.csv` (not yet verified) |
-| 19 | Review/merge gate: CI `checks`, `scripts/check.sh`, GPU smoke, `pr-reviewer` agent, `pr-gate` skill, Bash hook, CODEOWNERS, ruleset script | Aayush | 🔄 PR #5 (gate class: needs Disha's approval) | AGENTS.md "Change workflow". After merge: `bash scripts/setup_repo_rules.sh --apply` turns on the server-side ruleset (the repo is public) |
-| 20 | Analysis scripts: `experiments/stats.py` (T3, §6 verdict), `plots/diag_curves.py` (F2), `plots/qual_grid.py` (F3/F4), `plots/views.py` (F5) | Disha | 🔄 PR, tested on fixtures | Re-check on Aayush's sample `diag.csv` (Tue 15:00) |
+| 18 | Related work, verified baseline numbers | Disha | 🔄 Numbers verified 14 Oct (#10); section due Thu | `results/reported_baselines.csv`: every row checked against its own paper. FSGS now uses its own ECCV numbers (20.31 / 0.652 / 0.288); DropGaussian and CoR-GS copy FSGS's superseded arXiv v1 values (20.43 / 0.682 / 0.248). The 3DGS row is CoR-GS's re-run (flag `no`) |
+| 19 | Review/merge gate: CI `checks`, `scripts/check.sh`, GPU smoke, `pr-reviewer` agent, `pr-gate` skill, Bash hook, CODEOWNERS, ruleset script | Aayush | ✅ Merged (#5 12 Oct; cheaper delta reviews #6 14 Oct) | AGENTS.md "Change workflow". The server-side ruleset "main: review and CI gate" is active |
+| 20 | Analysis scripts: `experiments/stats.py` (T3, §6 verdict), `plots/diag_curves.py` (F2), `plots/qual_grid.py` (F3/F4), `plots/views.py` (F5) | Disha | ✅ Merged 14 Oct (#9), tested on fixtures | Re-check on the first real `diag.csv` from the dropout PR |
 
 Pull requests:
 
@@ -52,9 +52,15 @@ Pull requests:
 | #3 | `float.h`, C++17, version-safe `load_checkpoint()` | ✅ Merged Mon night, before Disha's review: **Disha to read it post-merge** |
 | #2 | `setup_env.sh`, `pip_freeze_laptop.txt` | ✅ Merged Mon night, before Disha's review: Disha to skim post-merge |
 | #1 | Colab notebook, `aggregate.py`, results starters | ✅ Reviewed by Aayush, fixes in `222b818`, approved and merged |
-| #4 | This plan, the revised playbook, AGENTS/CLAUDE/GEMINI/Copilot guides | ⏳ Open: Disha reviews (§2, §3, §4.2, §6), then squash-merge |
+| #4 | This plan, the revised playbook, AGENTS/CLAUDE/GEMINI/Copilot guides | ✅ Merged Mon night |
+| #5, #6 | Review and merge gate; cheaper delta reviews | ✅ Merged 12 Oct and 14 Oct |
+| #7 | PLAN follow-ups: interaction contrast, looser V3 gate, Kaggle fallback | ✅ Merged 13 Oct |
+| #8 | Colab Cell 3: leave the old clone before deleting it | ✅ Merged 14 Oct |
+| #9 | Analysis scripts: `stats.py`, `diag_curves.py`, `qual_grid.py`, `views.py` | ✅ Merged 14 Oct |
+| #10 | `reported_baselines.csv` verified against each paper | ✅ Merged 14 Oct |
+| #11 | Colab Cell V3 (regression check) and Cell 7b (`SEEDS`, `--work_root`, `STOP`) | ⏳ Agent review Approve on 0e7e11d; Aayush sets `agent-review` and merges |
 
-Next PR: `feat/dropout` → `main` (Tue 22:00).
+Next PR: `feat/dropout` → `main` (was due Tue 22:00; not opened as of Wed 12:30).
 
 ---
 
@@ -466,7 +472,7 @@ The contrast separates "the combination is worse" from "dropout simply hurts on 
 | # | Item | Owner | Script → output | Inputs | Ready by |
 | --- | --- | --- | --- | --- | --- |
 | F1 | One iteration of D vs E: three passes, where the mask applies, which loss goes where | Aayush | draw.io or TikZ → `results/figures/fig1_iteration.pdf` | §5 W2/W3 | Fri |
-| T1 | Main table: LLFF 3-view, A–E mean ± std over seeds; published baselines below a rule labelled "reported" | Disha | `aggregate.py` → `results/tables/main_3v.tex` | all `metrics.json`, `reported_baselines.csv` | Fri |
+| T1 | Main table: LLFF 3-view, A–E mean ± std over seeds; published baselines below a rule labelled "reported". Footnote: reported rows come from each method's own paper, except 3DGS (CoR-GS's re-run); FSGS is its ECCV version, not the arXiv v1 numbers other tables copy; DNGaussian's SSIM (0.591) is scikit-image, i.e. our `SSIM_sk` | Disha | `aggregate.py` → `results/tables/main_3v.tex` | all `metrics.json`, `reported_baselines.csv` | Fri |
 | T2 | Per-scene PSNR (appendix) | Disha | `aggregate.py` → `per_scene_3v.csv` | — | Fri |
 | T3 | Paired comparisons and interaction contrasts I_D, I_E with CIs (§6) | Disha | `experiments/stats.py` → `results/tables/paired_3v.tex` (+ `verdict_3v.txt`) | `runs.csv` | Fri |
 | F2 | Diagnostic curves: `loss_depth_used − loss_depth_clean` vs iteration for C, D, E (mean ± std over scenes); `depth_var_masks` vs iteration for A–E | Disha (script), Aayush (interpretation) | `experiments/plots/diag_curves.py` → `fig_diag.pdf` | all `diag.csv` | Thu night |
@@ -577,14 +583,16 @@ Each Colab account runs 60 Tier 1 runs: about **5 GPU-hours** (about 3.4 h Wed, 
 
 **Timing and memory:** laptop 7.5 min per full run, training footprint 1663 MB; T4 4.9 min per run.
 
-**Published LLFF 3-view numbers** (from DropGaussian's CVPR 2025 table; to be verified against each paper; see `results/reported_baselines.csv`):
+**Published LLFF 3-view numbers**, each checked against its own paper on 14 Oct (#10; evidence and sources in `results/reported_baselines.csv`):
 
 | Method | PSNR | SSIM | LPIPS |
 | --- | --- | --- | --- |
 | DropGaussian | 20.76 | 0.713 | 0.200 |
 | CoR-GS | 20.45 | 0.712 | 0.196 |
-| FSGS | 20.43 | 0.682 | 0.248 |
+| FSGS | 20.31 | 0.652 | 0.288 |
 | SparseNeRF | 19.86 | 0.624 | 0.328 |
 | FreeNeRF | 19.63 | 0.612 | 0.308 |
 | 3DGS | 19.22 | 0.649 | 0.229 |
 | DNGaussian | 19.12 | 0.591 | 0.294 |
+
+FSGS: ECCV 2024 Tab. 1. DropGaussian's and CoR-GS's tables carry FSGS's superseded arXiv v1 values, 20.43 / 0.682 / 0.248. 3DGS: CoR-GS's re-run, since vanilla 3DGS has no few-shot paper.
