@@ -1,6 +1,8 @@
 # Execution plan: depth × dropout in sparse-view 3DGS (12–20 Oct 2026)
 
-**Last updated:** Tue 13 Oct 2026 (IST) · **Maintainer:** Aayush (changes go through PRs, like code) · **Deadline:** Tue 20 Oct 2026
+**Last updated:** Wed 14 Oct 2026 (IST) · **Maintainer:** Aayush (changes go through PRs, like code) · **Deadline:** ~~Tue 20 Oct 2026~~ **Sun 15 Nov 2026** (moved 14 Oct; team target: submit Tue 10 – Wed 11 Nov)
+
+> **Deadline moved.** §4 (schedule) and §8 (risks) still describe the 20 Oct plan. They will be replaced by a redrafted plan, written after the research-scope analysis is agreed. Status (§1), decisions (§3), specs (§5) and the analysis rules (§6) remain current.
 
 This plan replaces the day-by-day sections of the playbook ([research_proposal_sparse_view_3dgs_2.md](research_proposal_sparse_view_3dgs_2.md)) wherever the two differ. The playbook stays the reference for background, the GitHub workflow and the A100 runbook. All times are IST.
 
@@ -39,11 +41,12 @@ Update this table whenever something changes. It is the single place where statu
 | 13 | `run_matrix.py`, `matrix.yaml`, `matrix_tier2.yaml` | Aayush | ⏳ Tue | W8 |
 | 14 | Questions to the lab admin | Aayush | ⏳ Not sent | §5 W13 |
 | 15 | Go-bag disk | Aayush | ⏸ Reduced to a light version (R3) | W13 |
-| 16 | Formats and decisions agreed | Both | ✅ Decided 13 Oct | §3, RUNLOG. D1 changed: official schedule `0.2 · t / 10000` verbatim (peaks at 0.12). D10: repo stays public |
+| 16 | Formats and decisions agreed | Both | ✅ Decided 13 Oct | §3, RUNLOG. D1 changed: official schedule `0.2 · t / 10000` verbatim (peaks at 0.12), confirmed by Disha 14 Oct. D10: repo stays public. D11 changed 14 Oct (γ = 1/3, plus C) |
 | 17 | T4 reproduction, 8 scenes (Cell 7a) | Disha | ✅ Done 13 Oct | Mean **18.93 PSNR / 0.595 SSIM / 0.294 LPIPS** vs paper 19.12 / 0.591 / 0.294 (−0.19 dB). Per scene: fern 21.08, flower 19.22, fortress 20.44, horns 18.61, leaves 16.64, orchids 14.90, room 20.35, trex 20.16. V3 baseline (mean of fern and horns) = **19.85** |
-| 18 | Related work, verified baseline numbers | Disha | 🔄 Numbers verified 14 Oct (#10); section due Thu | `results/reported_baselines.csv`: every row checked against its own paper. FSGS now uses its own ECCV numbers (20.31 / 0.652 / 0.288); DropGaussian and CoR-GS copy FSGS's superseded arXiv v1 values (20.43 / 0.682 / 0.248). The 3DGS row is CoR-GS's re-run (flag `no`) |
-| 19 | Review/merge gate: CI `checks`, `scripts/check.sh`, GPU smoke, `pr-reviewer` agent, `pr-gate` skill, Bash hook, CODEOWNERS, ruleset script | Aayush | ✅ Merged (#5 12 Oct; cheaper delta reviews #6 14 Oct) | AGENTS.md "Change workflow". The server-side ruleset "main: review and CI gate" is active |
-| 20 | Analysis scripts: `experiments/stats.py` (T3, §6 verdict), `plots/diag_curves.py` (F2), `plots/qual_grid.py` (F3/F4), `plots/views.py` (F5) | Disha | ✅ Merged 14 Oct (#9), tested on fixtures | Re-check on the first real `diag.csv` from the dropout PR |
+| 18 | Related work, verified baseline numbers | Disha | ✅ Merged (#10) 14 Oct | `results/reported_baselines.csv`: every row checked against the method's own paper. FSGS now uses its ECCV numbers 20.31 / 0.652 / 0.288 (DropGaussian and CoR-GS copied the superseded arXiv v1 values). The 3DGS row is CoR-GS's re-run; DNGaussian's own re-run gives 15.52. Related-work text still to write |
+| 19 | Review/merge gate: CI `checks`, `scripts/check.sh`, GPU smoke, `pr-reviewer` agent, `pr-gate` skill, Bash hook, CODEOWNERS, ruleset script | Aayush | ✅ Merged (#5, #6); ruleset active since 13 Oct | AGENTS.md "Change workflow". GitHub now requires `checks`, `agent-review` and code-owner review on `main`; squash-only merges |
+| 20 | Analysis scripts: `experiments/stats.py` (T3, §6 verdict), `plots/diag_curves.py` (F2), `plots/qual_grid.py` (F3/F4), `plots/views.py` (F5) | Disha | ✅ Merged (#9) 14 Oct | CI coverage in #12 (`check.sh` step 12, gate class). Re-check on a real sample `diag.csv` once W4 lands |
+| 21 | Deadline moved to Sun 15 Nov; target submission Tue 10 – Wed 11 Nov | Both | 🔄 Redrafting | First a research-scope analysis (improvements within the core question), then the redrafted plan |
 
 Pull requests:
 
@@ -52,15 +55,17 @@ Pull requests:
 | #3 | `float.h`, C++17, version-safe `load_checkpoint()` | ✅ Merged Mon night, before Disha's review: **Disha to read it post-merge** |
 | #2 | `setup_env.sh`, `pip_freeze_laptop.txt` | ✅ Merged Mon night, before Disha's review: Disha to skim post-merge |
 | #1 | Colab notebook, `aggregate.py`, results starters | ✅ Reviewed by Aayush, fixes in `222b818`, approved and merged |
-| #4 | This plan, the revised playbook, AGENTS/CLAUDE/GEMINI/Copilot guides | ✅ Merged Mon night |
-| #5, #6 | Review and merge gate; cheaper delta reviews | ✅ Merged 12 Oct and 14 Oct |
-| #7 | PLAN follow-ups: interaction contrast, looser V3 gate, Kaggle fallback | ✅ Merged 13 Oct |
+| #4 | This plan, the revised playbook, AGENTS/CLAUDE/GEMINI/Copilot guides | ✅ Merged 12 Oct |
+| #5 | Review/merge gate (CI, hook, `pr_ready.py`, reviewer agent, ruleset script) | ✅ Merged 12 Oct |
+| #6 | Cheaper reviews: review bundle, budgets, delta re-reviews; notebooks and small CSVs reviewed | ✅ Merged 14 Oct |
+| #7 | PLAN: interaction contrast, V3 rule, Kaggle test; decisions D1–D11 | ✅ Merged 13 Oct |
 | #8 | Colab Cell 3: leave the old clone before deleting it | ✅ Merged 14 Oct |
-| #9 | Analysis scripts: `stats.py`, `diag_curves.py`, `qual_grid.py`, `views.py` | ✅ Merged 14 Oct |
-| #10 | `reported_baselines.csv` verified against each paper | ✅ Merged 14 Oct |
-| #11 | Colab Cell V3 (regression check) and Cell 7b (`SEEDS`, `--work_root`, `STOP`) | ⏳ Agent review Approve on 0e7e11d; Aayush sets `agent-review` and merges |
+| #9 | Analysis scripts: stats and verdict, F2, F3/F4, F5 | ✅ Merged 14 Oct |
+| #10 | Reported baselines verified against each paper | ✅ Merged 14 Oct |
+| #11 | Colab: Cell V3 regression check; Cell 7b gets `SEEDS` and `--work_root` | ⏳ Open (Disha) |
+| #12 | CI runs the analysis scripts; AGENTS.md invariant 7 states D1 | ⏳ Open: gate class, needs Disha's approval |
 
-Next PR: `feat/dropout` → `main` (was due Tue 22:00; not opened as of Wed 12:30).
+Next PR: `feat/dropout` → `main` (W2–W7).
 
 ---
 
@@ -97,7 +102,7 @@ Monday's measurements change several assumptions in the playbook.
 | D8 | Figure 1 (D vs E iteration diagram) | Aayush | — |
 | D9 | Daily call | 21:30 IST, 15 min | — |
 | D10 | Repo visibility | **Public** (already done 12 Oct): GitHub rulesets need it to enforce the merge gate, and Colab needs no token | Private |
-| D11 | Optional Tier 2b (only if Tier 1 is complete by Thu night) | D and E at γ ∈ {0.1, 0.3} (same schedule, so peaks 0.06 and 0.18), 3-view, seed 0: 32 runs, about 2.6 T4-hours | Skip |
+| D11 | Optional Tier 2b (only if Tier 1 is complete by Thu night) | **Changed 14 Oct (Disha):** D and E at γ ∈ {0.1, 1/3} (same schedule, so peaks 0.06 and **0.2**: γ = 1/3 reaches DropGaussian's published end rate at our iteration 6000), plus **C at γ = 1/3**, so the interaction contrast can also be computed at the published dose. 3-view, seed 0: 40 runs, about 3.3 T4-hours | Skip |
 
 ---
 
@@ -579,11 +584,13 @@ Each Colab account runs 60 Tier 1 runs: about **5 GPU-hours** (about 3.4 h Wed, 
 
 **Cross-machine check:** fern on the Colab T4 (Disha's depth, PyTorch 2.11) gives PSNR 20.80, SSIM 0.674, LPIPS 0.257, against the laptop's 20.80, 0.671 and 0.262.
 
-**Nondeterminism:** fern at 1100 iterations, same seed, twice: PSNR 17.75 vs 17.29.
+**T4 reproduction** (Disha, Cell 7a, `upstream-baseline`, canonical depth tar): mean **18.93 / 0.595 / 0.294** vs paper 19.12 / 0.591 / 0.294 (−0.19 dB). Per scene: fern 21.08, flower 19.22, fortress 20.44, horns 18.61, leaves 16.64, orchids 14.90, room 20.35, trex 20.16. V3 baseline (mean of fern and horns) = 19.85.
+
+**Nondeterminism:** fern at 1100 iterations, same seed, twice: PSNR 17.75 vs 17.29. Fern on the T4 at 6000 iterations, two runs (12 Oct timing run, 13 Oct reproduction): 20.80 and 21.08.
 
 **Timing and memory:** laptop 7.5 min per full run, training footprint 1663 MB; T4 4.9 min per run.
 
-**Published LLFF 3-view numbers**, each checked against its own paper on 14 Oct (#10; evidence and sources in `results/reported_baselines.csv`):
+**Published LLFF 3-view numbers** (each row checked against the method's own paper in #10; sources in `results/reported_baselines.csv`). Papers differ in SSIM and LPIPS implementations, so these numbers are context, not like-for-like comparisons:
 
 | Method | PSNR | SSIM | LPIPS |
 | --- | --- | --- | --- |
