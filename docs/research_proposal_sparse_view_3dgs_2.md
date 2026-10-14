@@ -7,7 +7,7 @@ Oct 12, 2026 · @Aayush · **revised Mon 12 Oct evening** after the first measur
 > - **Measured:** Colab T4 **4.9 min/run**; laptop **7.5 min/run** with a **1663 MB** training footprint (it fits); laptop reproduction **18.73 / 0.594 / 0.297** against the paper's 19.12 / 0.591 / 0.294.
 > - **Machines:** Tier 1 runs on Colab T4s (about 9.8 GPU-hours, about 5 h per account, Wed–Thu). Tier 2 runs on the laptop **overnight only** (Wed and Thu nights), since a full-load run makes it unusable in the daytime. The A100 is optional; access is confirmed on Tue.
 > - **Variants:** DNGaussian renders depth in **two separate passes** (hard and soft) before the photometric pass, each with its own optimizer step. So D means "the dropout mask also hits the depth passes", and E costs **no extra render**.
-> - **Dropout:** the official code is `torch.nn.Dropout(p=0.2*iteration/10000)` applied to a ones vector, then multiplied into opacity. We use γ = 0.2 with the schedule rescaled to our 6000 iterations.
+> - **Dropout:** the official code is `torch.nn.Dropout(p=0.2*iteration/10000)` applied to a ones vector, then multiplied into opacity. We use γ = 0.2 with the schedule rescaled to our 6000 iterations. *(Superseded by decision D1, 13 Oct: the official `/10000` schedule is kept verbatim, so the rate peaks at 0.12; see PLAN.md W2.)*
 > - **Files:** `metrics.py` writes **`results_eval.json`** (not `results.json`) and renders go to **`eval/`** (not `test/`). Training also needs **shencoder**. Checkpoints must load through `load_checkpoint()`, because the laptop runs **PyTorch 1.12 / Python 3.7** and Colab runs PyTorch 2.11 / Python 3.13.
 > - **Storage:** a full upstream run is 337 MB (164 MB checkpoint, 13 MB TensorBoard). The runner deletes these, or 15 GB Drive quotas overflow.
 > - **DropGaussian's initialization** is a COLMAP **dense stereo** point cloud from the sparse views, not plain SfM points.
@@ -140,7 +140,7 @@ How the results map to the research question:
 
 1. **Add `--seed`.** ✅ *Done on `feat/dropout`.* Code derived from 3DGS fixes all seeds to 0 inside `safe_state()` in `utils/general_utils.py`. Pass `args.seed` into it, otherwise "three seeds" are three copies of one run. `--rand_pcd` draws the initial cloud from `np.random`, so it now changes per seed.
 2. **Add `--depth_scale`.** ✅ *Done.* One multiplier on both depth passes in `train_llff.py`. At `0` both passes are **skipped entirely**. Multiplying by zero would still let Adam momentum move the parameters and would add extra optimizer steps.
-3. **Port dropout, do not rewrite it (revised).** The official code ([DCVL-3D/DropGaussian\_release](https://github.com/DCVL-3D/DropGaussian_release), `gaussian_renderer/__init__.py`) is `compensation = torch.nn.Dropout(p=0.2*iteration/10000)(torch.ones(N))`, then `opacity = opacity * compensation[:, None]`. That is the mask and the 1/(1−r) compensation in one step; 10000 is their total iteration count. We use γ = 0.2 and r = 0.2 × t ÷ 6000. Mention in the report that the rate was tuned on vanilla 3DGS and the schedule was rescaled. Exact code: PLAN.md W2.
+3. **Port dropout, do not rewrite it (revised).** The official code ([DCVL-3D/DropGaussian\_release](https://github.com/DCVL-3D/DropGaussian_release), `gaussian_renderer/__init__.py`) is `compensation = torch.nn.Dropout(p=0.2*iteration/10000)(torch.ones(N))`, then `opacity = opacity * compensation[:, None]`. That is the mask and the 1/(1−r) compensation in one step; 10000 is their total iteration count. We use γ = 0.2 and r = 0.2 × t ÷ 6000. Mention in the report that the rate was tuned on vanilla 3DGS and the schedule was rescaled. *(Superseded by decision D1, 13 Oct: r = 0.2 × t ÷ 10000 verbatim, peak 0.12.)* Exact code: PLAN.md W2.
 4. **Training only.** Dropout must be active only inside the training loop. `render.py` and every evaluation path must never apply a mask. Render functions get a `drop_comp=None` argument that only the training loop sets.
 5. **Check densification (revised).** DropGaussian does nothing special here: densification uses the dropout render's `visibility_filter` and `radii`. Radii don't depend on opacity, so dropped Gaussians count as visible with zero gradient that iteration. Mirror that, which means changing nothing.
 6. **Decoupled mode (revised).** With `--depth_render clean`, the two depth passes get no mask and only the photometric pass is dropped. DNGaussian already renders depth separately, so this costs **no extra render**.
@@ -910,7 +910,7 @@ The report is written Saturday 17 to Monday 19 Oct, with Related Work and Method
 7. Tier 2 only: PSNR against number of views (2, 3, 6, 9) for **B, C, D and E** (laptop, seed 0).
 
 State these limitations plainly (revised):
-- The dropout rate was tuned on vanilla 3DGS, and the schedule was rescaled from 10000 to 6000 iterations.
+- The dropout rate was tuned on vanilla 3DGS, and the schedule was rescaled from 10000 to 6000 iterations. *(Superseded by D1: the schedule is kept at /10000, so the rate peaks at 0.12 over our 6000 iterations.)*
 - Our initialization is random, while DropGaussian's is a COLMAP dense stereo cloud from the sparse views.
 - In D, compensation inside the constant-opacity hard-depth pass saturates at the rasterizer's alpha cap of 0.99.
 - One dataset; 3 seeds.
