@@ -216,7 +216,6 @@ It is called only from `train.py` (`render(..., is_train=True, iteration=iterati
        drop_comp = torch.nn.Dropout(p=drop_rate_now)(torch.ones(gaussians.get_xyz.shape[0], device="cuda"))
    depth_comp = drop_comp if opt.depth_render == "shared" else None
    ```
-   AGENTS.md invariant 7 still says `/ opt.iterations`: correct it to `/ 10000` in the same PR (D1).
    Pass `drop_comp=depth_comp` to `render_for_depth` and `render_for_opa`, and `drop_comp=drop_comp` to the photometric `render`. **One mask per iteration** is valid because the Gaussian count only changes in densification, at the end of the iteration.
 4. **Leave unchanged:** `clean_views`, `training_report`, `scene.save(... render(...)["color"])` and densification. They call `render` without `drop_comp`, so they never drop. This mirrors DropGaussian: dropped Gaussians still have `radii > 0` (radii don't depend on opacity), so they count as visible with zero gradient that iteration. That slightly lowers their average densification gradient, exactly as in the official code.
 5. Use the global torch RNG (as the official code does). `safe_state(seed)` seeds it, so masks differ per seed.
