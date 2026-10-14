@@ -40,9 +40,10 @@ Update this table whenever something changes. It is the single place where statu
 | 14 | Questions to the lab admin | Aayush | ⏳ Not sent | §5 W13 |
 | 15 | Go-bag disk | Aayush | ⏸ Reduced to a light version (R3) | W13 |
 | 16 | Formats and decisions agreed | Both | ✅ Decided 13 Oct | §3, RUNLOG. D1 changed: official schedule `0.2 · t / 10000` verbatim (peaks at 0.12). D10: repo stays public |
-| 17 | T4 reproduction, 8 scenes (Cell 7a) | Disha | ⏳ Tue | W11 |
+| 17 | T4 reproduction, 8 scenes (Cell 7a) | Disha | ✅ Done 13 Oct | Mean **18.93 PSNR / 0.595 SSIM / 0.294 LPIPS** vs paper 19.12 / 0.591 / 0.294 (−0.19 dB). Per scene: fern 21.08, flower 19.22, fortress 20.44, horns 18.61, leaves 16.64, orchids 14.90, room 20.35, trex 20.16. V3 baseline (mean of fern and horns) = **19.85** |
 | 18 | Related work, verified baseline numbers | Disha | 🔄 Started | `results/reported_baselines.csv` (not yet verified) |
 | 19 | Review/merge gate: CI `checks`, `scripts/check.sh`, GPU smoke, `pr-reviewer` agent, `pr-gate` skill, Bash hook, CODEOWNERS, ruleset script | Aayush | 🔄 PR #5 (gate class: needs Disha's approval) | AGENTS.md "Change workflow". After merge: `bash scripts/setup_repo_rules.sh --apply` turns on the server-side ruleset (the repo is public) |
+| 20 | Analysis scripts: `experiments/stats.py` (T3, §6 verdict), `plots/diag_curves.py` (F2), `plots/qual_grid.py` (F3/F4), `plots/views.py` (F5) | Disha | 🔄 PR, tested on fixtures | Re-check on Aayush's sample `diag.csv` (Tue 15:00) |
 
 Pull requests:
 
@@ -467,7 +468,7 @@ The contrast separates "the combination is worse" from "dropout simply hurts on 
 | F1 | One iteration of D vs E: three passes, where the mask applies, which loss goes where | Aayush | draw.io or TikZ → `results/figures/fig1_iteration.pdf` | §5 W2/W3 | Fri |
 | T1 | Main table: LLFF 3-view, A–E mean ± std over seeds; published baselines below a rule labelled "reported" | Disha | `aggregate.py` → `results/tables/main_3v.tex` | all `metrics.json`, `reported_baselines.csv` | Fri |
 | T2 | Per-scene PSNR (appendix) | Disha | `aggregate.py` → `per_scene_3v.csv` | — | Fri |
-| T3 | Paired comparisons and interaction contrasts I_D, I_E with CIs (§6) | Disha | `experiments/stats.py` → `results/tables/paired.tex` | `runs.csv` | Fri |
+| T3 | Paired comparisons and interaction contrasts I_D, I_E with CIs (§6) | Disha | `experiments/stats.py` → `results/tables/paired_3v.tex` (+ `verdict_3v.txt`) | `runs.csv` | Fri |
 | F2 | Diagnostic curves: `loss_depth_used − loss_depth_clean` vs iteration for C, D, E (mean ± std over scenes); `depth_var_masks` vs iteration for A–E | Disha (script), Aayush (interpretation) | `experiments/plots/diag_curves.py` → `fig_diag.pdf` | all `diag.csv` | Thu night |
 | F3 | Qualitative grid: 3 scenes × [GT, B, C, D, E], RGB row and depth row, seed 0 | Disha | `experiments/plots/qual_grid.py` → `fig_qual.pdf` | `eval/ours_6000/{gt,renders,depth}` | Fri |
 | F4 | Failure cases: 2–3 scenes where combining hurt, RGB + depth (W16) | Aayush picks, Disha renders | `qual_grid.py --scenes …` | per-scene Δ from T3 | Fri |
