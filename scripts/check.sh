@@ -30,6 +30,10 @@ vermin_() { if command -v vermin >/dev/null 2>&1; then vermin "$@"; else uvx -q 
 if python3 -c "import pandas, yaml" >/dev/null 2>&1; then PYA=(python3)
 elif command -v uv >/dev/null 2>&1; then PYA=(uv run -q --no-project --python 3.11 --with "pandas>=2,<3" --with "pyyaml>=6" python)
 else PYA=(); fi
+# The plotting scripts (step 12) also need matplotlib.
+if python3 -c "import pandas, yaml, matplotlib" >/dev/null 2>&1; then PYP=(python3)
+elif command -v uv >/dev/null 2>&1; then PYP=(uv run -q --no-project --python 3.11 --with "pandas>=2,<3" --with "pyyaml>=6" --with "matplotlib>=3.5" python)
+else PYP=(); fi
 
 # Training-pipeline code that must run on the laptop's Python 3.7 / PyTorch 1.12.
 TRAIN_PATHS=(train_llff.py render.py metrics.py spiral.py gaussian_renderer utils scene arguments)
@@ -92,8 +96,7 @@ done < <(git ls-files '*.ipynb')
 if [ -z "$nb_bad" ]; then pass; else fail "notebook problems: $nb_bad"; fi
 
 step "8. Analysis pipeline: aggregate.py on fixtures"
-if [ ! -f experiments/aggregate.py ]; then echo "no experiments/aggregate.py yet"; pass
-elif [ ${#PYA[@]} -eq 0 ]; then skip "aggregate fixtures" "pandas/pyyaml unavailable"
+if [ ${#PYA[@]} -eq 0 ]; then skip "aggregate fixtures" "pandas/pyyaml unavailable"
 elif "${PYA[@]}" experiments/fixtures/make_fixtures.py "$TMP/fake" >/dev/null \
      && "${PYA[@]}" experiments/aggregate.py --out_root "$TMP/fake" --tables "$TMP/tables" >/dev/null 2>"$TMP/agg.err" \
      && test -s "$TMP/tables/main_3v.md" && test -s "$TMP/tables/runs.csv" \
@@ -182,6 +185,39 @@ assert worst_ci([{"__typename": "CheckRun", "name": "checks", "conclusion": "FAI
 assert smoke_line(["GPU-SMOKE PASS deadbeef A B C D E\nthanks"], "deadbeef").startswith("GPU-SMOKE PASS deadbeef")
 print("ok")
 EOF
+
+step "12. Analysis scripts on fixtures: diag_curves sharp checks, stats verdict, qual_grid, views"
+if [ ${#PYP[@]} -eq 0 ]; then skip "analysis scripts" "pandas/pyyaml/matplotlib unavailable"
+else
+  F="$TMP/fx"; T="$TMP/fx_tables"; G="$TMP/fx_figures"; an_ok=1
+  { "${PYP[@]}" experiments/fixtures/make_fixtures.py "$F" \
+    && "${PYP[@]}" experiments/aggregate.py --out_root "$F" --tables "$T" \
+    && "${PYP[@]}" experiments/plots/diag_curves.py --out_root "$F" --tables "$T" --figures "$G" \
+    && "${PYP[@]}" experiments/stats.py --runs "$T/runs.csv" --tables "$T" --diag_summary "$T/diag_summary_3v.csv" \
+    && "${PYP[@]}" experiments/plots/qual_grid.py --out_root "$F" --figures "$G" \
+    && "${PYP[@]}" experiments/plots/views.py --out_root "$F" --tables "$T" --figures "$G"; } >"$TMP/an.log" 2>&1 || an_ok=0
+  for f in "$G/fig_diag.png" "$G/fig_qual.png" "$G/fig_views.png" "$T/diag_summary_3v.csv" "$T/paired_3v.csv" \
+           "$T/verdict_3v.txt" "$T/views_summary.csv"; do
+    [ -s "$f" ] || { echo "missing output: $f"; an_ok=0; }
+  done
+  # The fixtures are seeded, so the verdict is fixed; a change means the §6 logic changed.
+  grep -q "^VERDICT: INTERFERING (D)$" "$T/verdict_3v.txt" 2>/dev/null || { echo "verdict on the fixtures changed"; an_ok=0; }
+  # The sharp checks must fail closed: a D run whose mask never reached the depth passes has gap == 0.
+  python3 - "$F/llff_3v/D/fern/seed0/diag.csv" <<'EOF' || an_ok=0
+import csv, sys
+rows = list(csv.DictReader(open(sys.argv[1])))
+for r in rows:
+    r["loss_depth_used"] = r["loss_depth_clean"]
+with open(sys.argv[1], "w", newline="") as f:
+    w = csv.DictWriter(f, fieldnames=list(rows[0]))
+    w.writeheader()
+    w.writerows(rows)
+EOF
+  if "${PYP[@]}" experiments/plots/diag_curves.py --out_root "$F" --tables "$T/neg" --figures "$G/neg" >"$TMP/an_neg.log" 2>&1; then
+    echo "diag_curves.py passed a D run whose gap is identically 0"; an_ok=0
+  elif ! grep -q "FAIL D/fern/seed0: gap identically 0" "$TMP/an_neg.log"; then echo "diag_curves.py failed but did not name the failing run"; an_ok=0; fi
+  if [ $an_ok -eq 1 ]; then pass; else tail -15 "$TMP/an.log"; tail -5 "$TMP/an_neg.log" 2>/dev/null; fail "analysis scripts on fixtures"; fi
+fi
 
 printf '\n== Summary\n'
 [ ${#SKIPPED[@]} -gt 0 ] && echo "Skipped locally: ${SKIPPED[*]}"

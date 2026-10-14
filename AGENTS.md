@@ -88,7 +88,7 @@ Experiment runner (being built, see PLAN W8): `python experiments/run_matrix.py 
 4. **One GPU type per seed.** All five variants of a given seed run on the same GPU type. `metrics.json` records `gpu` and `shared_gpu`. Efficiency numbers come only from runs with `shared_gpu: false`.
 5. **Experiments run only from a tag** (`v1.0-exp`, then `v1.1-exp` for fixes). `config.json` records the commit. Don't run the matrix from a branch.
 6. **Same data everywhere:** `llff_with_depth.tar`, checked by md5.
-7. Port DropGaussian, don't reinvent it. The official code (`gaussian_renderer/__init__.py` in their repo) is: `compensation = torch.nn.Dropout(p=r)(torch.ones(N))`, then `opacity = opacity * compensation[:, None]`, with `r = 0.2 * iteration / 10000`, where 10000 is their total iteration count. We use `0.2 * iteration / opt.iterations`. The full spec is in PLAN W2.
+7. Port DropGaussian, don't reinvent it. The official code (`gaussian_renderer/__init__.py` in their repo) is: `compensation = torch.nn.Dropout(p=r)(torch.ones(N))`, then `opacity = opacity * compensation[:, None]`, with `r = 0.2 * iteration / 10000`, where 10000 is their total iteration count. We keep it verbatim, `r = drop_rate * iteration / 10000`, even though we train for 6000 iterations, so with `--drop_rate 0.2` the rate peaks at 0.12 (decision D1, 13 Oct). The full spec is in PLAN W2.
 
 ## Git and ownership
 
