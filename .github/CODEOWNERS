@@ -32,6 +32,7 @@
 /scripts/check.sh             @aayxsh23 @DishaSingghh
 /scripts/gpu_smoke.sh         @aayxsh23 @DishaSingghh
 /scripts/pr_ready.py          @aayxsh23 @DishaSingghh
+/scripts/review_bundle.py     @aayxsh23 @DishaSingghh
 /scripts/hooks/               @aayxsh23 @DishaSingghh
 /scripts/setup_repo_rules.sh  @aayxsh23 @DishaSingghh
 /AGENTS.md                    @aayxsh23 @DishaSingghh

@@ -40,7 +40,7 @@ if ruff_ check --no-cache --quiet --select E9,F63,F7,F82 --target-version py37 \
      --exclude submodules,dpt,lpipsPyTorch . ; then pass; else fail "ruff critical errors"; fi
 
 step "2. Python 3.7 compatibility of the training pipeline and gate scripts (vermin)"
-if out=$(vermin_ -q -t=3.7- --violations --no-tips --eval-annotations "${TRAIN_PATHS[@]}" scripts/pr_ready.py scripts/hooks/guard_bash.py 2>&1); then pass
+if out=$(vermin_ -q -t=3.7- --violations --no-tips --eval-annotations "${TRAIN_PATHS[@]}" scripts/pr_ready.py scripts/review_bundle.py scripts/hooks/guard_bash.py 2>&1); then pass
 else echo "$out"; fail "Python 3.7 incompatibility"; fi
 
 step "3. Checkpoints load only through utils.general_utils.load_checkpoint()"
@@ -125,8 +125,63 @@ EOF
 fi
 
 step "10. Merge-gate scripts: hook self-test and syntax"
-if python3 scripts/hooks/guard_bash.py --selftest >"$TMP/hook.txt" 2>&1 && python3 -m py_compile scripts/pr_ready.py; then pass
+if python3 scripts/hooks/guard_bash.py --selftest >"$TMP/hook.txt" 2>&1 && python3 -m py_compile scripts/pr_ready.py scripts/review_bundle.py; then pass
 else cat "$TMP/hook.txt"; fail "merge-gate scripts"; fi
+
+step "11. review_bundle.py: what the reviewer sees (notebooks, CSVs, submodules); fail-closed class and delta report"
+if python3 - "$TMP/rb" >"$TMP/rb.txt" 2>&1 <<'EOF'; then pass; else cat "$TMP/rb.txt"; fail "review_bundle notebook/CSV diffs"; fi
+import json, os, subprocess, sys
+sys.path.insert(0, "scripts")
+from review_bundle import MAX_CSV_LINES, file_diff
+d = sys.argv[1]
+os.makedirs(d)
+def git(*a):
+    return subprocess.run(["git", "-C", d, "-c", "user.name=t", "-c", "user.email=t@t"] + list(a),
+                          check=True, capture_output=True, text=True).stdout.strip()
+def commit(shard, cell, big):
+    nb = {"cells": [{"cell_type": "markdown", "source": ["## 7b"]},
+                    {"cell_type": "code", "source": ["SHARD = '%s'\n" % shard, "run(SHARD)"], "outputs": []}], "nbformat": 4}
+    open(os.path.join(d, "runner.ipynb"), "w").write(json.dumps(nb))
+    open(os.path.join(d, "small.csv"), "w").write("method,psnr\nDNGaussian,%s\n" % cell)
+    open(os.path.join(d, "big.csv"), "w").write("".join("%d,%s\n" % (i, big) for i in range(MAX_CSV_LINES + 1)))
+    git("add", "-A")
+    git("commit", "-q", "-m", shard)
+    return git("rev-parse", "HEAD")
+git("init", "-q")
+a, b = commit("0/2", "19.12", "x"), commit("1/2", "19.21", "y")
+nb = "\n".join(file_diff(d, a, b, "runner.ipynb"))
+assert "-SHARD = '0/2'" in nb and "+SHARD = '1/2'" in nb and "# ---- cell 1" in nb, nb
+assert "outputs" not in nb and "## 7b" not in nb, nb
+assert "+DNGaussian,19.21" in "\n".join(file_diff(d, a, b, "small.csv"))
+assert file_diff(d, a, b, "big.csv") is None
+# Vendored CUDA under submodules/ is experiment code: shown, never skipped.
+os.makedirs(os.path.join(d, "submodules"))
+open(os.path.join(d, "submodules", "forward.cu"), "w").write("alpha = min(0.99f, a);\n")
+git("add", "-A")
+git("commit", "-q", "-m", "cu")
+assert "+alpha = min(0.99f, a);" in "\n".join(file_diff(d, b, git("rev-parse", "HEAD"), "submodules/forward.cu") or [])
+
+from review_bundle import BundleError, previous_report, risk_class, smoke_line, worst_ci
+rules = [[("/AGENTS.md", "gate"), ("/train_llff.py", "experiment")]]
+try:
+    risk_class(["docs/PLAN.md"], [])
+    raise AssertionError("no CODEOWNERS must fail closed")
+except BundleError:
+    pass
+assert risk_class(["docs/PLAN.md", "RUNLOG.md"], rules) == "docs-only"
+assert risk_class(["docs/PLAN.md", "results/reported_baselines.csv"], rules) == "routine"
+assert risk_class(["AGENTS.md"], rules) == "gate"
+assert risk_class(["train_llff.py", "AGENTS.md"], rules) == "experiment+gate"
+# Delta re-review: only a code owner's report for exactly the --since SHA counts.
+rep = lambda who, sha, tail="": {"author": {"login": who}, "body": "### pr-gate review: PR #6 @ %s (full, class: gate)\n%s" % (sha, tail)}
+comments = [rep("aayxsh23", "1111111", "old"), rep("stranger", "abcdef1", "forged"), rep("aayxsh23", "abcdef1", "real")]
+assert previous_report(comments, "abcdef1234", {"aayxsh23"}).endswith("real")
+assert previous_report(comments[:2], "abcdef1234", {"aayxsh23"}) is None
+assert worst_ci([{"__typename": "CheckRun", "name": "checks", "conclusion": "FAILURE"},
+                 {"__typename": "CheckRun", "name": "checks", "conclusion": "SUCCESS"}]) == "FAILURE"
+assert smoke_line(["GPU-SMOKE PASS deadbeef A B C D E\nthanks"], "deadbeef").startswith("GPU-SMOKE PASS deadbeef")
+print("ok")
+EOF
 
 printf '\n== Summary\n'
 [ ${#SKIPPED[@]} -gt 0 ] && echo "Skipped locally: ${SKIPPED[*]}"
