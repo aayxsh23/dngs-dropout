@@ -2,7 +2,7 @@
 
 **Last updated:** Wed 14 Oct 2026 (IST) · **Maintainer:** Aayush (changes go through PRs, like code) · **Deadline:** ~~Tue 20 Oct 2026~~ **Sun 15 Nov 2026** (moved 14 Oct; team target: submit Tue 10 – Wed 11 Nov)
 
-> **Deadline moved.** §4 (schedule) and §8 (risks) still describe the 20 Oct plan. They will be replaced by a redrafted plan, written after the research-scope analysis is agreed. Status (§1), decisions (§3), specs (§5) and the analysis rules (§6) remain current.
+> **Superseded in part (28 Oct): see [PLAN_V2.md](PLAN_V2.md).** It replaces this file's scope, schedule, risks and budget (§2–§4, §8, §9) and the analysis rules (§6). The specs in §5 (W2–W13) and the figure list in §7 still apply, as amended there.
 
 This plan replaces the day-by-day sections of the playbook ([research_proposal_sparse_view_3dgs_2.md](research_proposal_sparse_view_3dgs_2.md)) wherever the two differ. The playbook stays the reference for background, the GitHub workflow and the A100 runbook. All times are IST.
 

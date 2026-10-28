@@ -2,6 +2,8 @@
 
 **Wed 14 Oct 2026** · **Draft for Aayush to review and edit** · Deadline: Sun 15 Nov (team target: submit 10–11 Nov)
 
+> **28 Oct:** the decision sheet (§10) is settled in [PLAN_V2.md](PLAN_V2.md) §2.6, which also explains why packages P1 and P2 no longer fit before 10 Nov.
+
 **What this document is.** A critical review of the research idea and of where we stand, plus a ranked list of improvements. The redrafted plan (`docs/PLAN.md` v2) will be generated from the decisions you mark in §10, and only after you have edited this document.
 
 **What stays fixed.** These are not up for change; every recommendation sharpens or extends them:
