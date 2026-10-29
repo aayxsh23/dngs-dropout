@@ -12,8 +12,8 @@ import torch
 
 
 def gpu_used_mb():
-    out = subprocess.run(["nvidia-smi", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"],
-                         capture_output=True, text=True).stdout.split(",")
+    out = subprocess.run(["nvidia-smi", "--id=0", "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"],
+                         capture_output=True, text=True).stdout.splitlines()[0].split(",")   # GPU 0 only (multi-GPU hosts)
     return int(out[0]), int(out[1])
 
 

@@ -130,6 +130,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     diag_file.flush()
     torch.cuda.synchronize()
     t_train0 = t_row = time.time()
+    diag_time = 0.0
 
     for iteration in range(first_iter, opt.iterations + 1):        
 
@@ -249,7 +250,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         if iteration % DIAG_EVERY == 0:  # before densification, which changes the Gaussian count on the same multiples
             with torch.no_grad():
                 torch.cuda.synchronize()
-                iter_ms = (time.time() - t_row) * 1000.0 / DIAG_EVERY
+                t_diag0 = time.time()
+                iter_ms = (t_diag0 - t_row) * 1000.0 / DIAG_EVERY
                 clean = depth_diag(viewpoint_cam, gaussians, pipe, background, iteration, opt, None, None)
                 used = clean if hard_comp is None and soft_comp is None else \
                     depth_diag(viewpoint_cam, gaussians, pipe, background, iteration, opt, hard_comp, soft_comp)
@@ -260,6 +262,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 diag_file.flush()
                 torch.cuda.synchronize()
                 t_row = time.time()  # diagnostics time is excluded from the next row's iter_ms
+                diag_time += t_row - t_diag0
 
         with torch.no_grad():
             # Progress bar
@@ -330,6 +333,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     # train_stats.json (PLAN W5 + PLAN_V2 C3)
     stats = dict(
         train_time_s=round(time.time() - t_train0, 1),   # whole loop, incl. the final eval/save and diagnostics
+        diag_time_s=round(diag_time, 1),   # C, D, D_hard, D_soft render 2 more diagnostic passes per row than A, B, E
         n_gaussians=int(gaussians.get_xyz.shape[0]),
         vram_peak_mb=round(torch.cuda.max_memory_reserved() / 2**20, 1),
         model_size_mb=round(sum(p.numel() * p.element_size()

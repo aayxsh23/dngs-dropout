@@ -3,6 +3,7 @@
 scenes: [fern, flower, fortress, horns, leaves, orchids, room, trex]
 seeds: [0, 1, 2]
 n_views: [3]
+keep_ckpt_seeds: [0]   # T1 seed 0 only: the probes need these checkpoints
 variants:
   A: {depth_scale: 0, drop_rate: 0.0, depth_render: shared}
   B: {depth_scale: 1, drop_rate: 0.0, depth_render: shared}

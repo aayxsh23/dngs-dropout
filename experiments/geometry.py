@@ -73,7 +73,7 @@ def run_metrics(eval_dir, self_test=False):
     if not mvc:
         return None
     return dict(mvc5=float(np.mean(mvc)), median_rel_err=float(np.mean(med)), valid_frac=float(np.mean(valid)),
-                n_pairs=len(mvc), n_views=len(views))
+                n_pairs=len(mvc), n_eval_views=len(views))
 
 
 def main():
@@ -111,7 +111,7 @@ def main():
     if not rows:
         sys.exit("no runs with depth_raw under %s" % a.out_root)
     os.makedirs(a.tables, exist_ok=True)
-    cols = ["variant", "scene", "seed", "n_views", "mvc5", "median_rel_err", "valid_frac", "n_pairs"]
+    cols = ["variant", "scene", "seed", "n_views", "mvc5", "median_rel_err", "valid_frac", "n_pairs", "n_eval_views"]
     for nv in sorted(set(r["n_views"] for r in rows)):
         path = os.path.join(a.tables, "geometry_%dv.csv" % nv)
         with open(path, "w") as f:

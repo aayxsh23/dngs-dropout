@@ -29,15 +29,21 @@ METRICS_KEYS = ["variant", "scene", "n_views", "seed", "psnr", "ssim", "ssim_sk"
                 "shared_gpu", "torch_version", "drop_rate", "depth_scale", "depth_render"]
 
 
+def git(*args):
+    return subprocess.run(["git"] + list(args), cwd=REPO, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          universal_newlines=True)
+
+
 def code_tag(allow_untagged):
-    out = subprocess.run(["git", "describe", "--tags", "--exact-match", "HEAD"], cwd=REPO,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    if out.returncode == 0:
+    """The tag at HEAD. A tagged run must also have no changes to tracked files (AGENTS.md invariant 5)."""
+    out = git("describe", "--tags", "--exact-match", "HEAD")
+    dirty = bool(git("status", "--porcelain", "--untracked-files=no").stdout.strip())
+    if out.returncode == 0 and not dirty:
         return out.stdout.strip()
     if allow_untagged:
-        return "untagged"
-    sys.exit("HEAD is not exactly at a tag: experiments run only from a tag (AGENTS.md invariant 5). "
-             "Check out the tag, or pass --allow_untagged for a smoke test.")
+        return "untagged-dirty" if dirty else "untagged"
+    sys.exit("HEAD must be exactly at a tag with no changes to tracked files: experiments run only from a tag "
+             "(AGENTS.md invariant 5). Check out the tag, or pass --allow_untagged for a smoke test.")
 
 
 def load_json(path):
@@ -72,6 +78,9 @@ def build_metrics(work, variant, scene, n_views, seed, wall, tag, shared_gpu):
     train = load_json(os.path.join(work, "train_stats.json"))
     rstats = load_json(os.path.join(work, "render_stats.json"))
     config = load_json(os.path.join(work, "config.json"))
+    for name, d in (("train_stats.json", train), ("render_stats.json", rstats), ("config.json", config)):
+        if not d:
+            raise RuntimeError("%s is missing or unreadable" % name)
     rec = dict(train)   # all train_stats keys, incl. the C3 structure statistics
     rec.update(variant=variant, scene=scene, n_views=n_views, seed=seed,
                psnr=m.get("PSNR"), ssim=m.get("SSIM"), ssim_sk=m.get("SSIM_sk"), lpips=m.get("LPIPS"),
@@ -84,6 +93,15 @@ def build_metrics(work, variant, scene, n_views, seed, wall, tag, shared_gpu):
     return rec
 
 
+def mark_failed(work, out, status):
+    """W8 step 7: FAILED marker plus run.log next to the outputs; the run is redone next time."""
+    with open(os.path.join(work, "FAILED"), "w") as f:
+        f.write(status + "\n")
+    if work != out:
+        os.makedirs(out, exist_ok=True)
+        shutil.copy(os.path.join(work, "run.log"), out)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--matrix", default="experiments/matrix.yaml")
@@ -92,23 +110,27 @@ def main():
     ap.add_argument("--work_root", default=None, help="train here, then copy to out_root (Colab: /content/work)")
     ap.add_argument("--shard", default="0/1", help="i/N: take runs i, i+N, i+2N, ...")
     ap.add_argument("--seeds", type=int, nargs="*", default=None, help="override the matrix's seeds")
-    ap.add_argument("--keep_ckpt_seeds", type=int, nargs="*", default=[0],
-                    help="seeds whose checkpoint and point cloud are kept; give the flag with no values to keep none")
+    ap.add_argument("--keep_ckpt_seeds", type=int, nargs="*", default=None,
+                    help="seeds whose checkpoint and point cloud are kept (default: the matrix's keep_ckpt_seeds, "
+                         "else none); give the flag with no values to keep none")
     ap.add_argument("--shared_gpu", action="store_true", help="several runs share this GPU (A100 slots)")
     ap.add_argument("--allow_untagged", action="store_true", help="smoke tests only")
     ap.add_argument("--dry_run", action="store_true")
     a = ap.parse_args()
+    a.data_root, a.out_root = os.path.abspath(a.data_root), os.path.abspath(a.out_root)   # steps run with cwd=REPO
+    a.work_root = os.path.abspath(a.work_root) if a.work_root else None
 
     with open(a.matrix) as f:
         cfg = yaml.safe_load(f)
+    keep = a.keep_ckpt_seeds if a.keep_ckpt_seeds is not None else cfg.get("keep_ckpt_seeds", [])
     seeds = a.seeds if a.seeds else cfg["seeds"]
     i, n = (int(x) for x in a.shard.split("/"))
     runs = runs_for(cfg, seeds)
     mine = runs[i::n]
     tag = code_tag(a.allow_untagged)
     work_root = a.work_root or a.out_root
-    print("%s: shard %s, seeds %s: %d of %d runs, tag %s" % (a.matrix, a.shard, seeds, len(mine), len(runs), tag),
-          flush=True)
+    print("%s: shard %s, seeds %s: %d of %d runs, tag %s, keeping checkpoints for seeds %s"
+          % (a.matrix, a.shard, seeds, len(mine), len(runs), tag, keep), flush=True)
 
     done, skipped, failed = 0, 0, []
     for nv, seed, variant, scene in mine:
@@ -142,25 +164,24 @@ def main():
                     break
         wall = time.time() - t0
         if status != "ok":
-            with open(os.path.join(work, "FAILED"), "w") as f:
-                f.write(status + "\n")
-            if work != out:
-                os.makedirs(out, exist_ok=True)
-                shutil.copy(os.path.join(work, "run.log"), out)
+            mark_failed(work, out, status)
             failed.append(rel)
             print("FAILED %s (%s, %.0f s)" % (rel, status, wall), flush=True)
             continue
         try:
             rec = build_metrics(work, variant, scene, nv, seed, wall, tag, a.shared_gpu)
         except Exception as e:  # a run without usable results is a failure, not a done run
+            mark_failed(work, out, "results: %s" % e)
             failed.append(rel)
             print("FAILED %s (results: %s)" % (rel, e), flush=True)
             continue
-        cleanup(work, seed, a.keep_ckpt_seeds)
+        cleanup(work, seed, keep)
         if work != out:
             shutil.copytree(work, out)
-        with open(os.path.join(out, "metrics.json"), "w") as f:   # written last: the run now counts as done
+        tmp = os.path.join(out, "metrics.json.tmp")
+        with open(tmp, "w") as f:
             json.dump(rec, f, indent=2)
+        os.replace(tmp, os.path.join(out, "metrics.json"))   # written last and atomically: the run now counts as done
         done += 1
         print("done %s  psnr %.2f  %.0f s" % (rel, rec["psnr"], wall), flush=True)
 

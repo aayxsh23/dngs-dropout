@@ -34,6 +34,8 @@ else PYA=(); fi
 # Training-pipeline code that must run on the laptop's Python 3.7 / PyTorch 1.12.
 TRAIN_PATHS=(train_llff.py render.py metrics.py spiral.py gaussian_renderer utils scene arguments)
 [ -f experiments/run_matrix.py ] && TRAIN_PATHS+=(experiments/run_matrix.py)
+# Also run in the laptop's Python 3.7 env.
+for f in experiments/geometry.py scripts/peak_vram.py; do [ -f "$f" ] && TRAIN_PATHS+=("$f"); done
 EVAL_PATHS=(render.py render_sh.py metrics.py metrics_dtu.py metrics_count.py spiral.py)
 step "1. Syntax errors and undefined names (ruff E9,F63,F7,F82)"
 if ruff_ check --no-cache --quiet --select E9,F63,F7,F82 --target-version py37 \
@@ -183,7 +185,59 @@ assert smoke_line(["GPU-SMOKE PASS deadbeef A B C D E\nthanks"], "deadbeef").sta
 print("ok")
 EOF
 
-printf '\n== Summary\n'
+step "15. Dropout schedule (D1) and random point-cloud path (W7) match the agreed design"
+sched_ok=1
+grep -q 'drop_rate_now = opt.drop_rate \* iteration / 10000' train_llff.py || { echo "train_llff.py: schedule is not drop_rate * iteration / 10000 (D1)"; sched_ok=0; }
+grep -q 'iteration / opt.iterations' AGENTS.md && { echo "AGENTS.md still states the rescaled schedule (/ opt.iterations); D1 keeps / 10000"; sched_ok=0; }
+grep -q 'r = drop_rate \* iteration / 10000' AGENTS.md || { echo "AGENTS.md invariant 7 does not state the D1 schedule"; sched_ok=0; }
+if grep -rn 'sparse/0/points3D_random' scene/; then echo "the random cloud is written into the dataset folder again (W7)"; sched_ok=0; fi
+if [ $sched_ok -eq 1 ]; then pass; else fail "dropout schedule / point-cloud path"; fi
+
+step "16. geometry.py: synthetic two-camera scene (MVC@5% ~ 1; a wrong camera convention fails)"
+if [ ${#PYA[@]} -eq 0 ]; then skip "geometry synthetic test" "numpy unavailable"
+elif "${PYA[@]}" - "$TMP/geo" >"$TMP/geo.log" 2>&1 <<'EOF'; then pass; else cat "$TMP/geo.log"; fail "geometry.py camera model"; fi
+import json, math, os, sys
+import numpy as np
+sys.path.insert(0, "experiments")
+from geometry import run_metrics
+root = sys.argv[1]
+W, H, fov = 64, 48, math.radians(60)
+fx, fy = W / (2 * math.tan(fov / 2)), H / (2 * math.tan(fov / 2))
+n, d0 = np.array([-0.3, 0.0, 1.0]), 10.0          # tilted plane  z - 0.3 x = 10
+
+def rot_y(a):
+    c, s = math.cos(a), math.sin(a)
+    return np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+
+def camera(center, yaw):
+    R = rot_y(yaw).T                                # world -> camera rotation
+    w2c = np.eye(4); w2c[:3, :3] = R; w2c[:3, 3] = -R @ center
+    v, u = np.mgrid[0:H, 0:W].astype(float)
+    dirs = np.stack([(u - (W - 1) / 2) / fx, (v - (H - 1) / 2) / fy, np.ones_like(u)], -1) @ R   # camera ray -> world
+    t = (d0 - n @ center) / (dirs @ n)              # z_cam = t because the camera-space ray has z = 1
+    return w2c, t
+
+def write(name, cams, transpose):
+    d = os.path.join(root, name); os.makedirs(os.path.join(d, "depth_raw"))
+    meta = []
+    for k, (w2c, depth) in enumerate(cams):
+        np.savez_compressed(os.path.join(d, "depth_raw", "%05d.npz" % k), depth=depth.astype(np.float16),
+                            alpha=np.ones_like(depth, dtype=np.float16))
+        M = w2c if transpose else w2c.T             # 3DGS stores the transposed world-to-camera matrix
+        meta.append(dict(index=k, image_name=str(k), width=W, height=H, FoVx=fov, FoVy=2 * math.atan(H / (2 * fy)),
+                         world_view_transform=M.tolist()))
+    json.dump(meta, open(os.path.join(d, "cameras.json"), "w"))
+    return d
+
+cams = [camera(np.array([0.0, 0.0, 0.0]), 0.0), camera(np.array([2.0, 0.3, 0.5]), math.radians(12))]
+good = run_metrics(write("good", cams, False))
+bad = run_metrics(write("bad", cams, True))
+print("good", good, "\nbad", bad)
+assert good["mvc5"] > 0.98, good
+assert bad is None or bad["mvc5"] < 0.5, bad
+EOF
+
+printf '\n== Summary\n' 
 [ ${#SKIPPED[@]} -gt 0 ] && echo "Skipped locally: ${SKIPPED[*]}"
 if [ ${#FAILED[@]} -gt 0 ]; then
   echo "FAILED (${#FAILED[@]}): ${FAILED[*]}"

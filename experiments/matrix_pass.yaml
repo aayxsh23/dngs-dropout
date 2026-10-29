@@ -3,6 +3,7 @@
 scenes: [fern, flower, fortress, horns, leaves, orchids, room, trex]
 seeds: [0, 1, 2]
 n_views: [3]
+keep_ckpt_seeds: []   # Drive quota: only T1 seed 0 keeps checkpoints
 variants:
   D_hard: {depth_scale: 1, drop_rate: 0.2, depth_render: hard_only}
   D_soft: {depth_scale: 1, drop_rate: 0.2, depth_render: soft_only}

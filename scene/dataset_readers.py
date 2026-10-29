@@ -9,7 +9,9 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
+import atexit
 import os
+import shutil
 import sys
 import tempfile
 from PIL import Image
@@ -221,7 +223,9 @@ def readColmapSceneInfo(path, images, dataset, eval, rand_pcd, mvs_pcd, llffhold
     if rand_pcd:
         print('Init random point cloud.')
         # A unique temp dir, not the dataset folder: parallel runs on one scene would overwrite each other (PLAN W7)
-        ply_path = os.path.join(tempfile.mkdtemp(prefix="dngs_pcd_"), "points3D_random.ply")
+        pcd_dir = tempfile.mkdtemp(prefix="dngs_pcd_")
+        atexit.register(shutil.rmtree, pcd_dir, True)   # Scene copies the cloud to <model_path>/input.ply at once
+        ply_path = os.path.join(pcd_dir, "points3D_random.ply")
         bin_path = os.path.join(path, "sparse/0/points3D.bin")
         txt_path = os.path.join(path, "sparse/0/points3D.txt")
 
