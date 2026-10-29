@@ -12,9 +12,9 @@ Everything in AGENTS.md applies. This section adds only what is specific to Clau
 - **Merging:** always through the `pr-gate` skill. Use the `pr-reviewer` subagent for the independent review; never review your own change in your own context. The project hook (`.claude/settings.json`) blocks pushes to `main`, `--admin` merges, and any merge `scripts/pr_ready.py` rejects. If the hook, a permission prompt or GitHub refuses a merge, report it; don't route around it.
 - **GPU smoke test:** `bash scripts/gpu_smoke.sh` runs for 1.5–7 min. That is fine in the daytime. Longer GPU jobs only run overnight on Aayush's laptop.
 - **Plan and status:** the plan is `docs/PLAN_V2.md`. Progress is recorded by task ID in `aayush_context.md` on the `team-context` branch (AGENTS.md, "Team context files"), not in PLAN.md's old status table.
-- **Start of every session:** read `disha_context.md` from `origin/team-context`. Tell Aayush in one or two lines anything new from Disha that affects the task: a blocker, a request, a finished task he depends on.
-- **After every piece of work** (code, a PR, a merge, runs, analysis, a decision):
-  1. Update `aayush_context.md` on `team-context`: rewrite the Status block and add a log entry.
+- **Start of every session:** read Disha's file with `bash scripts/team_context.sh show disha`. Tell Aayush in one or two lines anything new from Disha that affects the task: a blocker, a request, a finished task he depends on.
+- **After every piece of work** (code, a PR, a merge, runs, analysis, a decision). This applies to the top-level session only: subagents such as `pr-reviewer` never touch the context files or write a Message to Disha.
+  1. Update `aayush_context.md` with `scripts/team_context.sh` (`open aayush`, edit, `push aayush "<summary>"`): rewrite the Status block and add a log entry.
   2. **End your final reply with a "Message to Disha" block**: a ready-to-send chat message. It must say:
      - what was done, with PR links;
      - exactly what she needs to do next (review or approve PR #N, run a Colab shard or a check, look at a file or figure), with the PLAN_V2 task IDs;

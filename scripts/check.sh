@@ -183,6 +183,71 @@ assert smoke_line(["GPU-SMOKE PASS deadbeef A B C D E\nthanks"], "deadbeef").sta
 print("ok")
 EOF
 
+step "13. Team context: files never on main; scripts/team_context.sh pushes only the caller's file"
+tc_ok=1
+# The context files live only on the team-context branch (AGENTS.md); they must never be tracked here.
+tc_pat='(aayush|disha)_context\.md'
+printf 'aayush_context.md\ndocs/x.md\n' | grep -qxE "$tc_pat" || { echo "self-test: pattern misses aayush_context.md"; tc_ok=0; }
+if git ls-files | grep -xE "$tc_pat"; then echo "context files are tracked on this branch"; tc_ok=0; fi
+# The test runs in its own bash process: inside an `if` condition, set -e would be ignored.
+cat > "$TMP/tc_test.sh" <<'TCEOF'
+set -euo pipefail
+REPO=$1; TMP=$2
+  T="$TMP/tc"; SCRIPT="$REPO/scripts/team_context.sh"
+  g() { git -c user.name=t -c user.email=t@t "$@"; }
+  git init -q --bare "$T/origin.git"
+  g init -q "$T/seed"; cd "$T/seed"
+  echo x > README; g add README; g commit -qm init; g branch -M main
+  g remote add origin "$T/origin.git"; g push -q origin main
+  g switch -q --orphan team-context
+  printf '# A\n' > aayush_context.md; printf '# D\n' > disha_context.md
+  g add aayush_context.md disha_context.md; g commit -qm ctx; g push -q origin team-context
+  for c in a d; do g clone -q "$T/origin.git" "$T/$c"; git -C "$T/$c" config user.name "$c"; git -C "$T/$c" config user.email "$c@t"; done
+  # Aayush and Disha edit at the same time; Disha pushes first, so Aayush's push must rebase and still succeed.
+  fa=$(cd "$T/a" && TEAM_CONTEXT_WT="$T/wa" bash "$SCRIPT" open aayush); echo "entry A" >> "$fa"
+  fd=$(cd "$T/d" && TEAM_CONTEXT_WT="$T/wd" bash "$SCRIPT" open disha); echo "entry D" >> "$fd"
+  (cd "$T/d" && TEAM_CONTEXT_WT="$T/wd" bash "$SCRIPT" push disha "d1") >/dev/null
+  (cd "$T/a" && TEAM_CONTEXT_WT="$T/wa" bash "$SCRIPT" push aayush "a1") >/dev/null
+  git -C "$T/seed" fetch -q origin
+  git -C "$T/seed" show origin/team-context:aayush_context.md | grep -q "entry A"
+  git -C "$T/seed" show origin/team-context:disha_context.md | grep -q "entry D"
+  [ "$(git -C "$T/seed" ls-tree --name-only origin/team-context | tr '\n' ' ')" = "aayush_context.md disha_context.md " ]
+  [ "$(git -C "$T/seed" rev-parse origin/main)" = "$(git -C "$T/seed" rev-parse main)" ]   # main untouched
+  # Editing the other person's file is refused, and nothing is pushed.
+  (cd "$T/a" && TEAM_CONTEXT_WT="$T/wa" bash "$SCRIPT" open aayush) >/dev/null
+  echo "mine" >> "$T/wa/aayush_context.md"; echo "x" >> "$T/wa/disha_context.md"
+  before=$(git -C "$T/seed" ls-remote origin team-context)
+  if (cd "$T/a" && TEAM_CONTEXT_WT="$T/wa" bash "$SCRIPT" push aayush "bad") 2>/dev/null; then echo "pushed another person's file"; exit 1; fi
+  [ "$before" = "$(git -C "$T/seed" ls-remote origin team-context)" ]
+  # open refuses to discard that unpushed change; push without open fails; unknown names fail.
+  if (cd "$T/a" && TEAM_CONTEXT_WT="$T/wa" bash "$SCRIPT" open aayush) 2>/dev/null; then echo "open discarded a change"; exit 1; fi
+  if (cd "$T/d" && TEAM_CONTEXT_WT="$T/none" bash "$SCRIPT" push disha "x") 2>/dev/null; then echo "push without open"; exit 1; fi
+  if (cd "$T/d" && bash "$SCRIPT" show bob) 2>/dev/null; then echo "accepted unknown name"; exit 1; fi
+  # A feature checkout is never pushed to team-context, even from inside the main clone.
+  (cd "$T/a" && g switch -q -c feat/x && echo y > y && g add y && g commit -qm y)
+  if (cd "$T/a" && TEAM_CONTEXT_WT="$T/a" bash "$SCRIPT" push aayush "wrong tree") 2>/dev/null; then echo "pushed a feature tree"; exit 1; fi
+echo "team_context test ok"
+TCEOF
+if ! bash "$TMP/tc_test.sh" "$PWD" "$TMP" >"$TMP/tc.log" 2>&1; then tail -5 "$TMP/tc.log"; tc_ok=0; fi
+if [ $tc_ok -eq 1 ]; then pass; else fail "team context files and script"; fi
+
+step "14. Agent guides link only to files that exist"
+if python3 - <<'EOF'; then pass; else fail "dead links in agent guides"; fi
+import os, re, sys
+bad = []
+for f in ["AGENTS.md", "CLAUDE.md", "GEMINI.md", ".github/copilot-instructions.md"]:
+    if not os.path.exists(f):
+        continue
+    for target in re.findall(r"\]\(([^)\s]+)\)", open(f, encoding="utf-8").read()):
+        if re.match(r"[a-z]+:", target) or target.startswith("#"):
+            continue
+        path = os.path.normpath(os.path.join(os.path.dirname(f), target.split("#")[0]))
+        if not os.path.exists(path):
+            bad.append("%s -> %s" % (f, target))
+print("\n".join(bad) or "ok")
+sys.exit(1 if bad else 0)
+EOF
+
 printf '\n== Summary\n'
 [ ${#SKIPPED[@]} -gt 0 ] && echo "Skipped locally: ${SKIPPED[*]}"
 if [ ${#FAILED[@]} -gt 0 ]; then

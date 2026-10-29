@@ -4,7 +4,7 @@ Instructions for any AI coding agent working in this repository (Claude Code, Ge
 
 ## What this project is
 
-This is a two-person course research project (Aayush and Disha) with a deadline of **Tue 20 Oct 2026**. It asks whether two sparse-view 3D Gaussian Splatting regularizers are **complementary, redundant or interfering**:
+This is a two-person course research project (Aayush and Disha) with a hard deadline of **Sun 15 Nov 2026** (team target: submit Tue 10 Nov). It asks whether two sparse-view 3D Gaussian Splatting regularizers are **complementary, redundant or interfering**:
 
 - **DNGaussian** (CVPR 2024): monocular-depth regularization. This repo is a fork of [Fictionarry/DNGaussian](https://github.com/Fictionarry/DNGaussian).
 - **DropGaussian** (CVPR 2025): randomly drops Gaussians during training. It is ported from [DCVL-3D/DropGaussian_release](https://github.com/DCVL-3D/DropGaussian_release).
@@ -162,46 +162,41 @@ Two files keep Aayush and Disha in sync between the 21:30 calls:
 | `aayush_context.md` | Aayush's agents only | Disha and her agents |
 | `disha_context.md` | Disha's agents only | Aayush and his agents |
 
-**Where they live.** Both files are on the **`team-context` branch**, not on `main`. They change many times a day, and `main` needs a reviewed PR for every change. The Bash hook blocks only pushes to `main`, so pushing to `team-context` is allowed. Never merge `team-context` into `main`.
+**Where they live.** Both files are on the **`team-context` branch**, never on `main` (`scripts/check.sh` step 13 fails if they are tracked there). They change many times a day, and `main` needs a reviewed PR for every change. The Bash hook blocks only pushes to `main`, so pushing to `team-context` is allowed. Never merge `team-context` into `main`.
 
 **Who you are.** Use `git config user.name`. If it contains "Aayush", your file is `aayush_context.md`. If it contains "Disha", your file is `disha_context.md`. Otherwise ask the human. Never edit the other person's file.
 
-**Before starting any task,** read the other person's file and your own status block:
-```bash
-git fetch -q origin team-context
-git show origin/team-context:disha_context.md | sed -n '1,80p'     # or aayush_context.md
-```
+**Top-level session only.** Subagents, such as `pr-reviewer`, never read or write the context files and never add a "Message to Disha". The main session records their results.
 
-**After finishing any piece of work, update your file.** That includes:
+**Use `scripts/team_context.sh` for every read and update.** Each command is self-contained, so the commands can run in separate tool calls; agents don't keep shell variables between calls.
+```bash
+bash scripts/team_context.sh show disha        # before starting: the other person's file (first 80 lines)
+bash scripts/team_context.sh show aayush 12    # your own status block
+bash scripts/team_context.sh open aayush       # prints the path of your file in a separate worktree
+#   ... edit that file: rewrite the Status block, add a log entry at the top of the Log ...
+bash scripts/team_context.sh push aayush "<one-line summary>"
+```
+The script works in a fixed worktree (`~/.cache/dngs-team-context`, or `TEAM_CONTEXT_WT`). `push` behaves as follows:
+- it commits **only your own file** and pushes **only** to `team-context`;
+- it rebases and retries if the other person pushed meanwhile;
+- if anything goes wrong, it exits non-zero and keeps your commit in the worktree.
+
+`open` refuses to discard an update that wasn't pushed. If `push` fails, report it; don't push by hand.
+
+**When to update your file:** after finishing any piece of work. That includes:
 - a PR opened, reviewed or merged;
 - a run block started, finished or failed;
 - a decision or a blocker;
 - a PLAN_V2 task done.
 
-Your file has two parts:
-1. **Rewrite the Status block** at the top: updated time (IST), the task you're on, task IDs done, what you're waiting on from the other person, and your next deadline.
+**Each update does two things:**
+1. **Rewrite the Status block:** updated time (IST), the task you're on, task IDs done, what you're waiting on from the other person, and your next deadline.
 2. **Add a log entry at the top of the Log** (newest first), using the file's template:
    - **Done:** what you did, with task IDs.
    - **Evidence:** PR links, commit SHAs, Drive paths, key numbers.
    - **Needs from the other person:** with deadlines.
    - **Next:** your next task.
    - **Aayush's file only, "Message to Disha":** the same message the agent drafts in its reply (CLAUDE.md).
-
-Then commit and push only that file:
-```bash
-NAME=aayush                                    # or disha
-WT="$(mktemp -d)/team-context"
-git fetch -q origin team-context
-git worktree add -q --detach "$WT" origin/team-context
-# ... edit "$WT/${NAME}_context.md" ...
-git -C "$WT" add "${NAME}_context.md"
-git -C "$WT" commit -q -m "context(${NAME}): <one line>"
-for i in 1 2 3; do                              # the other person may have pushed meanwhile
-  git -C "$WT" push -q origin HEAD:team-context && break
-  git -C "$WT" fetch -q origin team-context && git -C "$WT" rebase -q origin/team-context
-done
-git worktree remove --force "$WT"
-```
 
 **Rules for the context files:**
 - Facts only, with links: no secrets or tokens, no pasted logs longer than a few lines.
