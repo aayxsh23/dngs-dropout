@@ -17,7 +17,7 @@ The other run blocks (PLAN_V2 §3.1) go next to the T1 folder, as on Drive:
     fake_outputs_dose/   block G: C/D/E at γ = 0.1 (_g010) and 1/3 (_g033), 8 scenes x seed 0
     fake_outputs_noise/  block N: B_r1..B_r4 and D_r1..D_r4 on fern, seed 0
 Test them with the same scripts, one aggregate.py per block, then stats.py with --pass_runs, --dose_runs and
---noise_runs (see stats.py), and diag_curves.py --out_root on each block folder.
+--noise_runs (see stats.py), and diag_curves.py --out_root on each block folder with its own --tables/--figures.
 """
 import json, os, random, struct, sys, zlib
 

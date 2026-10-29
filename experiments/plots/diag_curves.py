@@ -3,6 +3,8 @@
 
 Example:
     python experiments/plots/diag_curves.py --out_root <drive>/sparse3dgs/outputs
+    python experiments/plots/diag_curves.py --out_root <drive>/sparse3dgs/outputs_pass \
+        --tables results/tables/pass --figures results/figures/pass        # other blocks: their own folders
 
 Panel (a): gap = loss_depth_used − loss_depth_clean vs iteration for C, D and E.
 Panel (b): depth_var_masks vs iteration for A–E.
@@ -174,6 +176,10 @@ def main():
     n = d.groupby("variant")[["scene", "seed"]].nunique()
     print(f"{d.groupby(['variant', 'scene', 'seed']).ngroups} diag.csv files; scenes and seeds per variant:\n"
           + n.to_string())
+    src = d.groupby(["variant", "scene", "seed"])["flags_from"].first().value_counts()
+    print("flags for the sharp checks: " + ", ".join(f"{n} runs from {k}" for k, n in src.items())
+          + ("" if src.index.tolist() == ["config.json"] else
+             " (runs 'from ID' have no drop_rate in config.json, so their checks use the factor table)"))
     failed = sharp_checks(d)
 
     late = d[d["iter"] >= a.from_iter]
@@ -188,6 +194,11 @@ def main():
     summary.to_csv(out, index=False)
     print("wrote", out)
 
+    if not set(d["variant"]) & set(style.COLORS):
+        print("no A–E runs here, so no figure (the panels show the T1 variants); summary and checks done")
+        if failed:
+            sys.exit("sharp checks failed: fix the failing runs before using the summary")
+        return
     style.apply()
     fig, (ax1, ax2) = style.plt.subplots(1, 2, figsize=(7.0, 2.6), constrained_layout=True)
     panel(ax1, curves(d, "gap"), ["C", "D", "E"], "(a) depth-loss gap under the dropout mask",

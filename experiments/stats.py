@@ -7,6 +7,7 @@ Example (aggregate.py once per block, each into its own folder; only --runs, blo
     python experiments/aggregate.py --out_root <drive>/sparse3dgs/outputs_dose  --tables results/tables/dose --seeds 0
     python experiments/aggregate.py --out_root <drive>/sparse3dgs/outputs_noise --tables results/tables/noise --seeds 0
     python experiments/plots/diag_curves.py --out_root <drive>/sparse3dgs/outputs     # for the mechanism test
+    (diag_curves.py on another block needs its own --tables and --figures, e.g. results/tables/pass)
     python experiments/geometry.py --out_root <drive>/sparse3dgs/outputs              # MVC@5% (optional)
     python experiments/stats.py --runs results/tables/runs.csv --diag_summary results/tables/diag_summary_3v.csv \\
         --pass_runs results/tables/pass/runs.csv --dose_runs results/tables/dose/runs.csv \\
@@ -21,15 +22,17 @@ Method (PLAN_V2 §5, fixed before results):
     Pass localization (block P with T1's E, 3 seeds): D_hard − E, D_soft − E; Holm across the two.
     Dose (block G with T1 seed 0 as anchors) and the noise floor (block N) are trends, not tests.
     Geometry: the primary contrasts on MVC@5% from geometry.py, Holm across the three.
-    Each contrast gets one class, decided in this order (the order of the §5 table):
+    Each contrast gets one class, decided in this order, the same everywhere:
+        "≈0"            the 95% CI lies inside ±δ (δ = 0.25 dB for PSNR, 0.02 for MVC@5%; none for SSIM/LPIPS).
+                        δ is the practical-zero margin, so an effect smaller than δ counts as 0 even when its CI
+                        excludes 0; such a row is flagged "CI excludes 0".
         ">0" / "<0"     the CI excludes 0 (Holm families: the Holm-adjusted p < 0.05)
-        "≈0"            the 95% CI lies inside ±δ (δ = 0.25 dB for PSNR, 0.02 for MVC@5%; none for SSIM/LPIPS)
         "inconclusive"  anything else
-    A ">0"/"<0" whose CI also lies inside ±δ is flagged "within ±δ".
-    Verdict for X in {D, E}: the §5 table. Row, first match: X beats B and C (X − B and X − C both ">0"); X
-    equivalent to B (X − B CI inside ±δ); X worse than B (X − B "<0"); otherwise. Column: the class of I_X.
-    B is the fixed reference. SSIM and LPIPS must point the same way: if either has a significant class opposite
-    to PSNR's on X − B, X − C or I_X, the verdict is "metric-dependent".
+    Verdict for X in {D, E}: the §5 table. Row: X beats B and C (X − B and X − C both ">0"); X equivalent to B
+    (X − B "≈0"); X worse than B (X − B "<0"); otherwise. Column: the class of I_X.
+    B is the fixed reference. SSIM and LPIPS must point the same way: if any two of PSNR, SSIM and LPIPS have
+    significant classes in opposite directions (better vs worse) on X − B, X − C or I_X, the verdict is
+    "metric-dependent".
 
 Writes to --tables:
     factors.csv                   the factor table: every planned variant ID, its flags, and runs found per input
@@ -159,10 +162,10 @@ def classify(r, delta, p_col="p"):
     """The §5 class of one contrast row: '>0', '<0', '≈0', 'inconclusive', or '?' without a CI."""
     if pd.isna(r["ci_lo"]):
         return "?"
+    if inside(r, delta):
+        return "≈0"
     if r[p_col] < ALPHA:
         return ">0" if r["mean"] > 0 else "<0"
-    if delta is not None and -delta < r["ci_lo"] and r["ci_hi"] < delta:
-        return "≈0"
     return "inconclusive"
 
 
@@ -226,7 +229,7 @@ def contrasts(tables, comps, family, holm_family, v=IDENTITY, scenes=None, extra
         for r, pa in zip(block, adj):
             r["p_holm"] = pa if holm_family else float("nan")
             r["class"] = classify(dict(r, p_decide=pa), DELTA.get(m), "p_decide")
-            r["within_delta"] = r["class"] in (">0", "<0") and inside(r, DELTA.get(m))
+            r["zero_excluded"] = r["class"] == "≈0" and pa < ALPHA   # an effect below δ, but not exactly 0
         rows += block
     return rows
 
@@ -265,7 +268,7 @@ def write_tables(res, metrics, base):
         if ps is not None:
             cells += [f"{int(ps['wins'])}/{int(ps['n'])}", fmt_p(ps["p_holm"] if family in ("primary", "pass")
                                                                   else ps["p"]),
-                      ps["class"] + (" (within ±δ)" if ps["within_delta"] else "")]
+                      ps["class"] + (" (CI excludes 0)" if ps["zero_excluded"] else "")]
         else:
             cells += ["–"] * 3
         rows.append(cells)
@@ -306,7 +309,7 @@ def verdict_for(res, X, metrics):
     xb, xc, ix = get(res, f"{X}-B"), get(res, f"{X}-C"), get(res, f"I_{X}")
     if xb["class"] == ">0" and xc["class"] == ">0":
         row = "beats"
-    elif inside(xb, DELTA["psnr"]):
+    elif xb["class"] == "≈0":
         row = "equivalent"
     elif xb["class"] == "<0":
         row = "worse"
@@ -320,16 +323,18 @@ def verdict_for(res, X, metrics):
         lines.append("  this (row, column) cell is empty in §5: describe the pattern instead of forcing a label")
     clash = []
     for key in (f"{X}-B", f"{X}-C", f"I_{X}"):
-        s = better(get(res, key)["class"], "psnr")
-        for m in [m for m in metrics if m != "psnr"]:
-            r = get(res, key, m)
-            if s and r is not None and better(r["class"], m) == -s:
-                clash.append(f"{m.upper()} on {key}")
+        way = {m: better(get(res, key, m)["class"], m) for m in metrics if get(res, key, m) is not None}
+        if {1, -1} <= set(way.values()):
+            clash.append(f"{key}: " + ", ".join(f"{m.upper()} {'better' if s > 0 else 'worse'}"
+                                                for m, s in way.items() if s))
+    missing = [m.upper() for m in ("ssim", "lpips") if m not in metrics]
     if clash:
-        lines.append("  SSIM/LPIPS point the other way (" + ", ".join(clash) + ")")
+        lines.append("  the metrics point different ways (" + "; ".join(clash) + ")")
         label = f"metric-dependent (PSNR alone: {label})"
+    elif missing:
+        lines.append(f"  agreement of SSIM and LPIPS: not evaluated, no {' or '.join(missing)} column")
     else:
-        lines.append("  SSIM and LPIPS: no significant disagreement with PSNR")
+        lines.append("  PSNR, SSIM and LPIPS: no significant disagreement")
     return label, lines
 
 
@@ -350,7 +355,7 @@ def mechanism_depth(res, diag_summary, n_views, scenes, dose_ps):
         gap = gap[gap.index.isin(scenes)]
         failed = s[s["variant"].isin(["C", "D"]) & ~s["checks_ok"].astype(bool)] if "checks_ok" in s else s[:0]
         if len(failed):
-            ok.append(False)
+            ok.append(None)
             out.append("  2. gap(D) > gap(C): diag.csv sharp checks FAILED for "
                        + ", ".join(failed["variant"] + "/" + failed["scene"]) + "; no conclusion until fixed")
         elif "C" not in gap or "D" not in gap:
@@ -391,7 +396,7 @@ def claim(ok):
         return "SUPPORTED (all conditions met)"
     if any(x is False for x in ok):
         return "not supported (a condition is not met)"
-    return "open (conditions met so far, others pending)"
+    return "open (no condition failed; some are pending or their data failed a check)"
 
 
 def main():
@@ -516,12 +521,12 @@ def main():
     for key, label, _, _ in PRIMARY:
         r = get(res, key, family="primary")
         lines.append(f"  {label:<26} {fmt_ci(r, 2):<26} Holm p {fmt_p(r['p_holm']):<7} {r['class']:<12}"
-                     f" wins {int(r['wins'])}/{int(r['n'])}" + ("  (within ±δ)" if r["within_delta"] else ""))
+                     f" wins {int(r['wins'])}/{int(r['n'])}" + ("  (CI excludes 0)" if r["zero_excluded"] else ""))
     lines += ["", "Secondary (PSNR; 95% CI, uncorrected):"]
     for key, label, _, _ in SECONDARY:
         r = get(res, key, family="secondary")
         lines.append(f"  {label:<26} {fmt_ci(r, 2):<26} p {fmt_p(r['p']):<12} {r['class']:<12}"
-                     f" wins {int(r['wins'])}/{int(r['n'])}" + ("  (within ±δ)" if r["within_delta"] else ""))
+                     f" wins {int(r['wins'])}/{int(r['n'])}" + ("  (CI excludes 0)" if r["zero_excluded"] else ""))
     labels = {}
     for X in ("D", "E"):
         labels[X], why = verdict_for(res, X, metrics)
