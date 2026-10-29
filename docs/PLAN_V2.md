@@ -177,6 +177,43 @@ With Tier 1's seed-0 runs, the noise block gives 5 same-seed runs each of B and 
 
 That is about 24 T4-hours over four days, so it fits even with Colab's daily limits. If Kaggle doesn't work, see trigger R4 in §8.
 
+### 3.4 With the A100 (2 h per weekday, added 29 Oct)
+
+**The A100's speed is not measured yet.** The first visit must time one full run (B on fern, 6000 iterations), then 2 and 4 copies in parallel. Until then, plan with three scenarios.
+
+Assumptions:
+- Each 2-hour window gives about **95 usable minutes**: about 15 min to start (environment, data check, runner) and about 10 min to drain (`touch STOP`) and copy results out.
+- Parallel slots fit easily (one run needs about 1.7 GB), but they make the runs `shared_gpu: true`. Efficiency numbers therefore keep coming from the T4 runs only.
+
+| Scenario | Slots × minutes per run | Runs per visit | By Wed 4 Nov (3 visits) | By Fri 6 Nov (5 visits) |
+| --- | --- | --- | --- | --- |
+| Pessimistic | 1 × 3.5 | 27 | 81 | 135 |
+| Middle | 3 × 4.5 | 63 | 189 | 315 |
+| Optimistic | 4 × 3.5 | 108 | 324 | 540 |
+
+**The A100 alone cannot carry the core** (296 runs):
+- by Wed 4 Nov it does so only in the optimistic case, with no margin;
+- in the pessimistic case it would need 11 visits.
+
+**Split by whole blocks**, so each comparison stays on one GPU type:
+- **T4 (Colab ×2):** T1 + N + G, 176 runs ≈ 14.4 T4-h. Capacity Sat 31 Oct – Tue 3 Nov is about 2 accounts × 14 h ≈ 28 h, about twice what is needed.
+- **A100:** block V **self-contained, with its own 3-view row**: A–E × {2, 3, 6, 9} × 8 = 160 runs. That finishes:
+  - in the middle scenario, in 3 visits (Mon–Wed);
+  - in the optimistic scenario, in 2 visits;
+  - in the pessimistic scenario, with 9-view cut (120 runs), in 5 visits, which runs to Fri 6 Nov.
+- **Laptop nights as the backup for V:** 160 runs × 7.5 min ≈ 20 h, i.e. the nights of 31 Oct, 1 Nov and 2 Nov.
+- **If one Colab account fails:** T4 capacity drops to about 14 h, with no margin. The A100's Monday visit then runs T1 seed 2 as a whole seed (40 runs) before starting V.
+
+**A100 visits**
+
+| Visit | Work |
+| --- | --- |
+| Thu 29 / Fri 30 Oct | Environment, extensions for sm_80, data md5, the timing test at `upstream-baseline`. A smoke test of the dropout branch with `--allow_untagged` |
+| Mon 2 – Wed 4 Nov | Block V from `v1.0-exp` (2-view first); T1 seed 2 if Colab fell short |
+| Thu 5 – Fri 6 Nov | Reruns, then stretch S only |
+
+**Ask the lab first:** can jobs keep running after the 2-hour window ends? If yes, all of the above roughly multiplies by 5 or more, and the A100 could take all of T1.
+
 ---
 
 ## 4. Code work (Aayush, Wed 28 – Sat 31 Oct)
