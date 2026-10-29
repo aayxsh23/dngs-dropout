@@ -223,6 +223,8 @@ REPO=$1; TMP=$2
   if (cd "$T/a" && TEAM_CONTEXT_WT="$T/wa" bash "$SCRIPT" open aayush) 2>/dev/null; then echo "open discarded a change"; exit 1; fi
   if (cd "$T/d" && TEAM_CONTEXT_WT="$T/none" bash "$SCRIPT" push disha "x") 2>/dev/null; then echo "push without open"; exit 1; fi
   if (cd "$T/d" && bash "$SCRIPT" show bob) 2>/dev/null; then echo "accepted unknown name"; exit 1; fi
+  if (cd "$T/d" && bash "$SCRIPT" show disha '1p;e echo pwned') 2>/dev/null; then echo "show passed a non-number to sed"; exit 1; fi
+  [ "$(cd "$T/d" && bash "$SCRIPT" show disha 1)" = "# D" ]
   # A feature checkout is never pushed to team-context, even from inside the main clone.
   (cd "$T/a" && g switch -q -c feat/x && echo y > y && g add y && g commit -qm y)
   if (cd "$T/a" && TEAM_CONTEXT_WT="$T/a" bash "$SCRIPT" push aayush "wrong tree") 2>/dev/null; then echo "pushed a feature tree"; exit 1; fi

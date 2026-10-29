@@ -24,8 +24,10 @@ ahead() { git -C "$WT" log --format=%H "origin/$BRANCH..HEAD"; }
 
 case "$cmd" in
 show)
+  lines=${3:-80}
+  case "$lines" in ''|*[!0-9]*) echo "show: line count must be a number" >&2; exit 2 ;; esac
   git -C "$repo" fetch -q origin "$BRANCH"
-  git -C "$repo" show "origin/$BRANCH:$file" | sed -n "1,${3:-80}p"
+  git -C "$repo" show "origin/$BRANCH:$file" | sed -n "1,${lines}p"
   ;;
 open)
   git -C "$repo" fetch -q origin "$BRANCH"
