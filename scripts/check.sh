@@ -113,7 +113,7 @@ missing = [k for k in ("scenes", "seeds", "n_views", "variants", "steps") if k n
 assert not missing, "%s: missing keys %s" % (sys.argv[1], missing)
 for name, v in cfg["variants"].items():
     assert set(v) == {"depth_scale", "drop_rate", "depth_render"}, "%s variant %s: %s" % (sys.argv[1], name, v)
-    assert v["depth_render"] in ("shared", "clean"), (sys.argv[1], name)
+    assert v["depth_render"] in ("shared", "clean", "hard_only", "soft_only"), (sys.argv[1], name)
 print("ok", sys.argv[1], len(cfg["scenes"]) * len(cfg["seeds"]) * len(cfg["n_views"]) * len(cfg["variants"]), "runs")
 EOF
   done
