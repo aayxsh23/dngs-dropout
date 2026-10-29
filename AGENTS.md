@@ -22,7 +22,9 @@ Every experimental variant is the **same code with different command-line flags*
 The main benchmark is LLFF 3-view (8 scenes × 5 variants × 3 seeds = 120 runs).
 
 **Read these before planning any work:**
-- [docs/PLAN.md](docs/PLAN.md): the current plan, status, decisions, specs and schedule. **It overrides the playbook wherever they differ.**
+- [docs/PLAN_V2.md](docs/PLAN_V2.md): the current plan: scope, experiment blocks, analysis rules, and the dated task list (AY-nn for Aayush, DS-nn for Disha) to submission on 10 Nov. **It overrides PLAN.md and the playbook wherever they differ.**
+- The **team context files** on the `team-context` branch (see "Team context files" below): what each person has done, is doing and needs from the other. Read the other person's file before starting work.
+- [docs/PLAN.md](docs/PLAN.md): the build specs W2–W13 (§5) and reference numbers (§10), which PLAN_V2 still uses.
 - [docs/research_proposal_sparse_view_3dgs_2.md](docs/research_proposal_sparse_view_3dgs_2.md): the original team playbook (12 Oct). Read it for background and runbooks.
 
 ## Environments: code must run on all of them
@@ -151,6 +153,61 @@ Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.
   The hook script and `.claude/settings.json` themselves are read from the checked-out branch. So branches cut before the gate landed (e.g. an old `feat/dropout`) have no hook: rebase them onto `main`. The hook guards against honest mistakes; it is not a sandbox (`bash -c`, `eval` or a script file can hide commands). It binds only Claude Code sessions in this repo.
 - **The GitHub ruleset on `main`** (`scripts/setup_repo_rules.sh --apply`): required checks `checks` + `agent-review`, code-owner review, no direct push or force-push. It enforces the gate server-side for everyone, humans included. Rulesets need a public repo (the repo is public again since 12 Oct night) or GitHub Pro, and an admin applies them once, after the gate PR is merged. The script stops without changing anything when rulesets are unavailable. Until it has run, nothing server-side stops a human (or the owner's token outside Claude Code) from merging a red PR: follow the workflow by hand and never merge a PR whose `checks` or `agent-review` isn't green.
 
+## Team context files (every agent, both people)
+
+Two files keep Aayush and Disha in sync between the 21:30 calls:
+
+| File | Written by | Read by |
+| --- | --- | --- |
+| `aayush_context.md` | Aayush's agents only | Disha and her agents |
+| `disha_context.md` | Disha's agents only | Aayush and his agents |
+
+**Where they live.** Both files are on the **`team-context` branch**, not on `main`. They change many times a day, and `main` needs a reviewed PR for every change. The Bash hook blocks only pushes to `main`, so pushing to `team-context` is allowed. Never merge `team-context` into `main`.
+
+**Who you are.** Use `git config user.name`. If it contains "Aayush", your file is `aayush_context.md`. If it contains "Disha", your file is `disha_context.md`. Otherwise ask the human. Never edit the other person's file.
+
+**Before starting any task,** read the other person's file and your own status block:
+```bash
+git fetch -q origin team-context
+git show origin/team-context:disha_context.md | sed -n '1,80p'     # or aayush_context.md
+```
+
+**After finishing any piece of work, update your file.** That includes:
+- a PR opened, reviewed or merged;
+- a run block started, finished or failed;
+- a decision or a blocker;
+- a PLAN_V2 task done.
+
+Your file has two parts:
+1. **Rewrite the Status block** at the top: updated time (IST), the task you're on, task IDs done, what you're waiting on from the other person, and your next deadline.
+2. **Add a log entry at the top of the Log** (newest first), using the file's template:
+   - **Done:** what you did, with task IDs.
+   - **Evidence:** PR links, commit SHAs, Drive paths, key numbers.
+   - **Needs from the other person:** with deadlines.
+   - **Next:** your next task.
+   - **Aayush's file only, "Message to Disha":** the same message the agent drafts in its reply (CLAUDE.md).
+
+Then commit and push only that file:
+```bash
+NAME=aayush                                    # or disha
+WT="$(mktemp -d)/team-context"
+git fetch -q origin team-context
+git worktree add -q --detach "$WT" origin/team-context
+# ... edit "$WT/${NAME}_context.md" ...
+git -C "$WT" add "${NAME}_context.md"
+git -C "$WT" commit -q -m "context(${NAME}): <one line>"
+for i in 1 2 3; do                              # the other person may have pushed meanwhile
+  git -C "$WT" push -q origin HEAD:team-context && break
+  git -C "$WT" fetch -q origin team-context && git -C "$WT" rebase -q origin/team-context
+done
+git worktree remove --force "$WT"
+```
+
+**Rules for the context files:**
+- Facts only, with links: no secrets or tokens, no pasted logs longer than a few lines.
+- A change of scope or of the analysis rules goes into PLAN_V2 through a PR. The context files record status; they don't change the plan.
+- Experiment events (a block started, failures, reruns) also go into `RUNLOG.md` on `main` at the milestones.
+
 ## Practical gotchas
 
 - **The rasterizer is nondeterministic.** The same seed gave 17.75 and 17.29 PSNR on fern at 1100 iterations. Compare variants with means over seeds and scenes, never single runs.
@@ -164,7 +221,7 @@ Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.
 
 ## How to work here
 
-- Read `docs/PLAN.md` first. The status table at its top is the single place where progress is recorded, so update it when you finish something.
+- Read `docs/PLAN_V2.md` and the other person's context file first. Progress is recorded by task ID in your own context file (below), not in PLAN.md's old status table.
 - Write code that matches the surrounding style: argparse groups in `arguments/`, the same comment density, minimal diffs. Don't refactor upstream code you don't need to touch; it keeps our diff against DNGaussian reviewable.
 - Test changes with `bash scripts/check.sh` (seconds, no GPU) and, for training code, `bash scripts/gpu_smoke.sh` (1100 iterations on `fern` per variant). Then check that the defaults (variant B) still behave like upstream.
 - When you change behaviour, say in the PR which variants it affects and how you tested it.
