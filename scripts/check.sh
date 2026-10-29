@@ -35,7 +35,7 @@ else PYA=(); fi
 TRAIN_PATHS=(train_llff.py render.py metrics.py spiral.py gaussian_renderer utils scene arguments)
 [ -f experiments/run_matrix.py ] && TRAIN_PATHS+=(experiments/run_matrix.py)
 # Also run in the laptop's Python 3.7 env.
-for f in experiments/geometry.py scripts/peak_vram.py; do [ -f "$f" ] && TRAIN_PATHS+=("$f"); done
+for f in experiments/geometry.py experiments/probes.py scripts/peak_vram.py; do [ -f "$f" ] && TRAIN_PATHS+=("$f"); done
 EVAL_PATHS=(render.py render_sh.py metrics.py metrics_dtu.py metrics_count.py spiral.py)
 step "1. Syntax errors and undefined names (ruff E9,F63,F7,F82)"
 if ruff_ check --no-cache --quiet --select E9,F63,F7,F82 --target-version py37 \
