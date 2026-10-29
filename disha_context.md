@@ -3,9 +3,9 @@
 Written only by Disha's agents; read by Aayush and his agents. The protocol is in AGENTS.md, "Team context files". The plan and task IDs (AY-nn, DS-nn) are in `docs/PLAN_V2.md` §7.
 
 ## Status (rewritten on every update)
-- **Updated:** Thu 29 Oct 2026, 22:20 IST (taken over from the seed; corrected)
-- **Working on:** DS-04 Kaggle smoke test (tonight), then DS-08 V3 regression at #19's head
-- **Done (PLAN_V2 §7):** DS-02 (reports on #11 and #14), DS-03 (PR #20), DS-05 (review of #19)
+- **Updated:** Thu 29 Oct 2026, 23:10 IST
+- **Working on:** DS-08 V3 regression at #19's head (Colab T4)
+- **Done (PLAN_V2 §7):** DS-04 (Kaggle YES), DS-02 (reports on #11 and #14), DS-03 (PR #20), DS-05 (review of #19)
 - **Open PRs:**
   - #11 (Colab: Cell V3, Cell 7b with `SEEDS`, `--work_root` and a `BLOCK` selector for T1/P/G/N): Approve @ 898b7cd
   - #14 (PLAN T1 footnote, FSGS/3DGS note, FSGS arXiv ID): Approve @ bb94fbf
@@ -15,7 +15,7 @@ Written only by Disha's agents; read by Aayush and his agents. The protocol is i
   - fix the High on #17 before I approve it (its CLAUDE.md names your file, so my agents would write `aayush_context.md`);
   - confirm the 5 analysis choices in #20's body before `prereg-v1`;
   - a runner smoke at #19's head before tagging `v1.0-exp` (#19 review, finding 7).
-- **Next deadline:** DS-04 Kaggle yes/no tonight 23:59; DS-08 V3 + DS-09 approve #19 by Sat 14:00 (earlier if I can)
+- **Next deadline:** DS-08 V3 + DS-09 approve #19 by Sat 14:00 (earlier if I can)
 
 ## Entry template
 ```
@@ -27,6 +27,12 @@ Written only by Disha's agents; read by Aayush and his agents. The protocol is i
 ```
 
 ## Log (newest first)
+
+### Thu 29 Oct, 23:10 IST · DS-04: Kaggle smoke test passes
+- Done: DS-04. One fern run at `upstream-baseline` on Kaggle (notebook `kaggle_smoke_ds04.ipynb`, 6000 iterations, 2 x Tesla T4, Python 3.13, torch 2.11+cu128, nvcc 12.8).
+- Evidence: **KAGGLE YES.** m = 4.44 min per run (train 4.03 + render/metrics 0.41; Colab T4: 4.9). Fern PSNR 21.07, SSIM 0.679, LPIPS 0.272 (Colab: 20.80). The four extensions built for sm_75. Training needed only the tag, with no token. Kaggle has no cache between sessions, so the build (~10 min) repeats every session.
+- Needs from Aayush: nothing. Decision for him: block N (8 runs) can run on Kaggle as PLAN_V2 §3.3 says; with two T4s, block V is an alternative if the A100 falls through (R4). The two-GPU parallel test (Cell 7) is not run yet.
+- Next: DS-08 V3 at 4f03a37, then DS-09 approve #19.
 
 ### Thu 29 Oct, 22:20 IST · Reviews of #17/#19, Cell 7b block selector, DS-03 PR #20
 - Done:
