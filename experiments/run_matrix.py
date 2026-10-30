@@ -14,6 +14,7 @@ import argparse
 import glob
 import itertools
 import json
+import math
 import os
 import shlex
 import shutil
@@ -36,7 +37,7 @@ def git(*args):
 
 def code_tag(allow_untagged):
     """The tag at HEAD. A tagged run must also have no changes to tracked files (AGENTS.md invariant 5)."""
-    out = git("describe", "--tags", "--exact-match", "HEAD")
+    out = git("describe", "--tags", "--exact-match", "--match", "v*-exp", "HEAD")   # invariant 5: only v1.x-exp tags
     dirty = bool(git("status", "--porcelain", "--untracked-files=no").stdout.strip())
     if out.returncode == 0 and not dirty:
         return out.stdout.strip()
@@ -81,6 +82,10 @@ def build_metrics(work, variant, scene, n_views, seed, wall, tag, shared_gpu):
     for name, d in (("train_stats.json", train), ("render_stats.json", rstats), ("config.json", config)):
         if not d:
             raise RuntimeError("%s is missing or unreadable" % name)
+    for key in ("PSNR", "SSIM", "LPIPS"):
+        v = m.get(key)
+        if not isinstance(v, (int, float)) or not math.isfinite(v):
+            raise RuntimeError("results_eval.json has no finite %s (%r)" % (key, v))
     rec = dict(train)   # all train_stats keys, incl. the C3 structure statistics
     rec.update(variant=variant, scene=scene, n_views=n_views, seed=seed,
                psnr=m.get("PSNR"), ssim=m.get("SSIM"), ssim_sk=m.get("SSIM_sk"), lpips=m.get("LPIPS"),
@@ -94,11 +99,12 @@ def build_metrics(work, variant, scene, n_views, seed, wall, tag, shared_gpu):
 
 
 def mark_failed(work, out, status):
-    """W8 step 7: FAILED marker plus run.log next to the outputs; the run is redone next time."""
-    with open(os.path.join(work, "FAILED"), "w") as f:
-        f.write(status + "\n")
+    """W8 step 7: FAILED marker plus run.log next to the outputs (also on Drive); the run is redone next time."""
+    for d in {work, out}:
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "FAILED"), "w") as f:
+            f.write(status + "\n")
     if work != out:
-        os.makedirs(out, exist_ok=True)
         shutil.copy(os.path.join(work, "run.log"), out)
 
 
@@ -127,7 +133,7 @@ def main():
     i, n = (int(x) for x in a.shard.split("/"))
     runs = runs_for(cfg, seeds)
     mine = runs[i::n]
-    tag = code_tag(a.allow_untagged)
+    tag = code_tag(a.allow_untagged or a.dry_run)   # a dry run only prints, so it may preview an untagged checkout
     work_root = a.work_root or a.out_root
     print("%s: shard %s, seeds %s: %d of %d runs, tag %s, keeping checkpoints for seeds %s"
           % (a.matrix, a.shard, seeds, len(mine), len(runs), tag, keep), flush=True)
@@ -143,7 +149,8 @@ def main():
             skipped += 1
             continue
         flags = " ".join("--%s %s" % (k, v) for k, v in cfg["variants"][variant].items())
-        fill = dict(python=sys.executable, scene_dir=os.path.join(a.data_root, scene), work=work, n_views=nv,
+        q = shlex.quote   # paths may contain spaces ("/content/drive/My Drive"); the steps go through shlex.split
+        fill = dict(python=q(sys.executable), scene_dir=q(os.path.join(a.data_root, scene)), work=q(work), n_views=nv,
                     seed=seed, variant_flags=flags, train_flags=" ".join(str(cfg.get("train_flags", "")).split()))
         cmds = [step.format(**fill) for step in cfg["steps"]]
         if a.dry_run:

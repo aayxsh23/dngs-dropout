@@ -63,7 +63,7 @@ peak VRAM of one training run: python scripts/peak_vram.py train_llff.py <same f
 8-scene reproduction summary:   python avg_llff.py    # reads output/llff/<scene>/results_eval.json
 ```
 
-Experiment runner (being built, see PLAN W8): `python experiments/run_matrix.py --matrix experiments/matrix.yaml --data_root <llff dir> --out_root <outputs> --shard i/N --seeds 0 [--dry_run]`. Always try `--dry_run` first.
+Experiment runner (PLAN W8, PLAN_V2 §3): `python experiments/run_matrix.py --matrix experiments/matrix.yaml --data_root <llff dir> --out_root <outputs> --shard i/N --seeds 0 [--dry_run]`. Always try `--dry_run` first.
 
 ## How the code is laid out (what matters for this project)
 

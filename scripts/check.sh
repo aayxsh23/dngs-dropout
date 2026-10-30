@@ -237,7 +237,75 @@ assert good["mvc5"] > 0.98, good
 assert bad is None or bad["mvc5"] < 0.5, bad
 EOF
 
-printf '\n== Summary\n' 
+step "17. run_matrix.py end to end with fake steps (done, failed, missing PSNR, spaces in paths, rerun skips)"
+if [ ${#PYA[@]} -eq 0 ]; then skip "runner end-to-end" "pyyaml unavailable"
+else
+  R="$TMP/runner"; mkdir -p "$R"
+  # Fake train/render/metrics steps; the variant comes from the work path (.../llff_3v/<variant>/<scene>/seed<k>).
+  cat > "$R/fake_step.py" <<'EOF'
+import json, os, sys
+step, work = sys.argv[1], sys.argv[2]
+variant = os.path.normpath(work).split(os.sep)[-3]
+if step == "train":
+    if variant == "bad":
+        sys.exit(3)
+    json.dump({"git_commit": "abc1234", "gpu": "FakeGPU", "drop_rate": 0.2, "depth_scale": 1, "depth_render": "shared"},
+              open(os.path.join(work, "config.json"), "w"))
+    json.dump({"train_time_s": 1.0, "n_gaussians": 10, "torch_version": "x"}, open(os.path.join(work, "train_stats.json"), "w"))
+    open(os.path.join(work, "events.out.tfevents.1"), "w").write("x")
+    open(os.path.join(work, "chkpnt_latest.pth"), "w").write("x")
+elif step == "render":
+    json.dump({"fps": 100.0}, open(os.path.join(work, "render_stats.json"), "w"))
+else:
+    m = {"SSIM": 0.6, "SSIM_sk": 0.6, "LPIPS": 0.3}
+    if variant != "nopsnr":
+        m["PSNR"] = 18.5
+    json.dump({"ours_6000": m}, open(os.path.join(work, "results_eval.json"), "w"))
+EOF
+  cat > "$R/m.yaml" <<EOF
+scenes: [fern]
+seeds: [0]
+n_views: [3]
+keep_ckpt_seeds: []
+variants:
+  ok: {depth_scale: 1, drop_rate: 0.2, depth_render: shared}
+  bad: {depth_scale: 1, drop_rate: 0.2, depth_render: shared}
+  nopsnr: {depth_scale: 1, drop_rate: 0.2, depth_render: shared}
+steps:
+  - "{python} $R/fake_step.py train {work}"
+  - "{python} $R/fake_step.py render {work}"
+  - "{python} $R/fake_step.py metrics {work}"
+EOF
+  if "${PYA[@]}" - "$R" >"$TMP/runner.log" 2>&1 <<'EOF'; then pass; else tail -15 "$TMP/runner.log"; fail "run_matrix.py end to end"; fi
+import json, os, subprocess, sys
+R = sys.argv[1]
+out, work = os.path.join(R, "out root"), os.path.join(R, "work root")   # spaces on purpose
+cmd = [sys.executable, "experiments/run_matrix.py", "--matrix", os.path.join(R, "m.yaml"), "--data_root", R,
+       "--out_root", out, "--work_root", work]
+p = subprocess.run(cmd + ["--allow_untagged"], capture_output=True, text=True)
+print(p.stdout, p.stderr)
+assert p.returncode == 1, "failures must make the runner exit 1"
+ok = os.path.join(out, "llff_3v", "ok", "fern", "seed0")
+m = json.load(open(os.path.join(ok, "metrics.json")))
+assert m["psnr"] == 18.5 and m["fps"] == 100.0 and m["gpu"] == "FakeGPU", m
+assert not os.path.exists(os.path.join(ok, "metrics.json.tmp"))
+assert not [f for f in os.listdir(ok) if f.startswith("events.out") or f.endswith(".pth")], os.listdir(ok)
+for v in ("bad", "nopsnr"):
+    d = os.path.join(out, "llff_3v", v, "fern", "seed0")
+    assert os.path.exists(os.path.join(d, "FAILED")) and os.path.exists(os.path.join(d, "run.log")), (v, os.listdir(d))
+    assert not os.path.exists(os.path.join(d, "metrics.json")), v
+assert "1 done" in p.stdout and "2 failed" in p.stdout, p.stdout
+p2 = subprocess.run(cmd + ["--allow_untagged"], capture_output=True, text=True)
+assert "1 already done" in p2.stdout, p2.stdout
+dry = subprocess.run(cmd + ["--dry_run"], capture_output=True, text=True)
+assert dry.returncode == 0, dry.stdout + dry.stderr
+real = subprocess.run(cmd, capture_output=True, text=True)
+assert real.returncode != 0 and "tag" in (real.stdout + real.stderr), "an untagged real run must be refused"
+print("runner ok")
+EOF
+fi
+
+printf '\n== Summary\n'  
 [ ${#SKIPPED[@]} -gt 0 ] && echo "Skipped locally: ${SKIPPED[*]}"
 if [ ${#FAILED[@]} -gt 0 ]; then
   echo "FAILED (${#FAILED[@]}): ${FAILED[*]}"
