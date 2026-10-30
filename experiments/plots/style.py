@@ -41,6 +41,14 @@ def end_labels(ax, items, min_gap=0.07):
         ax.text(x, yl, "  " + text, va="center", ha="left", fontsize=7, color=INK, clip_on=False)
 
 
+def margin_band(ax, delta, axis="y"):
+    """Shade ±delta around zero (PLAN_V2 §5: a CI inside the band is "equivalent to 0") and draw the zero line."""
+    span, line = (ax.axhspan, ax.axhline) if axis == "y" else (ax.axvspan, ax.axvline)
+    if delta:
+        span(-delta, delta, color=GRID, alpha=0.6, linewidth=0, zorder=0)
+    line(0, color=INK_2, linewidth=0.8, zorder=1)
+
+
 def save(fig, figures_dir, name):
     import os
     os.makedirs(figures_dir, exist_ok=True)
