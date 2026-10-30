@@ -80,7 +80,7 @@ Monday's measurements change several assumptions in the playbook.
 | **R3** | **The A100 becomes optional.** Send the admin questions anyway. Build only a light go-bag (git bundle, data tar, conda-pack): about 1 h instead of a day. | Nothing on the critical path needs it any more. It remains the fallback if Colab refuses GPUs, and a bonus for the optional Tier 2b. |
 | **R4** | Variants D and E are defined on **DNGaussian's actual structure**: three separate rasterizations per iteration (hard depth, soft depth, photometric). D applies the dropout mask to all three; E applies it only to the photometric pass. | DNGaussian never computes its depth loss on the photometric render, so the playbook's "depth loss on the dropout render" has to mean "the depth passes also see the mask". **E costs no extra render**, since DNGaussian already renders depth separately. The playbook's rule 6 ("one extra render per iteration") does not apply. |
 | **R5** | The runner reads **`results_eval.json`** and writes `ssim_sk` as well. On Colab it trains on local disk and copies only small files to Drive. It deletes TensorBoard events everywhere, and checkpoints for every seed except 0. | `metrics.py` writes `results_eval.json`, not `results.json`. One run is 337 MB with spiral renders: 164 MB checkpoint plus 13 MB TensorBoard. 120 such runs would overflow 15 GB Drive quotas. |
-| **R6** | The **main table uses the 3DGS SSIM** (`SSIM`). `SSIM_sk` goes in the appendix. | Our reproduction gives 0.594 with 3DGS SSIM and 0.583 with sklearn, against the paper's 0.591. The paper's number matches the 3DGS implementation. |
+| **R6** | The **main table uses the 3DGS SSIM** (`SSIM`). `SSIM_sk` goes in the appendix. | Our reproduction gives 0.594 with 3DGS SSIM and 0.583 with sklearn, against the paper's 0.591. The paper's number matches the 3DGS implementation. **Note 14 Oct:** DNGaussian's paper states it uses scikit-image SSIM (#10), so the like-for-like comparison is `SSIM_sk` 0.583 vs 0.591. D2 stands until the team decides otherwise; T1 footnotes the difference. |
 | **R7** | Tier 2 includes **both D and E**, so no second tag is needed. | Disha's suggestion. Only 32 more runs. |
 | **R8** | Dropout: γ = 0.2 with the **official schedule, verbatim**: r(t) = γ · t / 10000. Over our 6000 iterations r rises linearly to **0.12**. | DropGaussian's official code hard-codes `0.2 * (iteration/10000)` (10000 is their total). Decided 13 Oct (D1): port it unchanged instead of rescaling to our T, so our dropout is exactly their code. The report states that the rate peaks at 0.12, not 0.2. |
 
@@ -477,7 +477,7 @@ The contrast separates "the combination is worse" from "dropout simply hurts on 
 | # | Item | Owner | Script → output | Inputs | Ready by |
 | --- | --- | --- | --- | --- | --- |
 | F1 | One iteration of D vs E: three passes, where the mask applies, which loss goes where | Aayush | draw.io or TikZ → `results/figures/fig1_iteration.pdf` | §5 W2/W3 | Fri |
-| T1 | Main table: LLFF 3-view, A–E mean ± std over seeds; published baselines below a rule labelled "reported" | Disha | `aggregate.py` → `results/tables/main_3v.tex` | all `metrics.json`, `reported_baselines.csv` | Fri |
+| T1 | Main table: LLFF 3-view, A–E mean ± std over seeds; published baselines below a rule labelled "reported". Footnote: reported rows come from each method's own paper, except 3DGS (CoR-GS's re-run); FSGS is its ECCV version, not the arXiv v1 numbers other tables copy; DNGaussian's SSIM (0.591) is scikit-image, i.e. our `SSIM_sk`. `aggregate.py` writes no footnote: Disha adds it to the LaTeX caption | Disha | `aggregate.py` → `results/tables/main_3v.tex` | all `metrics.json`, `reported_baselines.csv` | Fri |
 | T2 | Per-scene PSNR (appendix) | Disha | `aggregate.py` → `per_scene_3v.csv` | — | Fri |
 | T3 | Paired comparisons and interaction contrasts I_D, I_E with CIs (§6) | Disha | `experiments/stats.py` → `results/tables/paired_3v.tex` (+ `verdict_3v.txt`) | `runs.csv` | Fri |
 | F2 | Diagnostic curves: `loss_depth_used − loss_depth_clean` vs iteration for C, D, E (mean ± std over scenes); `depth_var_masks` vs iteration for A–E | Disha (script), Aayush (interpretation) | `experiments/plots/diag_curves.py` → `fig_diag.pdf` | all `diag.csv` | Thu night |
@@ -580,7 +580,7 @@ Each Colab account runs 60 Tier 1 runs: about **5 GPU-hours** (about 3.4 h Wed, 
 | room | 20.46 | 0.762 | 0.741 | 0.276 |
 | trex | 19.93 | 0.711 | 0.703 | 0.241 |
 | **Mean** | **18.73** | **0.594** | **0.583** | **0.297** |
-| Paper (DNGaussian, Table 1) | 19.12 | 0.591 | — | 0.294 |
+| Paper (DNGaussian, Table 1; SSIM is scikit-image) | 19.12 | — | 0.591 | 0.294 |
 
 **Cross-machine check:** fern on the Colab T4 (Disha's depth, PyTorch 2.11) gives PSNR 20.80, SSIM 0.674, LPIPS 0.257, against the laptop's 20.80, 0.671 and 0.262.
 
@@ -590,7 +590,7 @@ Each Colab account runs 60 Tier 1 runs: about **5 GPU-hours** (about 3.4 h Wed, 
 
 **Timing and memory:** laptop 7.5 min per full run, training footprint 1663 MB; T4 4.9 min per run.
 
-**Published LLFF 3-view numbers** (each row checked against the method's own paper in #10; sources in `results/reported_baselines.csv`). Papers differ in SSIM and LPIPS implementations, so these numbers are context, not like-for-like comparisons:
+**Published LLFF 3-view numbers** (each row except 3DGS checked against the method's own paper in #10; sources in `results/reported_baselines.csv`). Papers differ in SSIM and LPIPS implementations, so these numbers are context, not like-for-like comparisons:
 
 | Method | PSNR | SSIM | LPIPS |
 | --- | --- | --- | --- |
@@ -601,3 +601,5 @@ Each Colab account runs 60 Tier 1 runs: about **5 GPU-hours** (about 3.4 h Wed, 
 | FreeNeRF | 19.63 | 0.612 | 0.308 |
 | 3DGS | 19.22 | 0.649 | 0.229 |
 | DNGaussian | 19.12 | 0.591 | 0.294 |
+
+FSGS: ECCV 2024 Tab. 1. DropGaussian's and CoR-GS's tables carry FSGS's superseded arXiv v1 values, 20.43 / 0.682 / 0.248. 3DGS: CoR-GS's re-run, since vanilla 3DGS has no few-shot paper.
