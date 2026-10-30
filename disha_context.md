@@ -3,13 +3,13 @@
 Written only by Disha's agents; read by Aayush and his agents. The protocol is in AGENTS.md, "Team context files". The plan and task IDs (AY-nn, DS-nn) are in `docs/PLAN_V2.md` §7.
 
 ## Status (rewritten on every update)
-- **Updated:** Fri 30 Oct 2026, 18:55 IST
+- **Updated:** Fri 30 Oct 2026, 20:15 IST
 - **Working on:** DS-08 V3 regression at #19's head (Colab T4)
-- **Done (PLAN_V2 §7):** DS-04 (Kaggle YES), DS-02 (reports on #11 and #14), DS-03 (PR #20), DS-05 (review of #19)
+- **Done (PLAN_V2 §7):** DS-06 (PR #22, Approve), DS-07 skeleton (Claude Doc), DS-04 (Kaggle YES), DS-02 (reports on #11 and #14), DS-03 (PR #20), DS-05 (review of #19)
 - **Open PRs:**
-  - none of mine. #11, #14 and #20 are merged (30 Oct).
+  - #22 (DS-06 plots) @ 58faa48: CI green, agent review Approve (2 rounds). #11, #14 and #20 are merged (30 Oct).
 - **Waiting on Aayush:**
-  - nothing blocking. The 5 analysis choices in #20's body are to be confirmed by both of us before `prereg-v1`.
+  - `agent-review` + merge of #22 at 58faa48 (routine class). The 5 analysis choices in #20's body are to be confirmed by both of us before `prereg-v1`.
 - **Next deadline:** approve #12 (b3ef4b7) and #17 (ff2df54) now; DS-08 V3 + DS-09 approve #19 (2957499) by Sat 14:00
 
 ## Entry template
@@ -22,6 +22,12 @@ Written only by Disha's agents; read by Aayush and his agents. The protocol is i
 ```
 
 ## Log (newest first)
+
+### Fri 30 Oct, 20:15 IST · DS-06 plots PR #22; DS-07 Related Work skeleton
+- Done: DS-06. PR #22 adds `forest.py` (F6), `pass_loc.py` (F8), `dose.py` (F7), panel (c) of `views.py` (F5) and A at 2/6/9 views in the fixtures; T1/P/G/N fixture outputs unchanged. DS-07: Related Work skeleton (sections 2.1-2.5) and a 30-row source list, unverified rows marked "to check".
+- Evidence: https://github.com/aayxsh23/dngs-dropout/pull/22 (round 1 Approve with 6 Lows; Lows 1/2/3/5 fixed in 58faa48; delta review Approve, posted). DS-07 doc: https://claude.ai/artifact/JaLHkmvwQ4rpLv1EwBXSjs
+- Needs from Aayush: `agent-review` on 58faa48 and merge #22. After #12 merges I'll add the three new plot scripts to `check.sh` step 12 (gate class, needs your approval).
+- Next: approve #12 and #17; DS-08 V3, then approve #19 by Sat 14:00.
 
 ### Fri 30 Oct, 18:55 IST · Checked Aayush's new heads of #12, #17, #19
 - Done: verified the three heads Aayush asked me to approve. My `pr12_step12_fix.patch` is withdrawn: b3ef4b7 already has the step-12 change (blocks P/G/N, factors/dose/noise outputs, the new verdict line).
