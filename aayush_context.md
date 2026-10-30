@@ -3,11 +3,11 @@
 Written only by Aayush's agents; read by Disha and her agents. The protocol is in AGENTS.md, "Team context files". The plan and task IDs (AY-nn, DS-nn) are in `docs/PLAN_V2.md` §7.
 
 ## Status (rewritten on every update)
-- **Updated:** Thu 29 Oct 2026, evening (IST)
-- **Working on:** waiting for approvals; A100 setup visit Fri (AY-10)
-- **Done (PLAN_V2 §7):** AY-01 (#16 merged), AY-02, AY-03, AY-06, AY-07, AY-08, AY-09 + AY-11 (one PR, #19), AY-21 (`geometry.py`, early), AY-22 (`probes.py`, early, branch `feat/probes`); AY-05 partly (git bundle and visit kit ready; `conda pack` waits on the lab's OS)
-- **Waiting on Disha:** approve #19 after the V3 regression at its head (DS-08/DS-09; the earlier the better, at the latest Sat 14:00); approve #17 and #12; reviewer reports on #11 and #14; DS-03 `stats.py` v2 (Fri 18:00); DS-04 Kaggle yes/no
-- **Next deadline:** tags `v1.0-exp` + `prereg-v1` as soon as #19 is approved (plan: Sat 16:00), then Tier 1 starts on Colab
+- **Updated:** Fri 30 Oct 2026, midday (IST)
+- **Working on:** A100 visit 1 (AY-10) today; waiting for approvals before tagging
+- **Done (PLAN_V2 §7):** AY-01–03, AY-06–09 + AY-11 (#19), AY-21, AY-22 (`feat/probes`), AY-04 partly (merged #11, #14, #20; #12 and #17 are ready); AY-05 partly
+- **Waiting on Disha:** (1) V3 regression at #19's head **2957499** (DS-08), then approval (DS-09); (2) approve #17 (head ff2df54) and #12 (head b3ef4b7); (3) confirm the 5 analysis choices in #20 before `prereg-v1`
+- **Next deadline:** tags `v1.0-exp` + `prereg-v1` once #19 is approved (plan: Sat 16:00)
 
 ## Entry template
 ```
@@ -20,6 +20,13 @@ Written only by Aayush's agents; read by Disha and her agents. The protocol is i
 ```
 
 ## Log (newest first)
+
+### Fri 30 Oct, midday · Disha's reviews handled; #12, #17, #19 ready for her approval
+- Done: AY-04 (merged #14, #11, #20 after checking her reviewer's Approve); #19 runner Lows 1-6 fixed (check.sh step 17); #17 High fixed (identity-aware `team_context.sh`, step 13); #12 rebased onto #20 (step 12: new verdict line, blocks P/G/N). Follow-ups: issues #15, #18, #21.
+- Evidence: #19 head 2957499: GPU-SMOKE PASS (A-E), runner smoke 5 done 0 failed, delta review Approve, agent-review set. #17 head ff2df54 and #12 head b3ef4b7: Approve reports and agent-review set. CI green on all three.
+- Needs from Disha: V3 at 2957499 and approval of #19 (by Sat 14:00); approve #17 and #12; confirm #20's 5 analysis choices before prereg-v1.
+- Next: A100 visit 1 (AY-10); then tags v1.0-exp and prereg-v1 and T1 seed 0 once #19 is approved (AY-12, AY-13).
+- Message to Disha: "Hi Disha, thanks for the Kaggle test and the reviews. Kaggle is a yes: block N goes there, and I'll note block V as the fallback if the A100 falls through. Done on my side: I merged #14, #11 and #20 (stats.py v2) with the agent-review statuses. I fixed your findings on #19 (runner Lows 1-6) and on #17 (your High: the script now refuses any file but your own, and CLAUDE.md follows who the session works for; set TEAM_CONTEXT_ME=disha in your cloud sessions). I also rebased #12 onto #20 and updated its step 12 to the new verdict line and blocks P, G, N. Both smoke tests pass at #19's new head 2957499: GPU-SMOKE PASS (A-E) and the runner smoke, 5 done and 0 failed (posted on #19). What I need from you: (1) The V3 regression at 2957499, with Cell 3 set to TAG='feat/dropout' as you said. The code is the same as 4f03a37, so a result from either commit is valid. Post the two numbers on #19, then approve it (DS-08/09). Fine tomorrow morning, but the earlier the better, at the latest Sat 14:00. (2) Approve #17 (head ff2df54) and #12 (head b3ef4b7): both have an Approve report and the agent-review status. (3) Please confirm the 5 analysis choices in #20's description. I agree with all five; with your OK I tag prereg-v1. Please don't start any Colab matrix runs until I post that v1.0-exp is tagged."
 
 ### Thu 29 Oct, evening · Dropout code complete (#19), tested and reviewed
 - Done: AY-02, AY-03, AY-06, AY-07, AY-08, AY-09 + AY-11 (merged into one PR, #19), AY-21, AY-22. Merged #16 (PLAN_V2). #17 rebased and approved by the reviewer; it needs Disha's approval.
