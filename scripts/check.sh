@@ -202,7 +202,9 @@ REPO=$1; TMP=$2
   g switch -q --orphan team-context
   printf '# A\n' > aayush_context.md; printf '# D\n' > disha_context.md
   g add aayush_context.md disha_context.md; g commit -qm ctx; g push -q origin team-context
-  for c in a d; do g clone -q "$T/origin.git" "$T/$c"; git -C "$T/$c" config user.name "$c"; git -C "$T/$c" config user.email "$c@t"; done
+  g clone -q "$T/origin.git" "$T/a"; git -C "$T/a" config user.name "Aayush Trivedi"; git -C "$T/a" config user.email a@t
+  g clone -q "$T/origin.git" "$T/d"; git -C "$T/d" config user.name "Disha Singh"; git -C "$T/d" config user.email d@t
+  g clone -q "$T/origin.git" "$T/c"; git -C "$T/c" config user.name "Claude"; git -C "$T/c" config user.email c@t
   # Aayush and Disha edit at the same time; Disha pushes first, so Aayush's push must rebase and still succeed.
   fa=$(cd "$T/a" && TEAM_CONTEXT_WT="$T/wa" bash "$SCRIPT" open aayush); echo "entry A" >> "$fa"
   fd=$(cd "$T/d" && TEAM_CONTEXT_WT="$T/wd" bash "$SCRIPT" open disha); echo "entry D" >> "$fd"
@@ -225,6 +227,13 @@ REPO=$1; TMP=$2
   if (cd "$T/d" && bash "$SCRIPT" show bob) 2>/dev/null; then echo "accepted unknown name"; exit 1; fi
   if (cd "$T/d" && bash "$SCRIPT" show disha '1p;e echo pwned') 2>/dev/null; then echo "show passed a non-number to sed"; exit 1; fi
   [ "$(cd "$T/d" && bash "$SCRIPT" show disha 1)" = "# D" ]
+  # Only your own file: Disha's agent can't open Aayush's file; an unidentified cloud session must set TEAM_CONTEXT_ME.
+  if (cd "$T/d" && TEAM_CONTEXT_WT="$T/wd2" bash "$SCRIPT" open aayush) 2>/dev/null; then echo "Disha's agent opened Aayush's file"; exit 1; fi
+  if (cd "$T/c" && TEAM_CONTEXT_WT="$T/wc" bash "$SCRIPT" open disha) 2>/dev/null; then echo "an unidentified session opened a file"; exit 1; fi
+  fc=$(cd "$T/c" && TEAM_CONTEXT_ME=disha TEAM_CONTEXT_WT="$T/wc" bash "$SCRIPT" open disha); echo "entry C" >> "$fc"
+  (cd "$T/c" && TEAM_CONTEXT_ME=disha TEAM_CONTEXT_WT="$T/wc" bash "$SCRIPT" push disha "c1") >/dev/null
+  if (cd "$T/c" && TEAM_CONTEXT_ME=aayush TEAM_CONTEXT_WT="$T/wc" bash "$SCRIPT" push disha "x") 2>/dev/null; then echo "pushed with a mismatched TEAM_CONTEXT_ME"; exit 1; fi
+  git -C "$T/seed" fetch -q origin; git -C "$T/seed" show origin/team-context:disha_context.md | grep -q "entry C"
   # A feature checkout is never pushed to team-context, even from inside the main clone.
   (cd "$T/a" && g switch -q -c feat/x && echo y > y && g add y && g commit -qm y)
   if (cd "$T/a" && TEAM_CONTEXT_WT="$T/a" bash "$SCRIPT" push aayush "wrong tree") 2>/dev/null; then echo "pushed a feature tree"; exit 1; fi

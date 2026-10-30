@@ -7,6 +7,8 @@
 #   bash scripts/team_context.sh push <aayush|disha> "<summary>"   # commit that one file and push it
 #
 # Each command is self-contained, so they can run in separate shells (agents don't keep shell state).
+# open and push write only your OWN file: who you are comes from TEAM_CONTEXT_ME (aayush|disha), else from
+# git config user.name; a cloud session whose user.name is neither must set TEAM_CONTEXT_ME.
 # The worktree lives at a fixed path: TEAM_CONTEXT_WT, default ~/.cache/dngs-team-context.
 # push only ever pushes to team-context, refuses any change other than the caller's own file, and keeps the
 # worktree with the commit if the push fails, so nothing is lost.
@@ -22,6 +24,30 @@ EXPECTED="aayush_context.md disha_context.md "
 
 ahead() { git -C "$WT" log --format=%H "origin/$BRANCH..HEAD"; }
 
+whoami_ctx() {   # aayush | disha | "" (unknown)
+  local me=${TEAM_CONTEXT_ME:-}
+  if [ -z "$me" ]; then
+    case "$(git -C "$repo" config user.name | tr '[:upper:]' '[:lower:]')" in
+      *aayush*) me=aayush ;;
+      *disha*) me=disha ;;
+    esac
+  fi
+  case "$me" in aayush|disha|"") echo "$me" ;; *) echo "TEAM_CONTEXT_ME must be aayush or disha" >&2; return 1 ;; esac
+}
+
+require_owner() {   # open/push only your own file (AGENTS.md, "Team context files")
+  local me
+  me=$(whoami_ctx)
+  if [ -z "$me" ]; then
+    echo "cannot tell whose agent this is: git user.name is neither Aayush nor Disha; set TEAM_CONTEXT_ME=aayush|disha" >&2
+    exit 1
+  fi
+  if [ "$me" != "$name" ]; then
+    echo "you are $me: only ${name}'s agents write $file (yours is ${me}_context.md)" >&2
+    exit 1
+  fi
+}
+
 case "$cmd" in
 show)
   lines=${3:-80}
@@ -30,9 +56,11 @@ show)
   git -C "$repo" show "origin/$BRANCH:$file" | sed -n "1,${lines}p"
   ;;
 open)
+  require_owner
   git -C "$repo" fetch -q origin "$BRANCH"
   if [ -e "$WT/.git" ]; then
-    if [ -n "$(git -C "$WT" status --porcelain)" ] || [ -n "$(ahead)" ]; then
+    pending=$(ahead)   # on its own line: set -e does not see a failure inside [ ... ]
+    if [ -n "$(git -C "$WT" status --porcelain)" ] || [ -n "$pending" ]; then
       echo "an earlier context update in $WT is not pushed: run '$0 push $name \"...\"' or inspect it" >&2
       exit 1
     fi
@@ -47,6 +75,7 @@ open)
   echo "$WT/$file"
   ;;
 push)
+  require_owner
   msg=${3:-}
   [ -n "$msg" ] || { echo "push needs a one-line summary" >&2; exit 2; }
   [ -e "$WT/.git" ] || { echo "no worktree at $WT: run '$0 open $name' first" >&2; exit 1; }
@@ -58,7 +87,8 @@ push)
     git -C "$WT" add -- "$file"
     git -C "$WT" commit -q -m "context($name): $msg"
   fi
-  [ -n "$(ahead)" ] || { echo "nothing to push"; exit 0; }
+  pending=$(ahead)   # on its own line: set -e does not see a failure inside [ ... ]
+  [ -n "$pending" ] || { echo "nothing to push"; exit 0; }
   changed=$(git -C "$WT" diff --name-only "origin/$BRANCH...HEAD" | sort -u | tr '\n' ' ')
   [ "$changed" = "$file " ] || { echo "unpushed commits touch more than $file: $changed" >&2; exit 1; }
   ok=0
