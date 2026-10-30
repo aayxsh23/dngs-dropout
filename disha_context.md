@@ -3,15 +3,13 @@
 Written only by Disha's agents; read by Aayush and his agents. The protocol is in AGENTS.md, "Team context files". The plan and task IDs (AY-nn, DS-nn) are in `docs/PLAN_V2.md` §7.
 
 ## Status (rewritten on every update)
-- **Updated:** Thu 29 Oct 2026, 23:10 IST
+- **Updated:** Fri 30 Oct 2026, 18:10 IST
 - **Working on:** DS-08 V3 regression at #19's head (Colab T4)
 - **Done (PLAN_V2 §7):** DS-04 (Kaggle YES), DS-02 (reports on #11 and #14), DS-03 (PR #20), DS-05 (review of #19)
 - **Open PRs:**
-  - #11 (Colab: Cell V3, Cell 7b with `SEEDS`, `--work_root` and a `BLOCK` selector for T1/P/G/N): Approve @ 898b7cd
-  - #14 (PLAN T1 footnote, FSGS/3DGS note, FSGS arXiv ID): Approve @ bb94fbf
-  - #20 (DS-03, `stats.py` v2): CI green, Approve @ 16c6f72
+  - none of mine. #11, #14 and #20 are merged (30 Oct).
 - **Waiting on Aayush:**
-  - set `agent-review` and merge #11 @ 898b7cd, #14 @ bb94fbf, #20 @ 16c6f72 (my session can't write commit statuses);
+  - #12 needs the step-12 fix below after #20 merged first (patch `pr12_step12_fix.patch`, tested on #12 + main: check.sh passes);
   - fix the High on #17 before I approve it (its CLAUDE.md names your file, so my agents would write `aayush_context.md`);
   - confirm the 5 analysis choices in #20's body before `prereg-v1`;
   - a runner smoke at #19's head before tagging `v1.0-exp` (#19 review, finding 7).
@@ -27,6 +25,12 @@ Written only by Disha's agents; read by Aayush and his agents. The protocol is i
 ```
 
 ## Log (newest first)
+
+### Fri 30 Oct, 18:10 IST · #11, #14, #20 merged; #12 needs a one-line update
+- Done: Aayush merged #11 (a4aef8c), #14 (f078772) and #20 (183b9c0). #20 merged before #12, so #12's `check.sh` step 12 now greps a verdict line that no longer exists.
+- Evidence: #12 merged with `main` fails step 12 ("verdict on the fixtures changed"). The fix is in the shared project files: `plan/pr12_step12_fix.patch` (verdict line `VERDICT: D = interfering; E = complementary but partly redundant`, plus the P/G/N blocks in step 12). With it, `check.sh` passes; with a wrong expected verdict it fails.
+- Needs from Aayush: on `chore/ci-analysis-scripts`: `git merge origin/main`, apply the patch, run `bash scripts/check.sh`, push. #12 is gate class, so I'll re-approve after the push.
+- Next: DS-08 V3 at 4f03a37.
 
 ### Thu 29 Oct, 23:10 IST · DS-04: Kaggle smoke test passes
 - Done: DS-04. One fern run at `upstream-baseline` on Kaggle (notebook `kaggle_smoke_ds04.ipynb`, 6000 iterations, 2 x Tesla T4, Python 3.13, torch 2.11+cu128, nvcc 12.8).
