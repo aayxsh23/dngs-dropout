@@ -3,17 +3,14 @@
 Written only by Disha's agents; read by Aayush and his agents. The protocol is in AGENTS.md, "Team context files". The plan and task IDs (AY-nn, DS-nn) are in `docs/PLAN_V2.md` §7.
 
 ## Status (rewritten on every update)
-- **Updated:** Fri 30 Oct 2026, 18:10 IST
+- **Updated:** Fri 30 Oct 2026, 18:55 IST
 - **Working on:** DS-08 V3 regression at #19's head (Colab T4)
 - **Done (PLAN_V2 §7):** DS-04 (Kaggle YES), DS-02 (reports on #11 and #14), DS-03 (PR #20), DS-05 (review of #19)
 - **Open PRs:**
   - none of mine. #11, #14 and #20 are merged (30 Oct).
 - **Waiting on Aayush:**
-  - #12 needs the step-12 fix below after #20 merged first (patch `pr12_step12_fix.patch`, tested on #12 + main: check.sh passes);
-  - fix the High on #17 before I approve it (its CLAUDE.md names your file, so my agents would write `aayush_context.md`);
-  - confirm the 5 analysis choices in #20's body before `prereg-v1`;
-  - a runner smoke at #19's head before tagging `v1.0-exp` (#19 review, finding 7).
-- **Next deadline:** DS-08 V3 + DS-09 approve #19 by Sat 14:00 (earlier if I can)
+  - nothing blocking. The 5 analysis choices in #20's body are to be confirmed by both of us before `prereg-v1`.
+- **Next deadline:** approve #12 (b3ef4b7) and #17 (ff2df54) now; DS-08 V3 + DS-09 approve #19 (2957499) by Sat 14:00
 
 ## Entry template
 ```
@@ -25,6 +22,15 @@ Written only by Disha's agents; read by Aayush and his agents. The protocol is i
 ```
 
 ## Log (newest first)
+
+### Fri 30 Oct, 18:55 IST · Checked Aayush's new heads of #12, #17, #19
+- Done: verified the three heads Aayush asked me to approve. My `pr12_step12_fix.patch` is withdrawn: b3ef4b7 already has the step-12 change (blocks P/G/N, factors/dose/noise outputs, the new verdict line).
+- Evidence:
+  - #12 @ b3ef4b7: `checks` and `agent-review` green; step 12 checks `VERDICT: D = interfering; E = complementary but partly redundant`.
+  - #17 @ ff2df54: the High is fixed. `team_context.sh` open/push refuse any file but the caller's own (`TEAM_CONTEXT_ME`, else git user.name; an unidentified session is refused), and CLAUDE.md's rules now work for either person. Medium 2 and Lows 3-6 addressed. CI and `agent-review` green.
+  - #19 @ 2957499: since 4f03a37 only `run_matrix.py` (my review Lows 1-6), `check.sh` (step 17, runner end to end) and AGENTS.md changed; no training code, so V3 at either head is equivalent.
+- Needs from Aayush: nothing. One cosmetic leftover in #17's CLAUDE.md: "anything she should *not* do yet" still says "she".
+- Next: approve #12 and #17; DS-08 V3, then approve #19.
 
 ### Fri 30 Oct, 18:10 IST · #11, #14, #20 merged; #12 needs a one-line update
 - Done: Aayush merged #11 (a4aef8c), #14 (f078772) and #20 (183b9c0). #20 merged before #12, so #12's `check.sh` step 12 now greps a verdict line that no longer exists.
