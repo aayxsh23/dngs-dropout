@@ -7,9 +7,12 @@ python experiments/plots/diag_curves.py --out_root fake_outputs --tables fake_ta
 python experiments/stats.py --runs fake_tables/runs.csv --tables fake_tables --diag_summary fake_tables/diag_summary_3v.csv
 python experiments/plots/qual_grid.py --out_root fake_outputs --figures fake_figures
 python experiments/plots/views.py --out_root fake_outputs --tables fake_tables --figures fake_figures
+python experiments/plots/forest.py --tables fake_tables --figures fake_figures
+python experiments/plots/pass_loc.py --tables fake_tables --figures fake_figures   # needs stats.py --pass_runs
+python experiments/plots/dose.py --tables fake_tables --figures fake_figures       # needs stats.py --dose_runs
 Numbers are random and mean nothing. Seed 2 is deliberately incomplete and two files have quirks.
 Seed 1 runs on a quiet laptop GPU, so the efficiency table must keep it apart from seed 0's T4.
-Also written: a diag.csv and config.json for every 3-view run, Tier 2 metrics (2, 6 and 9 views, B-E, seed 0),
+Also written: a diag.csv and config.json for every 3-view run, Tier 2 metrics (2, 6 and 9 views, A-E, seed 0),
 and tiny eval/ours_6000 images for seed 0 of fern, horns and trex.
 
 The other run blocks (PLAN_V2 §3.1) go next to the T1 folder, as on Drive:
@@ -139,6 +142,19 @@ for nv, shift in [(2, -2.0), (6, 2.5), (9, 4.0)]:
                      gpu="NVIDIA GeForce RTX 3050 Ti Laptop GPU", shared_gpu=False)
             m["ssim_sk"] = round(m["ssim"] - 0.006, 4)
             json.dump(m, open(f"{out}/metrics.json", "w"), indent=2)
+# A at 2, 6 and 9 views (block V runs A-E), from its own generator so the B-E numbers above don't change.
+# Its gap to B shrinks with more views, so the interactions do too (H6).
+arng = random.Random(4)
+for nv, shift in [(2, -2.0), (6, 2.5), (9, 4.0)]:
+    for scene in scenes:
+        out = f"{root}/llff_{nv}v/A/{scene}/seed0"
+        os.makedirs(out, exist_ok=True)
+        p = base["A"] + shift + 0.15 * (shift + 2) + arng.gauss(0, 0.3)
+        m = dict(variant="A", scene=scene, n_views=nv, seed=0, psnr=round(p, 3),
+                 ssim=round(0.6 + shift / 20 + arng.gauss(0, 0.02), 4), lpips=round(0.29 - shift / 40, 4),
+                 gpu="NVIDIA GeForce RTX 3050 Ti Laptop GPU", shared_gpu=False)
+        m["ssim_sk"] = round(m["ssim"] - 0.006, 4)
+        json.dump(m, open(f"{out}/metrics.json", "w"), indent=2)
 
 
 def write_png(path, w, h, pixel):
