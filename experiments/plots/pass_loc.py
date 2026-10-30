@@ -10,7 +10,8 @@ Three bars, each a variant minus E (the mask kept off both depth passes), paired
     D_hard − E   the mask on the hard depth pass only (block P)
     D_soft − E   the mask on the soft depth pass only (block P)
 H2 (the opacity cap) predicts D_hard − E ≈ D − E < 0 and D_soft − E ≈ 0. Per-scene differences are drawn as dots
-and the ±δ band is shaded. The label under each bar is stats.py's class (Holm across the two pass contrasts).
+and the ±δ band is shaded. The label under each bar is stats.py's class: D − E takes the primary family's
+(Holm across 3, as E − D), D_hard − E and D_soft − E the pass family's (Holm across 2).
 
 Writes <figures>/fig_pass.pdf and .png.
 Needs matplotlib >= 3.3 (Colab, or any Python >= 3.8 environment), not the laptop's Python 3.7 training env.

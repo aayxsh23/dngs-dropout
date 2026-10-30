@@ -118,7 +118,7 @@ def main():
         ax3.errorbar(g["n_views"] + dodge, g["mean"], yerr=err, color=style.INK, marker=CONTRAST_MARKERS[key],
                      markersize=4, capsize=2, elinewidth=0.8, linewidth=1.0, alpha=1.0 - 0.25 * i)
         items3.append((g["n_views"].iloc[-1] + dodge, g["mean"].iloc[-1], clabel.split(" = ")[0]))
-    ax3.set_title("(c) E − D and interactions, 95% CI", loc="left")
+    ax3.set_title("(c) E − D and interactions, unadjusted 95% CI", loc="left")
     ax3.set_xlabel("training views")
     ax3.set_ylabel(f"Δ{label}")
     ax3.set_xticks(views)

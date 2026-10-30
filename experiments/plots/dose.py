@@ -40,7 +40,8 @@ def main():
     res = pd.read_csv(path)
     res = res[res["metric"] == "psnr"]
     ps_path = os.path.join(a.tables, f"dose_per_scene_{a.n_views}v.csv")
-    per_scene = pd.read_csv(ps_path) if os.path.exists(ps_path) else pd.DataFrame(columns=["gamma", "comparison", "scene"])
+    per_scene = (pd.read_csv(ps_path) if os.path.exists(ps_path)
+                 else pd.DataFrame(columns=["gamma", "comparison", "scene", "psnr_delta"]))   # no file: no scene lines
 
     style.apply()
     fig, axes = style.plt.subplots(1, len(PRIMARY), figsize=(7.0, 2.4), sharey=True, constrained_layout=True)

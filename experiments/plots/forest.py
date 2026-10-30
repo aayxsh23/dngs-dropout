@@ -92,8 +92,8 @@ def main():
     ax.set_xlabel(f"Δ{a.metric.upper()}{unit}, mean of per-scene differences, 95% CI ({better})"
                   + (f"; band ±δ = {delta:g}" if delta else ""))
     n = int(res["n"].max())
-    ax.set_title(f"{a.n_views}-view contrasts, paired over {n} scenes (filled square: decided; dots: scenes)",
-                 loc="left")
+    ax.set_title(f"{a.n_views}-view contrasts, paired over {n} scenes (filled square: decided"
+                 + ("; dots: scenes)" if per_scene is not None else ")"), loc="left")
     style.save(fig, a.figures, a.name if a.metric == "psnr" else f"{a.name}_{a.metric}")
 
 
