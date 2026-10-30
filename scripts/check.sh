@@ -34,6 +34,8 @@ else PYA=(); fi
 # Training-pipeline code that must run on the laptop's Python 3.7 / PyTorch 1.12.
 TRAIN_PATHS=(train_llff.py render.py metrics.py spiral.py gaussian_renderer utils scene arguments)
 [ -f experiments/run_matrix.py ] && TRAIN_PATHS+=(experiments/run_matrix.py)
+# Also run in the laptop's Python 3.7 env.
+for f in experiments/geometry.py scripts/peak_vram.py; do [ -f "$f" ] && TRAIN_PATHS+=("$f"); done
 EVAL_PATHS=(render.py render_sh.py metrics.py metrics_dtu.py metrics_count.py spiral.py)
 step "1. Syntax errors and undefined names (ruff E9,F63,F7,F82)"
 if ruff_ check --no-cache --quiet --select E9,F63,F7,F82 --target-version py37 \
@@ -113,7 +115,7 @@ missing = [k for k in ("scenes", "seeds", "n_views", "variants", "steps") if k n
 assert not missing, "%s: missing keys %s" % (sys.argv[1], missing)
 for name, v in cfg["variants"].items():
     assert set(v) == {"depth_scale", "drop_rate", "depth_render"}, "%s variant %s: %s" % (sys.argv[1], name, v)
-    assert v["depth_render"] in ("shared", "clean"), (sys.argv[1], name)
+    assert v["depth_render"] in ("shared", "clean", "hard_only", "soft_only"), (sys.argv[1], name)
 print("ok", sys.argv[1], len(cfg["scenes"]) * len(cfg["seeds"]) * len(cfg["n_views"]) * len(cfg["variants"]), "runs")
 EOF
   done
@@ -183,7 +185,127 @@ assert smoke_line(["GPU-SMOKE PASS deadbeef A B C D E\nthanks"], "deadbeef").sta
 print("ok")
 EOF
 
-printf '\n== Summary\n'
+step "15. Dropout schedule (D1) and random point-cloud path (W7) match the agreed design"
+sched_ok=1
+grep -q 'drop_rate_now = opt.drop_rate \* iteration / 10000' train_llff.py || { echo "train_llff.py: schedule is not drop_rate * iteration / 10000 (D1)"; sched_ok=0; }
+grep -q 'iteration / opt.iterations' AGENTS.md && { echo "AGENTS.md still states the rescaled schedule (/ opt.iterations); D1 keeps / 10000"; sched_ok=0; }
+grep -q 'r = drop_rate \* iteration / 10000' AGENTS.md || { echo "AGENTS.md invariant 7 does not state the D1 schedule"; sched_ok=0; }
+if grep -rn 'sparse/0/points3D_random' scene/; then echo "the random cloud is written into the dataset folder again (W7)"; sched_ok=0; fi
+if [ $sched_ok -eq 1 ]; then pass; else fail "dropout schedule / point-cloud path"; fi
+
+step "16. geometry.py: synthetic two-camera scene (MVC@5% ~ 1; a wrong camera convention fails)"
+if [ ${#PYA[@]} -eq 0 ]; then skip "geometry synthetic test" "numpy unavailable"
+elif "${PYA[@]}" - "$TMP/geo" >"$TMP/geo.log" 2>&1 <<'EOF'; then pass; else cat "$TMP/geo.log"; fail "geometry.py camera model"; fi
+import json, math, os, sys
+import numpy as np
+sys.path.insert(0, "experiments")
+from geometry import run_metrics
+root = sys.argv[1]
+W, H, fov = 64, 48, math.radians(60)
+fx, fy = W / (2 * math.tan(fov / 2)), H / (2 * math.tan(fov / 2))
+n, d0 = np.array([-0.3, 0.0, 1.0]), 10.0          # tilted plane  z - 0.3 x = 10
+
+def rot_y(a):
+    c, s = math.cos(a), math.sin(a)
+    return np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+
+def camera(center, yaw):
+    R = rot_y(yaw).T                                # world -> camera rotation
+    w2c = np.eye(4); w2c[:3, :3] = R; w2c[:3, 3] = -R @ center
+    v, u = np.mgrid[0:H, 0:W].astype(float)
+    dirs = np.stack([(u - (W - 1) / 2) / fx, (v - (H - 1) / 2) / fy, np.ones_like(u)], -1) @ R   # camera ray -> world
+    t = (d0 - n @ center) / (dirs @ n)              # z_cam = t because the camera-space ray has z = 1
+    return w2c, t
+
+def write(name, cams, transpose):
+    d = os.path.join(root, name); os.makedirs(os.path.join(d, "depth_raw"))
+    meta = []
+    for k, (w2c, depth) in enumerate(cams):
+        np.savez_compressed(os.path.join(d, "depth_raw", "%05d.npz" % k), depth=depth.astype(np.float16),
+                            alpha=np.ones_like(depth, dtype=np.float16))
+        M = w2c if transpose else w2c.T             # 3DGS stores the transposed world-to-camera matrix
+        meta.append(dict(index=k, image_name=str(k), width=W, height=H, FoVx=fov, FoVy=2 * math.atan(H / (2 * fy)),
+                         world_view_transform=M.tolist()))
+    json.dump(meta, open(os.path.join(d, "cameras.json"), "w"))
+    return d
+
+cams = [camera(np.array([0.0, 0.0, 0.0]), 0.0), camera(np.array([2.0, 0.3, 0.5]), math.radians(12))]
+good = run_metrics(write("good", cams, False))
+bad = run_metrics(write("bad", cams, True))
+print("good", good, "\nbad", bad)
+assert good["mvc5"] > 0.98, good
+assert bad is None or bad["mvc5"] < 0.5, bad
+EOF
+
+step "17. run_matrix.py end to end with fake steps (done, failed, missing PSNR, spaces in paths, rerun skips)"
+if [ ${#PYA[@]} -eq 0 ]; then skip "runner end-to-end" "pyyaml unavailable"
+else
+  R="$TMP/runner"; mkdir -p "$R"
+  # Fake train/render/metrics steps; the variant comes from the work path (.../llff_3v/<variant>/<scene>/seed<k>).
+  cat > "$R/fake_step.py" <<'EOF'
+import json, os, sys
+step, work = sys.argv[1], sys.argv[2]
+variant = os.path.normpath(work).split(os.sep)[-3]
+if step == "train":
+    if variant == "bad":
+        sys.exit(3)
+    json.dump({"git_commit": "abc1234", "gpu": "FakeGPU", "drop_rate": 0.2, "depth_scale": 1, "depth_render": "shared"},
+              open(os.path.join(work, "config.json"), "w"))
+    json.dump({"train_time_s": 1.0, "n_gaussians": 10, "torch_version": "x"}, open(os.path.join(work, "train_stats.json"), "w"))
+    open(os.path.join(work, "events.out.tfevents.1"), "w").write("x")
+    open(os.path.join(work, "chkpnt_latest.pth"), "w").write("x")
+elif step == "render":
+    json.dump({"fps": 100.0}, open(os.path.join(work, "render_stats.json"), "w"))
+else:
+    m = {"SSIM": 0.6, "SSIM_sk": 0.6, "LPIPS": 0.3}
+    if variant != "nopsnr":
+        m["PSNR"] = 18.5
+    json.dump({"ours_6000": m}, open(os.path.join(work, "results_eval.json"), "w"))
+EOF
+  cat > "$R/m.yaml" <<EOF
+scenes: [fern]
+seeds: [0]
+n_views: [3]
+keep_ckpt_seeds: []
+variants:
+  ok: {depth_scale: 1, drop_rate: 0.2, depth_render: shared}
+  bad: {depth_scale: 1, drop_rate: 0.2, depth_render: shared}
+  nopsnr: {depth_scale: 1, drop_rate: 0.2, depth_render: shared}
+steps:
+  - "{python} $R/fake_step.py train {work}"
+  - "{python} $R/fake_step.py render {work}"
+  - "{python} $R/fake_step.py metrics {work}"
+EOF
+  if "${PYA[@]}" - "$R" >"$TMP/runner.log" 2>&1 <<'EOF'; then pass; else tail -15 "$TMP/runner.log"; fail "run_matrix.py end to end"; fi
+import json, os, subprocess, sys
+R = sys.argv[1]
+out, work = os.path.join(R, "out root"), os.path.join(R, "work root")   # spaces on purpose
+cmd = [sys.executable, "experiments/run_matrix.py", "--matrix", os.path.join(R, "m.yaml"), "--data_root", R,
+       "--out_root", out, "--work_root", work]
+p = subprocess.run(cmd + ["--allow_untagged"], capture_output=True, text=True)
+print(p.stdout, p.stderr)
+assert p.returncode == 1, "failures must make the runner exit 1"
+ok = os.path.join(out, "llff_3v", "ok", "fern", "seed0")
+m = json.load(open(os.path.join(ok, "metrics.json")))
+assert m["psnr"] == 18.5 and m["fps"] == 100.0 and m["gpu"] == "FakeGPU", m
+assert not os.path.exists(os.path.join(ok, "metrics.json.tmp"))
+assert not [f for f in os.listdir(ok) if f.startswith("events.out") or f.endswith(".pth")], os.listdir(ok)
+for v in ("bad", "nopsnr"):
+    d = os.path.join(out, "llff_3v", v, "fern", "seed0")
+    assert os.path.exists(os.path.join(d, "FAILED")) and os.path.exists(os.path.join(d, "run.log")), (v, os.listdir(d))
+    assert not os.path.exists(os.path.join(d, "metrics.json")), v
+assert "1 done" in p.stdout and "2 failed" in p.stdout, p.stdout
+p2 = subprocess.run(cmd + ["--allow_untagged"], capture_output=True, text=True)
+assert "1 already done" in p2.stdout, p2.stdout
+dry = subprocess.run(cmd + ["--dry_run"], capture_output=True, text=True)
+assert dry.returncode == 0, dry.stdout + dry.stderr
+real = subprocess.run(cmd, capture_output=True, text=True)
+assert real.returncode != 0 and "tag" in (real.stdout + real.stderr), "an untagged real run must be refused"
+print("runner ok")
+EOF
+fi
+
+printf '\n== Summary\n'  
 [ ${#SKIPPED[@]} -gt 0 ] && echo "Skipped locally: ${SKIPPED[*]}"
 if [ ${#FAILED[@]} -gt 0 ]; then
   echo "FAILED (${#FAILED[@]}): ${FAILED[*]}"
