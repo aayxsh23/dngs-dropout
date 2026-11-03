@@ -3,11 +3,11 @@
 Written only by Aayush's agents; read by Disha and her agents. The protocol is in AGENTS.md, "Team context files". The plan and task IDs (AY-nn, DS-nn) are in `docs/PLAN_V2.md` §7.
 
 ## Status (rewritten on every update)
-- **Updated:** Fri 30 Oct 2026, midday (IST)
-- **Working on:** A100 visit 1 (AY-10) today; waiting for approvals before tagging
-- **Done (PLAN_V2 §7):** AY-01–03, AY-06–09 + AY-11 (#19), AY-21, AY-22 (`feat/probes`), AY-04 partly (merged #11, #14, #20; #12 and #17 are ready); AY-05 partly
-- **Waiting on Disha:** (1) V3 regression at #19's head **2957499** (DS-08), then approval (DS-09); (2) approve #17 (head ff2df54) and #12 (head b3ef4b7); (3) confirm the 5 analysis choices in #20 before `prereg-v1`
-- **Next deadline:** tags `v1.0-exp` + `prereg-v1` once #19 is approved (plan: Sat 16:00)
+- **Updated:** Tue 3 Nov 2026, evening (IST)
+- **Working on:** waiting for Disha's V3 + approvals of #19 and #17; then tags and T1 on Colab
+- **Done (PLAN_V2 §7):** AY-01–03, AY-06–09, AY-11 (#19), AY-21, AY-22 (`feat/probes`), AY-04 (merged #12, #22), AY-16 + AY-20 drafts (PR #23)
+- **Waiting on Disha:** (1) V3 regression at #19 (any head since 4f03a37; training code unchanged) and approval of #19 at **7633acc**; (2) re-approve #17 at **540a42b**; (3) confirm #20's 5 analysis choices
+- **Next deadline:** tags `v1.0-exp` + `prereg-v1` and T1 seed 0 start on both Colab accounts the same evening Disha approves (target Tue 3 Nov night, latest Wed 4 Nov 12:00)
 
 ## Entry template
 ```
@@ -20,6 +20,13 @@ Written only by Aayush's agents; read by Disha and her agents. The protocol is i
 ```
 
 ## Log (newest first)
+
+### Tue 3 Nov, evening · Merged #12 and #22; #17 and #19 updated for the new main; Method and Setup drafts
+- Done: merged #12 (CI analysis scripts) and #22 (DS-06 plots, after checking Disha's reviewer Approve at 58faa48). Both #17 and #19 conflicted with the new main in `check.sh`; merged main into each (step 12 before 13–14 / 15–17), delta reviews Approve, `agent-review` set. AY-16/AY-20: Method and Experimental setup drafts, PR #23 (docs-only).
+- Evidence: #19 head 7633acc: GPU-SMOKE PASS (A 17.04, B 17.52, C 17.31, D 17.87, E 17.67), check.sh and CI green. #17 head 540a42b: check.sh and CI green. #23: `docs/report/03_method.md`, `docs/report/04_setup.md`.
+- Needs from Disha: V3 + approve #19 at 7633acc; re-approve #17 at 540a42b (GitHub needs approval on the new head); confirm #20's 5 choices; read #23 §3.4 and §4.6.
+- Next: merge #19 and #17, tag `v1.0-exp` + `prereg-v1`, start T1 seed 0 (shard 0/2) on Colab A; open the probes PR; figure F1 (AY-24).
+- Message to Disha: see the chat message of Tue 3 Nov.
 
 ### Fri 30 Oct, midday · Disha's reviews handled; #12, #17, #19 ready for her approval
 - Done: AY-04 (merged #14, #11, #20 after checking her reviewer's Approve); #19 runner Lows 1-6 fixed (check.sh step 17); #17 High fixed (identity-aware `team_context.sh`, step 13); #12 rebased onto #20 (step 12: new verdict line, blocks P/G/N). Follow-ups: issues #15, #18, #21.
