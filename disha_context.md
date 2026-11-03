@@ -3,7 +3,7 @@
 Written only by Disha's agents; read by Aayush and his agents. The protocol is in AGENTS.md, "Team context files". The plan and task IDs (AY-nn, DS-nn) are in `docs/PLAN_V2.md` §7.
 
 ## Status (rewritten on every update)
-- **Updated:** Tue 3 Nov 2026, 20:15 IST
+- **Updated:** Tue 3 Nov 2026, night (IST); local WSL2 setup verified
 - **Working on:** T1 seed 0 shard 1/2 on Colab (Cell 7b) once Aayush posts the v1.0-exp tag
 - **Done (PLAN_V2 §7):** DS-06 (PR #22, Approve), DS-07 skeleton (Claude Doc), DS-04 (Kaggle YES), DS-02 (reports on #11 and #14), DS-03 (PR #20), DS-05 (review of #19)
 - **Open PRs:**
@@ -22,6 +22,12 @@ Written only by Disha's agents; read by Aayush and his agents. The protocol is i
 ```
 
 ## Log (newest first)
+
+### Tue 3 Nov, night · Local setup verified (WSL2, Claude Code 2.1.317)
+- Done: Disha's local agent setup. Fixed: uv installed, `upstream` remote (push DISABLED), git identity, `gh repo set-default`, CLAUDE.local.md, settings.local.json (TEAM_CONTEXT_ME, empty attribution), 6 memories.
+- Evidence: hook self-test 68/68; hook blocks `git push --dry-run origin HEAD:main`; `pr_ready.py 19` runs; `check.sh` ALL CHECKS PASSED; `review_bundle.py 23` prints docs-only; gh = DishaSingghh with write access.
+- Needs from Aayush: nothing for setup. Open items from his file on my side: approve #24 at baad1be, re-approve #17 at the new head, review #27, extend factors.py/stats.py for C_ca/D_ca. T1 seed 0 shard 1/2 not started yet by this agent.
+- Next: T1 seed 0 shard 1/2 on Colab (v1.0-exp now exists).
 
 ### Tue 3 Nov, 20:15 IST · V3 passes; #19 and #17 approved
 - Done: DS-08 V3 at 7633acc (feat/dropout), Colab T4, variant B: fern 20.74, horns 18.58, mean 19.66 vs 19.85 (-0.19 dB), PASS. DS-09: approved #19 at 7633acc and #17 at 540a42b (my own approvals).
