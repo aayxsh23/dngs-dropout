@@ -23,6 +23,7 @@ from gaussian_renderer import render, render_for_depth, render_for_opa  # , netw
 import sys
 from scene import RenderScene, Scene, GaussianModel
 from utils.general_utils import safe_state, load_checkpoint
+from utils.dropout import ALPHA_MAX, clamp_aware_rates, compensated_mask
 import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
@@ -38,11 +39,13 @@ except ImportError:
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 DEPTH_RENDER_MODES = ("shared", "clean", "hard_only", "soft_only")
+DROP_MODES = ("uniform", "clamp_aware")   # uniform = DropGaussian verbatim; clamp_aware = our per-Gaussian rate cap (H7)
+HARD_OPACITY = 0.95   # render_for_depth's fixed opacity (its `value` default)
 DIAG_EVERY = 100   # diag.csv row interval (PLAN W4)
 DIAG_PATCH = 11    # fixed patch size (middle of DNGaussian's 5..17) so used and clean are comparable
 DIAG_PROBE_RATE, DIAG_PROBES = 0.2, 4
 DIAG_COLUMNS = ["iter", "loss_rgb", "loss_depth_used", "loss_depth_clean", "depth_var_masks", "n_gaussians",
-                "drop_rate_now", "iter_ms", "vram_peak_mb", "rgb_var_masks"]
+                "drop_rate_now", "iter_ms", "vram_peak_mb", "rgb_var_masks", "frac_over_cap", "drop_rate_eff", "drop_rate_eff_hard"]
 
 
 def depth_loss_diag(depth, depth_mono, it, tol):
@@ -93,6 +96,7 @@ def structure_stats(gaussians):
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from, near_range, seed=0):
     assert opt.depth_render in DEPTH_RENDER_MODES, "--depth_render must be one of %s" % (DEPTH_RENDER_MODES,)
+    assert opt.drop_mode in DROP_MODES, "--drop_mode must be one of %s" % (DROP_MODES,)
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset, opt)
     gaussians = GaussianModel(dataset.sh_degree)
@@ -131,6 +135,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     torch.cuda.synchronize()
     t_train0 = t_row = time.time()
     diag_time = 0.0
+    rate_sums = [0.0, 0.0, 0.0]   # summed over iterations: nominal, effective (soft/photometric), effective (hard) rate
 
     for iteration in range(first_iter, opt.iterations + 1):        
 
@@ -150,10 +155,19 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # DropGaussian schedule, verbatim from the official code (0.2 * iteration / 10000); D1: not rescaled to opt.iterations.
         # One mask per iteration: the Gaussian count only changes at the end of the iteration.
         drop_rate_now = opt.drop_rate * iteration / 10000
-        drop_comp = None
-        if drop_rate_now > 0:
+        drop_comp = hard_drop_comp = u = None
+        rate_eff = rate_eff_hard = drop_rate_now   # mean rate actually applied; below drop_rate_now only in clamp_aware mode
+        if drop_rate_now > 0 and opt.drop_mode == "clamp_aware":
+            # One uniform draw per Gaussian, thresholded per pass at each Gaussian's largest unbiased rate (utils/dropout.py).
+            # This cuts the dose for opaque Gaussians (rate 0 at opacity >= 0.99): H7 must be read with drop_rate_eff.
+            u = torch.rand(gaussians.get_xyz.shape[0], device="cuda")
+            drop_comp = compensated_mask(u, clamp_aware_rates(gaussians.get_opacity_.detach().squeeze(-1), drop_rate_now))
+            rate_eff_hard = clamp_aware_rates(HARD_OPACITY, drop_rate_now)
+            hard_drop_comp = compensated_mask(u, rate_eff_hard)
+        elif drop_rate_now > 0:
             drop_comp = torch.nn.Dropout(p=drop_rate_now)(torch.ones(gaussians.get_xyz.shape[0], device="cuda"))
-        hard_comp = drop_comp if opt.depth_render in ("shared", "hard_only") else None
+            hard_drop_comp = drop_comp
+        hard_comp = hard_drop_comp if opt.depth_render in ("shared", "hard_only") else None
         soft_comp = drop_comp if opt.depth_render in ("shared", "soft_only") else None
 
         if not viewpoint_sprical_stack:
@@ -221,6 +235,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         # ---------------------------------------------- Photometric --------------------------------------------
         
+        if u is not None:  # clamp_aware: the soft pass's step moved the opacities; re-cap from the same draw
+            rates = clamp_aware_rates(gaussians.get_opacity_.detach().squeeze(-1), drop_rate_now)
+            drop_comp, rate_eff = compensated_mask(u, rates), rates.mean()
+        rate_sums[0] += drop_rate_now; rate_sums[1] += rate_eff; rate_sums[2] += rate_eff_hard
         render_pkg = render(viewpoint_cam, gaussians, pipe, background, drop_comp=drop_comp)
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
         # depth
@@ -256,8 +274,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 used = clean if hard_comp is None and soft_comp is None else \
                     depth_diag(viewpoint_cam, gaussians, pipe, background, iteration, opt, hard_comp, soft_comp)
                 var_depth, var_rgb = mask_variances(diag_cam, gaussians, pipe, background, diag_gen)
+                # Share of Gaussians whose uniformly compensated opacity would exceed the alpha cap in the soft and
+                # photometric passes (bias exposure, H7). The hard pass (opacity 0.95) is fully exposed once r > 0.0404.
+                over_cap = (gaussians.get_opacity_ / (1 - drop_rate_now) > ALPHA_MAX).float().mean().item() \
+                    if drop_rate_now > 0 else 0.0
                 row = [iteration, loss_rgb.item(), used, clean, var_depth, gaussians.get_xyz.shape[0], drop_rate_now,
-                       iter_ms, torch.cuda.max_memory_reserved() / 2**20, var_rgb]
+                       iter_ms, torch.cuda.max_memory_reserved() / 2**20, var_rgb, over_cap, float(rate_eff),
+                       float(rate_eff_hard)]
                 diag_file.write(",".join("%.6g" % v if isinstance(v, float) else str(v) for v in row) + "\n")
                 diag_file.flush()
                 torch.cuda.synchronize()
@@ -338,7 +361,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         vram_peak_mb=round(torch.cuda.max_memory_reserved() / 2**20, 1),
         model_size_mb=round(sum(p.numel() * p.element_size()
                                 for g in gaussians.optimizer.param_groups for p in g["params"]) / 2**20, 2),
-        drop_rate=opt.drop_rate, depth_scale=opt.depth_scale, depth_render=opt.depth_render,
+        drop_rate=opt.drop_rate, depth_scale=opt.depth_scale, depth_render=opt.depth_render, drop_mode=opt.drop_mode,
+        # mean rate over all iterations: nominal schedule, and what was applied (equal unless clamp_aware; H7 dose)
+        drop_rate_mean=round(rate_sums[0] / opt.iterations, 6), drop_rate_eff_mean=round(float(rate_sums[1]) / opt.iterations, 6),
+        drop_rate_eff_hard_mean=round(float(rate_sums[2]) / opt.iterations, 6),
         seed=seed, torch_version=torch.__version__)
     with torch.no_grad():
         stats.update(structure_stats(gaussians))

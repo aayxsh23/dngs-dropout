@@ -96,6 +96,7 @@ class OptimizationParams(ParamGroup):
         self.depth_scale = 1.0  # multiplies every depth term; 0 disables depth regularization
         self.drop_rate = 0.0  # DropGaussian gamma: the rate at iteration 10000 (official schedule); 0 disables dropout entirely
         self.depth_render = "shared"  # which depth passes see the dropout mask: shared (both, D), clean (neither, E), hard_only, soft_only
+        self.drop_mode = "uniform"  # uniform: DropGaussian verbatim; clamp_aware: per-Gaussian rate min(r, 1 - opacity/0.99) (H7)
 
         self.shape_pena = 0.001
         self.scale_pena = 0.001
