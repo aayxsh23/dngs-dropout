@@ -173,7 +173,8 @@ def build(a):
     ])))
     out.append(section("Evidence already established (do not re-run)", "\n".join([
         "- CI `%s` on head: %s (runs scripts/check.sh: ruff, vermin py3.7, invariant greps, hygiene, secrets,"
-        " notebooks, aggregate fixtures, configs, hook self-test, review_bundle self-test)" % (CI_CHECK, worst_ci(d["statusCheckRollup"])),
+        " notebooks, aggregate fixtures, configs, hook self-test, review_bundle self-test, analysis scripts on fixtures:"
+        " diag_curves sharp checks, stats verdict, qual_grid, views)" % (CI_CHECK, worst_ci(d["statusCheckRollup"])),
         "- `%s` status on head: %s" % (REVIEW_STATUS, status),
         "- GPU smoke: %s" % smoke_line(bodies, head),
     ])))
