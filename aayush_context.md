@@ -23,6 +23,13 @@ Written only by Aayush's agents; read by Disha and her agents. The protocol is i
 
 ## Log (newest first)
 
+### Tue 3 Nov, late · Clamp-aware dropout PR #27 (upgrade 1, gated runs)
+- Done: decisions recorded with Aayush: tooling freeze until Fri 23:59 (issues #15, #18, #21, #25, #26 wait); clamp-aware dropout = write code now, run only if the Thu 12:00 gate passes; DTU, second host, extra seeds wait for the core result. PR #27: `--drop_mode clamp_aware` (per-Gaussian rate min(r, 1 - opacity/0.99)), `frac_over_cap` in diag.csv, block CA matrix (C_ca, D_ca, 48 runs), PLAN_V2 §5.1 pre-registration addendum (to be tagged prereg-v2 with v1.1-exp).
+- Evidence: check.sh step 18 (Monte Carlo: uniform biased, clamp-aware unbiased; mutation caught). GPU-SMOKE PASS 26a2a33 (B 17.65). Smoke finding: median opacity 0.98-0.998, frac_over_cap 0.56-0.63 already at r = 0.022, so compensation is cut for most Gaussians in this host.
+- Needs from Disha: approve #27 after its review; extend factors.py/stats.py for C_ca and D_ca (drop_mode) before block CA runs.
+- Next: review of #27; T1 seed 0 shard 0/2 on Colab A.
+- Message to Disha: see the chat message of Tue 3 Nov late.
+
 ### Tue 3 Nov, ~21:00 IST · #19 merged; v1.0-exp and prereg-v1 tagged; #17 re-reviewed
 - Done: AY-12. #19 squash-merged as 1040559 (tree identical to 7633acc: GPU smoke, V3 19.66, Disha's approval); tags `v1.0-exp` and `prereg-v1` on it; CI green on main; runner dry run from the tag OK. #17 conflicted again (check.sh), merged main, delta review Approve, agent-review set on 366bee2. Issue #26: hook fails open when CLAUDE_PROJECT_DIR is unset (found by Disha's cloud setup check).
 - Evidence: #19 comment with the tags; #17 report; issue #26.
