@@ -4,7 +4,9 @@ name: Tracker
 # README.md, PLAN.md, PROGRESS.md, REMAINING.md and FUTURE.md on the `tracker` branch. Status comes from
 # evidence: merged PRs, tags, files on main and the **Tracker:** lines of both context files (team-context).
 # Runs hourly, on every push to main, and on demand: gh workflow run tracker.yml --repo aayxsh23/dngs-dropout
-# It never touches main; the `tracker` branch holds only generated files.
+# Two jobs, so repo code never holds a write token (check.sh step 10b enforces it):
+#   build   read-only, no persisted credentials: runs tracker.py --strict, uploads the files;
+#   publish write access, runs only git: commits the files to `tracker` if more than the timestamp changed.
 on:
   schedule:
     - cron: "17 * * * *"
@@ -12,22 +14,28 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write        # push the generated files to the tracker branch
-  pull-requests: read    # merged-PR evidence
+permissions: {}
 
 concurrency:
   group: tracker
   cancel-in-progress: false
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  tracker:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -37,8 +45,29 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python3 scripts/tracker.py --fetch --out "$RUNNER_TEMP/tracker" --summary | tee "$RUNNER_TEMP/summary.txt"
+          python3 scripts/tracker.py --fetch --strict --out "$RUNNER_TEMP/tracker" --summary | tee "$RUNNER_TEMP/summary.txt"
+          cp "$RUNNER_TEMP/summary.txt" "$RUNNER_TEMP/tracker/summary.txt"
           { echo '```'; cat "$RUNNER_TEMP/summary.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tracker
+          path: ${{ runner.temp }}/tracker
+          retention-days: 3
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: tracker
+          path: ${{ runner.temp }}/tracker
       - name: Publish to the tracker branch
         run: |
           pub="$RUNNER_TEMP/pub"
@@ -52,10 +81,10 @@ jobs:
             git -C "$pub" checkout -q --orphan tracker
             git -C "$pub" rm -rqf .
           fi
-          cp "$RUNNER_TEMP"/tracker/*.md "$pub/"
+          for f in README.md PLAN.md PROGRESS.md REMAINING.md FUTURE.md; do cp "$RUNNER_TEMP/tracker/$f" "$pub/$f"; done
           cd "$pub"
           git add README.md PLAN.md PROGRESS.md REMAINING.md FUTURE.md
           # Only the "as of" time changed: nothing to publish.
           if git diff --cached --quiet -I ' · as of ' -I '^Tracker .* IST:'; then echo "no change"; exit 0; fi
-          git commit -qm "tracker: $(head -1 "$RUNNER_TEMP/summary.txt" | cut -c1-150)"
+          git commit -qm "tracker: $(head -1 "$RUNNER_TEMP/tracker/summary.txt" | cut -c1-150)"
           git push -q origin HEAD:refs/heads/tracker

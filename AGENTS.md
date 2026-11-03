@@ -111,7 +111,7 @@ Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.
 | --- | --- | --- |
 | **Routine** | everything not listed in CODEOWNERS (docs, notebooks, `aggregate.py`, plots, results) | CI `checks` green + agent review Approve on the head commit. **Docs-only** PRs (every file under `docs/` or `*.md`, none in CODEOWNERS; `review_bundle.py` prints the class) need no reviewer: the pr-gate report and `agent-review` status say so |
 | **Experiment** | training, rendering, evaluation, extensions, runner, `experiments/*.yaml` | the above + `GPU-SMOKE PASS <head sha>` comment from `scripts/gpu_smoke.sh` + approval from the **other** teammate. After `v1.0-exp`: also a new tag and a RUNLOG entry |
-| **Gate** | `.github/`, `.claude/`, `scripts/check.sh`, `scripts/gpu_smoke.sh`, `scripts/pr_ready.py`, `scripts/hooks/`, `scripts/setup_repo_rules.sh`, AGENTS/CLAUDE/GEMINI.md | the routine requirements + approval from the **other** teammate |
+| **Gate** | `.github/`, `.claude/`, `scripts/check.sh`, `scripts/gpu_smoke.sh`, `scripts/pr_ready.py`, `scripts/tracker.py`, `scripts/hooks/`, `scripts/setup_repo_rules.sh`, AGENTS/CLAUDE/GEMINI.md | the routine requirements + approval from the **other** teammate |
 
 **Agents never submit APPROVE reviews** (`gh pr review --approve` is blocked by the hook). Approvals are a human's decision; an agent posts its review report as a comment and sets the `agent-review` status.
 
@@ -164,7 +164,7 @@ Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.
 
 ## How to work here
 
-- Read `docs/PLAN.md` first. The status table at its top is the single place where progress is recorded, so update it when you finish something.
+- Read `docs/PLAN_V2.md` first. Progress is recorded by task ID in the `**Tracker:**` line of your own context file; the generated tracker shows it ("Project tracker" below). PLAN.md's old status table is no longer updated.
 - Write code that matches the surrounding style: argparse groups in `arguments/`, the same comment density, minimal diffs. Don't refactor upstream code you don't need to touch; it keeps our diff against DNGaussian reviewable.
 - Test changes with `bash scripts/check.sh` (seconds, no GPU) and, for training code, `bash scripts/gpu_smoke.sh` (1100 iterations on `fern` per variant). Then check that the defaults (variant B) still behave like upstream.
 - When you change behaviour, say in the PR which variants it affects and how you tested it.
