@@ -131,6 +131,11 @@ step "10. Merge-gate scripts: hook self-test and syntax"
 if python3 scripts/hooks/guard_bash.py --selftest >"$TMP/hook.txt" 2>&1 && python3 -m py_compile scripts/pr_ready.py scripts/review_bundle.py; then pass
 else cat "$TMP/hook.txt"; fail "merge-gate scripts"; fi
 
+step "10b. Project tracker: docs/tracker/plan.yaml is valid; tracker.py self-test (status from evidence, ranges, prospects)"
+if [ ${#PYA[@]} -eq 0 ]; then skip "project tracker" "pyyaml unavailable"
+elif "${PYA[@]}" scripts/tracker.py --check >"$TMP/trk.txt" 2>&1 && "${PYA[@]}" scripts/tracker.py --self_test >>"$TMP/trk.txt" 2>&1; then pass
+else cat "$TMP/trk.txt"; fail "project tracker"; fi
+
 step "11. review_bundle.py: what the reviewer sees (notebooks, CSVs, submodules); fail-closed class and delta report"
 if python3 - "$TMP/rb" >"$TMP/rb.txt" 2>&1 <<'EOF'; then pass; else cat "$TMP/rb.txt"; fail "review_bundle notebook/CSV diffs"; fi
 import json, os, subprocess, sys

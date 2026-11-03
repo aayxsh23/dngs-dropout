@@ -168,3 +168,12 @@ Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.
 - Write code that matches the surrounding style: argparse groups in `arguments/`, the same comment density, minimal diffs. Don't refactor upstream code you don't need to touch; it keeps our diff against DNGaussian reviewable.
 - Test changes with `bash scripts/check.sh` (seconds, no GPU) and, for training code, `bash scripts/gpu_smoke.sh` (1100 iterations on `fern` per variant). Then check that the defaults (variant B) still behave like upstream.
 - When you change behaviour, say in the PR which variants it affects and how you tested it.
+
+## Project tracker
+
+- **What:** four generated files on the `tracker` branch answer "what is the plan, how much is done, what is left, what could we add": `PLAN.md`, `PROGRESS.md` (overall, per person, per phase, run counts, coverage of the course rubric), `REMAINING.md` (overdue, next 48 h, who waits on whom, critical path to submission) and `FUTURE.md` (prospects, READY when they fit). `.github/workflows/tracker.yml` regenerates them hourly and on every push to `main`, from `docs/tracker/plan.yaml` plus evidence. Nobody edits them.
+- **Start of a session:** `git fetch -q origin tracker && git show origin/tracker:REMAINING.md`, or `python3 scripts/tracker.py --fetch --summary` for the live state.
+- **Status comes only from evidence:** merged PRs, tags and files on `main` named in a task's `done_when`, plus one machine-readable line in the Status block of each person's own context file, which that person's agent keeps current (cumulative lists):
+  `- **Tracker:** done AY-01..03, AY-05; partial AY-22; working AY-12; runs T1=40 P=0 G=0 N=0 V=0`
+  IDs are the task IDs in `plan.yaml` (also `EXP-T1`, `FREEZE`, `DRAFT`, ...). `runs` counts the finished runs in **your own** output folders per block (`python3 scripts/tracker.py --count_runs <outputs> <outputs_pass> ...` prints it); the two files are summed.
+- **Changing the plan** (dates, tasks, adopting a prospect once FUTURE.md says READY and both agree): edit `docs/tracker/plan.yaml` in a docs-only PR. `bash scripts/check.sh` validates it (step 10b).
