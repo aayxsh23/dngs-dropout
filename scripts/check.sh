@@ -131,6 +131,31 @@ step "10. Merge-gate scripts: hook self-test and syntax"
 if python3 scripts/hooks/guard_bash.py --selftest >"$TMP/hook.txt" 2>&1 && python3 -m py_compile scripts/pr_ready.py scripts/review_bundle.py; then pass
 else cat "$TMP/hook.txt"; fail "merge-gate scripts"; fi
 
+step "10b. Project tracker: docs/tracker/plan.yaml is valid; tracker.py self-test (status from evidence, ranges, prospects)"
+if [ ${#PYA[@]} -eq 0 ]; then skip "project tracker" "pyyaml unavailable"
+elif "${PYA[@]}" scripts/tracker.py --check >"$TMP/trk.txt" 2>&1 && "${PYA[@]}" scripts/tracker.py --self_test >>"$TMP/trk.txt" 2>&1 \
+     && "${PYA[@]}" - >>"$TMP/trk.txt" 2>&1 <<'EOF'; then pass
+# tracker.py runs hourly on main: it is gate code, and only a job without write access may run it.
+import yaml
+owners = [l.split()[0] for l in open(".github/CODEOWNERS") if l.strip() and not l.startswith("#")]
+assert "/scripts/tracker.py" in owners, "scripts/tracker.py must be in CODEOWNERS (gate)"
+wf = yaml.safe_load(open(".github/workflows/tracker.yml"))
+for name, job in wf["jobs"].items():
+    runs = " ".join(s.get("run", "") for s in job["steps"])
+    perms = job.get("permissions") or wf.get("permissions") or {}
+    writes = any(v == "write" for v in perms.values())
+    if "tracker.py" in runs or "pip " in runs:
+        assert not writes, "job %s runs repo code but has write permissions %s" % (name, perms)
+        co = [s for s in job["steps"] if str(s.get("uses", "")).startswith("actions/checkout")]
+        assert co and all((s.get("with") or {}).get("persist-credentials") is False for s in co), \
+            "job %s must check out with persist-credentials: false" % name
+        assert "--strict" in runs, "job %s must run tracker.py --strict (fail on missing evidence)" % name
+    elif writes:
+        assert "python" not in runs and "scripts/" not in runs, "write job %s must not run repo code" % name
+print("tracker workflow ok")
+EOF
+else cat "$TMP/trk.txt"; fail "project tracker"; fi
+
 step "11. review_bundle.py: what the reviewer sees (notebooks, CSVs, submodules); fail-closed class and delta report"
 if python3 - "$TMP/rb" >"$TMP/rb.txt" 2>&1 <<'EOF'; then pass; else cat "$TMP/rb.txt"; fail "review_bundle notebook/CSV diffs"; fi
 import json, os, subprocess, sys
