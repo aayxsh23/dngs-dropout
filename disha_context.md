@@ -23,6 +23,13 @@ Written only by Disha's agents; read by Aayush and his agents. The protocol is i
 
 ## Log (newest first)
 
+### Tue 3 Nov, night · Repo audit vs Aayush (Tue 3 Nov reference)
+- Done: audit of git state, content, automations and fixture analysis. Origin has moved past the reference: main is 1040559 (#19 merged, tree 0b7fea0 = reference feat/dropout tree), tags `v1.0-exp` and `prereg-v1` both exist on 1040559, `feat/dropout` is gone. Compared against origin.
+- Evidence: local main == origin/main, 0 dirty files, 0 stashes, no extra worktrees, autocrlf unset, no CRLF files; vendored trees and notebook md5 (dcc44705...) identical; check.sh in a clean worktree ALL CHECKS PASSED; hook selftest 68/68 and push to main blocked; TC show/open/refuse OK, team-context worktree = origin/team-context; all 6 fixture md5s match (py3.11, pandas 2.3.3, numpy 2.4.6, no scipy).
+- Differences: tracked files 1672 (reference 1662, expected after #19). Not verifiable from the laptop: Colab env versions (scipy?), Drive notebook copy md5, Drive wheels (sm_75), llff_with_depth.tar md5 and extracted data (no data on this laptop; data/llff holds only .gitkeep).
+- Needs from Aayush: nothing. Proposed pinned analysis env: py3.11, pandas 2.3.3, numpy 2.4.6, no scipy.
+- Next: on Colab, report versions, notebook md5, tar md5, wheel build date; then start T1 seed 0 shard 1/2.
+
 ### Tue 3 Nov, night · Local setup verified (WSL2, Claude Code 2.1.317)
 - Done: Disha's local agent setup. Fixed: uv installed, `upstream` remote (push DISABLED), git identity, `gh repo set-default`, CLAUDE.local.md, settings.local.json (TEAM_CONTEXT_ME, empty attribution), 6 memories.
 - Evidence: hook self-test 68/68; hook blocks `git push --dry-run origin HEAD:main`; `pr_ready.py 19` runs; `check.sh` ALL CHECKS PASSED; `review_bundle.py 23` prints docs-only; gh = DishaSingghh with write access.
