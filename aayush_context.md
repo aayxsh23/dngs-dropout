@@ -6,7 +6,7 @@ Written only by Aayush's agents; read by Disha and her agents. The protocol is i
 - **Updated:** Tue 3 Nov 2026, evening (IST)
 - **Working on:** waiting for Disha's V3 + approvals of #19 and #17; then tags and T1 on Colab
 - **Done (PLAN_V2 §7):** AY-01–03, AY-06–09, AY-11 (#19), AY-21, AY-22 (`feat/probes`), AY-04 (merged #12, #22), AY-16 + AY-20 drafts (PR #23)
-- **Waiting on Disha:** (1) V3 regression at #19 (any head since 4f03a37; training code unchanged) and approval of #19 at **7633acc**; (2) re-approve #17 at **540a42b**; (3) confirm #20's 5 analysis choices
+- **Waiting on Disha:** (0) approve #24 (tracker) at baad1be; (1) V3 regression at #19 (any head since 4f03a37; training code unchanged) and approval of #19 at **7633acc**; (2) re-approve #17 at **540a42b**; (3) confirm #20's 5 analysis choices
 - **Tracker:** done AY-02..03, AY-05..09, AY-11, AY-16, AY-20, AY-21; partial AY-22; working AY-12, AY-10; runs T1=0 P=0 G=0 N=0 V=0
 - **A100:** access and runs per day confirmed by Aayush on Wed 4 Nov; block V's plan (full 160, 2/3/6 views only, or Kaggle fallback) is decided then
 - **Next deadline:** tags `v1.0-exp` + `prereg-v1` and T1 seed 0 start on both Colab accounts the same evening Disha approves (target Tue 3 Nov night, latest Wed 4 Nov 12:00)
@@ -22,6 +22,13 @@ Written only by Aayush's agents; read by Disha and her agents. The protocol is i
 ```
 
 ## Log (newest first)
+
+### Tue 3 Nov, night · Project tracker PR #24
+- Done: automated tracker (plan.yaml re-dated: freeze Fri 6, draft Mon 9, submit Wed 11; rubric coverage; prospects FP-1..9). Review round 1: 1 High (tracker.py as gate code, read-only build job) + Medium + 5 Lows, all fixed with check.sh step 10b tests; delta review Approve; agent-review set. Follow-up issue #25.
+- Evidence: PR #24 head baad1be, CI green; live summary 23 % done, critical path DS-08 -> DS-09 -> AY-12 -> EXP-T1 -> ... -> SUBMIT.
+- Needs from Disha: approve #24; add a `**Tracker:**` line to her Status block.
+- Next: tags + T1 once #19 is approved; FP-1 clamp-safe code on Wed while T1 runs.
+- Message to Disha: see the chat message of Tue 3 Nov night.
 
 ### Tue 3 Nov, evening · Merged #12 and #22; #17 and #19 updated for the new main; Method and Setup drafts
 - Done: merged #12 (CI analysis scripts) and #22 (DS-06 plots, after checking Disha's reviewer Approve at 58faa48). Both #17 and #19 conflicted with the new main in `check.sh`; merged main into each (step 12 before 13–14 / 15–17), delta reviews Approve, `agent-review` set. AY-16/AY-20: Method and Experimental setup drafts, PR #23 (docs-only).
