@@ -117,8 +117,9 @@ cfg = yaml.safe_load(open(sys.argv[1]))
 missing = [k for k in ("scenes", "seeds", "n_views", "variants", "steps") if k not in cfg]
 assert not missing, "%s: missing keys %s" % (sys.argv[1], missing)
 for name, v in cfg["variants"].items():
-    assert set(v) == {"depth_scale", "drop_rate", "depth_render"}, "%s variant %s: %s" % (sys.argv[1], name, v)
+    assert set(v) - {"drop_mode"} == {"depth_scale", "drop_rate", "depth_render"}, "%s variant %s: %s" % (sys.argv[1], name, v)
     assert v["depth_render"] in ("shared", "clean", "hard_only", "soft_only"), (sys.argv[1], name)
+    assert v.get("drop_mode", "uniform") in ("uniform", "clamp_aware"), (sys.argv[1], name)
 print("ok", sys.argv[1], len(cfg["scenes"]) * len(cfg["seeds"]) * len(cfg["n_views"]) * len(cfg["variants"]), "runs")
 EOF
   done
@@ -346,6 +347,38 @@ assert real.returncode != 0 and "tag" in (real.stdout + real.stderr), "an untagg
 print("runner ok")
 EOF
 fi
+
+step "18. Clamp-aware dropout (H7): uniform compensation is biased by the 0.99 alpha cap, clamp-aware is not; default stays verbatim"
+grep -q 'drop_comp = torch.nn.Dropout(p=drop_rate_now)(torch.ones(gaussians.get_xyz.shape\[0\], device="cuda"))' train_llff.py \
+  || echo "train_llff.py: the uniform (default) mask is no longer DropGaussian's verbatim torch.nn.Dropout" >"$TMP/ca.txt"
+if [ ${#PYA[@]} -eq 0 ]; then skip "clamp-aware dropout" "numpy unavailable"
+elif [ ! -s "$TMP/ca.txt" ] && "${PYA[@]}" - >>"$TMP/ca.txt" 2>&1 <<'EOF'; then pass; else cat "$TMP/ca.txt"; fail "clamp-aware dropout"; fi
+import importlib.util
+import numpy as np
+spec = importlib.util.spec_from_file_location("dropout", "utils/dropout.py")   # no utils/__init__ (it imports torch)
+d = importlib.util.module_from_spec(spec); spec.loader.exec_module(d)
+rng = np.random.default_rng(0)
+n, cap = 400000, d.ALPHA_MAX
+for r in (0.06, 0.12, 0.2):
+    for a in (0.3, 0.87, 0.9, 0.95, 0.99, 1.0):
+        u = rng.random(n)
+        uni = np.minimum(cap, a * (u >= r) / (1 - r)).mean()                 # DropGaussian, then the rasterizer clamp
+        ca = np.minimum(cap, a * d.compensated_mask(u, d.clamp_aware_rates(np.full(n, a), r))).mean()
+        clean = min(cap, a)
+        assert abs(ca - clean) < 4e-3, ("clamp-aware is biased", r, a, ca, clean)
+        if a / (1 - r) > cap + 1e-9 and a < cap:
+            assert uni < clean - 0.01, ("uniform should be biased here", r, a, uni, clean)
+# the hard-depth pass (opacity 0.95) at r = 0.12: uniform loses 8 %, as in PLAN_V2 §2.4
+u = rng.random(n)
+assert abs(np.minimum(cap, 0.95 * (u >= 0.12) / 0.88).mean() - 0.871) < 4e-3
+# rates: never above r, never negative, unchanged where the cap doesn't bind; nested masks across passes
+a = np.array([0.1, 0.5, 0.871, 0.9, 0.95, 0.99, 1.0])
+rt = d.clamp_aware_rates(a, 0.12)
+assert (rt <= 0.12 + 1e-12).all() and (rt >= 0).all() and rt[0] == 0.12 and rt[1] == 0.12 and rt[-1] == 0 and rt[-2] == 0, rt
+lo, hi = d.compensated_mask(u, np.full(n, 0.03)) > 0, d.compensated_mask(u, np.full(n, 0.12)) > 0
+assert (lo | ~hi).all(), "a Gaussian kept at the higher rate must be kept at the lower one"
+print("clamp-aware ok")
+EOF
 
 printf '\n== Summary\n'
 [ ${#SKIPPED[@]} -gt 0 ] && echo "Skipped locally: ${SKIPPED[*]}"

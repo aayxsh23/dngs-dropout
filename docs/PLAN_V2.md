@@ -301,6 +301,25 @@ B (published DNGaussian) is the fixed reference; we never pick "the better of B 
 
 **Power (state it in the report).** With 8 scenes × 3 seeds, interactions smaller than about 0.35–0.5 dB are below our detection limit (RESEARCH_ANALYSIS §5.3).
 
+### 5.1 Addendum (3 Nov, tag `prereg-v2`, before any block-CA result): clamp-aware dropout
+
+**Method.** `--drop_mode clamp_aware` (`utils/dropout.py`): each Gaussian's drop rate is lowered to r_i = min(r, 1 − α_i/0.99), or 0 when α_i ≥ 0.99, where α_i is its opacity in that pass (0.95 in the hard-depth pass). Survivors are scaled by 1/(1 − r_i), so the compensated opacity never exceeds the rasterizer's alpha cap and Proposition 1 holds in every pass. All passes of an iteration threshold one uniform draw per Gaussian. The default `--drop_mode uniform` stays DropGaussian verbatim. (A fixed base opacity of 0.99(1 − r) in the hard pass is *not* a fix: its survivors land on exactly the clamped value, so it changes nothing.)
+
+**Block CA:** `C_ca`, `D_ca` (γ = 0.2), 8 scenes × seeds 0–2 = 48 runs on Colab T4, paired with T1's C, D and E (`experiments/matrix_ca.yaml`, output root `outputs_ca/`, tag `v1.1-exp`). A, B, C, D and E are unchanged in `v1.1-exp`.
+
+**Gate (decided Thu 5 Nov 12:00, recorded in RUNLOG).** Run block CA only if both hold:
+1. T1 seeds 0 and 1 are complete (80 runs);
+2. the bias is not negligible: in T1 seed 0, the median over scenes of `frac_opacity_gt_0_9` in C or D is ≥ 0.05, **or** the Monte-Carlo probe on the seed-0 D checkpoints gives a median relative hard-pass depth shift ≥ 0.5 % at r = 0.12.
+
+If the gate fails, block CA is not run, and the report states the measured exposure and probe values.
+
+**H7, clamp bias matters.**
+- H7a: C_ca − C > 0. Fixing the photometric pass helps DropGaussian itself.
+- H7b: D_ca − D > 0. If D < E (H2), then D_ca − E is equivalent to 0, so the clamp bias explains the D vs E gap.
+- **Falsified if** C_ca − C and D_ca − D are both equivalent to 0. In that case the bias is real (`frac_over_cap` in `diag.csv`, the probe) but harmless at the published dose.
+
+**Analysis.** §5 rules, paired by scene over seeds 0–2: 95 % t-intervals, δ = 0.25 dB, Holm across the three contrasts C_ca − C, D_ca − D and D_ca − E. A secondary check: `frac_over_cap` over training, uniform vs clamp-aware.
+
 ---
 
 ## 6. Testing and validation
