@@ -9,6 +9,8 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
+import json
+import time
 import torch
 from scene import Scene
 import os
@@ -100,10 +102,13 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
     render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders")
     gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt")
     depth_path = os.path.join(model_path, name, "ours_{}".format(iteration), "depth")
+    raw_path = os.path.join(model_path, name, "ours_{}".format(iteration), "depth_raw")
 
     makedirs(render_path, exist_ok=True)
     makedirs(gts_path, exist_ok=True)
     makedirs(depth_path, exist_ok=True)
+    makedirs(raw_path, exist_ok=True)
+    cameras = []
 
     if near > 0:
         mask_near = None
@@ -121,11 +126,37 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         torchvision.utils.save_image(gt, os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
         torchvision.utils.save_image(1 - depth, os.path.join(depth_path, '{0:05d}'.format(idx) + ".png"))
         torchvision.utils.save_image(render_pkg["alpha"], os.path.join(depth_path, 'alpha_{0:05d}'.format(idx) + ".png"))
+        # Raw depth for geometry metrics (PLAN_V2 novelty 2): alpha-weighted view-space z, not normalized by alpha
+        np.savez_compressed(os.path.join(raw_path, '{0:05d}'.format(idx) + ".npz"),
+                            depth=render_pkg["depth"].squeeze().cpu().numpy().astype(np.float16),
+                            alpha=render_pkg["alpha"].squeeze().cpu().numpy().astype(np.float16))
+        cameras.append(dict(index=idx, image_name=view.image_name, width=int(view.image_width), height=int(view.image_height),
+                            FoVx=float(view.FoVx), FoVy=float(view.FoVy),
+                            world_view_transform=view.world_view_transform.cpu().tolist()))
 
         depth_est = depth.squeeze().cpu().numpy()
         depth_est = visualize_cmap(depth_est, np.ones_like(depth_est), cm.get_cmap('turbo'), curve_fn=depth_curve_fn).copy()
         depth_est = torch.as_tensor(depth_est).permute(2,0,1)
         torchvision.utils.save_image(depth_est, os.path.join(depth_path, 'color_{0:05d}'.format(idx) + ".png"))
+
+    # world_view_transform is 3DGS's transposed world-to-camera matrix: [x, y, z, 1] @ W gives camera coordinates
+    with open(os.path.join(model_path, name, "ours_{}".format(iteration), "cameras.json"), "w") as f:
+        json.dump(cameras, f)
+
+
+def timing_stats(model_path, views, gaussians, pipeline, background, warmup=5, timed=50):
+    """render_stats.json (PLAN W6): FPS from a separate timed loop over the eval views; no dropout."""
+    for i in range(warmup):
+        render(views[i % len(views)], gaussians, pipeline, background, inference=True)
+    torch.cuda.synchronize()
+    t0 = time.time()
+    for i in range(timed):
+        render(views[i % len(views)], gaussians, pipeline, background, inference=True)
+    torch.cuda.synchronize()
+    v = views[0]
+    with open(os.path.join(model_path, "render_stats.json"), "w") as f:
+        json.dump(dict(fps=round(timed / (time.time() - t0), 2), n_gaussians_render=int(gaussians.get_xyz.shape[0]),
+                       resolution=[int(v.image_width), int(v.image_height)]), f, indent=2)
 
 
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_test : bool, near : int):
@@ -141,6 +172,7 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
 
         render_set(dataset.model_path, "eval", scene.loaded_iter, scene.getEvalCameras(), gaussians, pipeline, background, near)
+        timing_stats(dataset.model_path, scene.getEvalCameras(), gaussians, pipeline, background)
         if not skip_train:
              render_set(dataset.model_path, "train", scene.loaded_iter, scene.getTrainCameras(), gaussians, pipeline, background)
 

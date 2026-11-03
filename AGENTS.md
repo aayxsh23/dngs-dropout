@@ -18,6 +18,8 @@ Every experimental variant is the **same code with different command-line flags*
 | C | 0 | 0.2 | shared | Dropout only |
 | D | 1 | 0.2 | shared | Naive combination: the dropout mask also hits the depth passes |
 | E | 1 | 0.2 | clean | Decoupled: the depth passes never see the mask |
+| D_hard | 1 | 0.2 | hard_only | Only the hard-depth pass sees the mask (PLAN_V2 block P) |
+| D_soft | 1 | 0.2 | soft_only | Only the soft-depth pass sees the mask (PLAN_V2 block P) |
 
 The main benchmark is LLFF 3-view (8 scenes × 5 variants × 3 seeds = 120 runs).
 
@@ -63,7 +65,7 @@ peak VRAM of one training run: python scripts/peak_vram.py train_llff.py <same f
 8-scene reproduction summary:   python avg_llff.py    # reads output/llff/<scene>/results_eval.json
 ```
 
-Experiment runner (being built, see PLAN W8): `python experiments/run_matrix.py --matrix experiments/matrix.yaml --data_root <llff dir> --out_root <outputs> --shard i/N --seeds 0 [--dry_run]`. Always try `--dry_run` first.
+Experiment runner (PLAN W8, PLAN_V2 §3): `python experiments/run_matrix.py --matrix experiments/matrix.yaml --data_root <llff dir> --out_root <outputs> --shard i/N --seeds 0 [--dry_run]`. Always try `--dry_run` first.
 
 ## How the code is laid out (what matters for this project)
 
@@ -210,7 +212,7 @@ The script works in a fixed worktree (`~/.cache/dngs-team-context`, or `TEAM_CON
 - **The rasterizer is nondeterministic.** The same seed gave 17.75 and 17.29 PSNR on fern at 1100 iterations. Compare variants with means over seeds and scenes, never single runs.
 - The laptop GPU has 4 GB, and a training run's footprint is about 1.7 GB. Run **one** training job at a time, and check `pgrep -af "train_llff|render.py|metrics.py"` before you start one. nvidia-smi can't show per-process memory under WSL, so use `scripts/peak_vram.py`.
 - Long runs on the laptop: start them in `tmux` or with `nohup`. A job started in a VS Code terminal dies when VS Code restarts.
-- `--rand_pcd` writes `sparse/0/points3D_random.ply` into the **dataset folder**. Parallel runs on the same scene race on that file (PLAN W7 fixes this).
+- `--rand_pcd` writes its random cloud to a unique temp dir (PLAN W7), never into the dataset folder, so parallel runs on one scene don't race. `scripts/check.sh` fails if the old `sparse/0/points3D_random` path comes back.
 - The playbook's `run_matrix.py` sketch reads `results.json`. The real file is `results_eval.json`.
 - `run_llff.sh` also renders a spiral video with `spiral.py`. The matrix skips it.
 - Training writes large files: `chkpnt_latest.pth` is about 164 MB and TensorBoard events are about 13 MB per run. Drive quota is 15 GB per account, so the runner deletes them (PLAN W8).
