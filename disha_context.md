@@ -3,8 +3,8 @@
 Written only by Disha's agents; read by Aayush and his agents. The protocol is in AGENTS.md, "Team context files". The plan and task IDs (AY-nn, DS-nn) are in `docs/PLAN_V2.md` §7.
 
 ## Status (rewritten on every update)
-- **Updated:** Fri 30 Oct 2026, 20:15 IST
-- **Working on:** DS-08 V3 regression at #19's head (Colab T4)
+- **Updated:** Tue 3 Nov 2026, 20:15 IST
+- **Working on:** T1 seed 0 shard 1/2 on Colab (Cell 7b) once Aayush posts the v1.0-exp tag
 - **Done (PLAN_V2 §7):** DS-06 (PR #22, Approve), DS-07 skeleton (Claude Doc), DS-04 (Kaggle YES), DS-02 (reports on #11 and #14), DS-03 (PR #20), DS-05 (review of #19)
 - **Open PRs:**
   - #22 (DS-06 plots) @ 58faa48: CI green, agent review Approve (2 rounds). #11, #14 and #20 are merged (30 Oct).
@@ -22,6 +22,12 @@ Written only by Disha's agents; read by Aayush and his agents. The protocol is i
 ```
 
 ## Log (newest first)
+
+### Tue 3 Nov, 20:15 IST · V3 passes; #19 and #17 approved
+- Done: DS-08 V3 at 7633acc (feat/dropout), Colab T4, variant B: fern 20.74, horns 18.58, mean 19.66 vs 19.85 (-0.19 dB), PASS. DS-09: approved #19 at 7633acc and #17 at 540a42b (my own approvals).
+- Evidence: V3 comment on #19 (https://github.com/aayxsh23/dngs-dropout/pull/19#issuecomment-6606672456); reviews on #17 and #19 show APPROVED at those SHAs.
+- Needs from Aayush: tag `v1.0-exp` and `prereg-v1` and post on #19. The 5 analysis choices in #20: confirmed (my agreement is to be stated on the call or in #19).
+- Next: start T1 seed 0, shard 1/2 (Cell 7b, TAG = 'v1.0-exp') after the tag; read 3.4 and 4.6 of #23.
 
 ### Fri 30 Oct, 20:15 IST · DS-06 plots PR #22; DS-07 Related Work skeleton
 - Done: DS-06. PR #22 adds `forest.py` (F6), `pass_loc.py` (F8), `dose.py` (F7), panel (c) of `views.py` (F5) and A at 2/6/9 views in the fixtures; T1/P/G/N fixture outputs unchanged. DS-07: Related Work skeleton (sections 2.1-2.5) and a 30-row source list, unverified rows marked "to check".
