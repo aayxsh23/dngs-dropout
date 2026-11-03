@@ -7,7 +7,7 @@ Written only by Aayush's agents; read by Disha and her agents. The protocol is i
 - **Working on:** waiting for Disha's V3 + approvals of #19 and #17; then tags and T1 on Colab
 - **Done (PLAN_V2 §7):** AY-01–03, AY-06–09, AY-11 (#19), AY-21, AY-22 (`feat/probes`), AY-04 (merged #12, #22), AY-16 + AY-20 drafts (PR #23)
 - **Waiting on Disha:** (0) approve #24 (tracker) at baad1be; (1) V3 regression at #19 (any head since 4f03a37; training code unchanged) and approval of #19 at **7633acc**; (2) re-approve #17 at **540a42b**; (3) confirm #20's 5 analysis choices
-- **Tracker:** done AY-02..03, AY-05..09, AY-11, AY-16, AY-20, AY-21; partial AY-22; working AY-12, AY-10; runs T1=0 P=0 G=0 N=0 V=0
+- **Tracker:** done AY-02..03, AY-05..09, AY-11, AY-12, AY-16, AY-20, AY-21; partial AY-22; working AY-13, AY-10; runs T1=0 P=0 G=0 N=0 V=0
 - **A100:** access and runs per day confirmed by Aayush on Wed 4 Nov; block V's plan (full 160, 2/3/6 views only, or Kaggle fallback) is decided then
 - **Next deadline:** tags `v1.0-exp` + `prereg-v1` and T1 seed 0 start on both Colab accounts the same evening Disha approves (target Tue 3 Nov night, latest Wed 4 Nov 12:00)
 
@@ -22,6 +22,13 @@ Written only by Aayush's agents; read by Disha and her agents. The protocol is i
 ```
 
 ## Log (newest first)
+
+### Tue 3 Nov, ~21:00 IST · #19 merged; v1.0-exp and prereg-v1 tagged; #17 re-reviewed
+- Done: AY-12. #19 squash-merged as 1040559 (tree identical to 7633acc: GPU smoke, V3 19.66, Disha's approval); tags `v1.0-exp` and `prereg-v1` on it; CI green on main; runner dry run from the tag OK. #17 conflicted again (check.sh), merged main, delta review Approve, agent-review set on 366bee2. Issue #26: hook fails open when CLAUDE_PROJECT_DIR is unset (found by Disha's cloud setup check).
+- Evidence: #19 comment with the tags; #17 report; issue #26.
+- Needs from Disha: start T1 seed 0 shard 1/2 now; approve #17 at 366bee2 and #24 at baad1be; do the setup on her local machine.
+- Next: T1 seed 0 shard 0/2 on Colab A (AY-13); research-upgrade plan (clamp-aware dropout, DTU, power).
+- Message to Disha: see the chat reply of Tue 3 Nov ~21:00.
 
 ### Tue 3 Nov, night · Project tracker PR #24
 - Done: automated tracker (plan.yaml re-dated: freeze Fri 6, draft Mon 9, submit Wed 11; rubric coverage; prospects FP-1..9). Review round 1: 1 High (tracker.py as gate code, read-only build job) + Medium + 5 Lows, all fixed with check.sh step 10b tests; delta review Approve; agent-review set. Follow-up issue #25.
