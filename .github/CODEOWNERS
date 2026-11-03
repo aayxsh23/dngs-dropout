@@ -35,6 +35,7 @@
 /scripts/review_bundle.py     @aayxsh23 @DishaSingghh
 /scripts/hooks/               @aayxsh23 @DishaSingghh
 /scripts/setup_repo_rules.sh  @aayxsh23 @DishaSingghh
+/scripts/team_context.sh      @aayxsh23 @DishaSingghh
 /AGENTS.md                    @aayxsh23 @DishaSingghh
 /CLAUDE.md                    @aayxsh23 @DishaSingghh
 /GEMINI.md                    @aayxsh23 @DishaSingghh

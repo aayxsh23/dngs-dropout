@@ -11,7 +11,7 @@ Follow these stages in order. Never skip a stage because a previous run "probabl
 
 ## Stage A: Understand
 1. Identify the PR (`gh pr view <N> -R $R`) or, for local work, the branch and its base (`main`).
-2. Read the goal: the PR text, the linked issue or `docs/PLAN.md` item, and the acceptance criteria. If none are stated, write them down before going on.
+2. Read the goal: the PR text, the linked issue or the PLAN_V2 task ID (build specs in `docs/PLAN.md` §5), and the acceptance criteria. If none are stated, write them down before going on.
 3. Classify the PR from the changed files against `.github/CODEOWNERS`:
    - **routine:** no protected path.
    - **experiment:** training, rendering, evaluation or experiment config.
