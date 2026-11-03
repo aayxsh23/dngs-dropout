@@ -1,4 +1,4 @@
-# Block CA: clamp-aware dropout, H7 (48 runs, Colab T4, paired with T1's C and D; runs only if the PLAN_V2 §5 addendum gate passes). Runner: experiments/run_matrix.py; layout and keys: PLAN.md W8. Output root: outputs_ca/ (PLAN_V2 §3.1).
+# Block CA: clamp-aware dropout, H7 (48 runs, Colab T4, tag v1.1-exp; paired with T1's C and D, E and A as references; runs only if the gate in PLAN_V2 §5.1 passes). Runner: experiments/run_matrix.py; layout and keys: PLAN.md W8. Output root: outputs_ca/ (PLAN_V2 §3.1, §5.1).
 # Identical to scripts/run_llff.sh except: no spiral video, eval-only render, explicit seed, variant flags.
 scenes: [fern, flower, fortress, horns, leaves, orchids, room, trex]
 seeds: [0, 1, 2]

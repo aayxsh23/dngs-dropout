@@ -10,6 +10,10 @@ Clamp-aware dropout lowers each Gaussian's rate to r_i = min(r, 1 - opacity_i / 
 opacity_i >= ALPHA_MAX. Then opacity_i / (1 - r_i) <= ALPHA_MAX, the clamp never cuts a survivor (the 2D falloff only
 lowers alpha away from the centre), and the expected alpha equals the clean alpha in every pass. All passes of one
 iteration threshold the same uniform draw u, so a Gaussian kept at a high rate is also kept at a lower one.
+
+The price is dose: for opacity_i >= ALPHA_MAX * (1 - r) no rescaling can make rate r unbiased (dropping the Gaussian
+alone lets light through with probability r), and 1 - opacity_i / ALPHA_MAX is the largest unbiased rate. With
+near-opaque Gaussians, clamp-aware dropout is a much smaller dose than DropGaussian's (PLAN_V2 §5.1).
 """
 
 ALPHA_MAX = 0.99   # per-pixel alpha cap of the rasterizer (submodules/diff-gaussian-rasterization, forward.cu)

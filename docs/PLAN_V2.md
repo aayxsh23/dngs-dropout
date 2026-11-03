@@ -124,7 +124,7 @@ Derivation: RESEARCH_ANALYSIS.md §6.
 ## 3. Experiment matrix
 
 ### 3.1 Blocks
-One LLFF run takes about 4.9 min on a T4. All blocks run from tag `v1.0-exp`. Each block has its own output root, so Tier 1's tables stay clean.
+One LLFF run takes about 4.9 min on a T4. All blocks run from tag `v1.0-exp`, except block CA (`v1.1-exp`, §5.1). Each block has its own output root, so Tier 1's tables stay clean.
 
 | Block | Variants | Scenes × seeds | Runs | Where | Hours | Output root | Matrix file | Priority |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -133,6 +133,7 @@ One LLFF run takes about 4.9 min on a T4. All blocks run from tag `v1.0-exp`. Ea
 | **G dose** | `C_g010 D_g010 E_g010 C_g033 D_g033 E_g033` | 8 × seed 0 | 48 | Colab T4 ×2 | 3.9 T4-h | `outputs_dose/` | `matrix_dose.yaml` | 3 |
 | **N noise** | `B_r1..B_r4`, `D_r1..D_r4` | fern × seed 0 | 8 | Colab T4 | 0.7 T4-h | `outputs_noise/` | `matrix_noise.yaml` | 4 |
 | **V views** | A–E, self-contained | 8 × seed 0 at 2, 3, 6, 9 views | 160 | **A100** (`--shared_gpu`) | 2–3 visits (middle case) | `outputs_views/` | `matrix_views_a100.yaml` | 5 |
+| **CA clamp-aware** (§5.1, gated) | `C_ca`, `D_ca` (γ = 0.2, `drop_mode: clamp_aware`) | 8 × 3 | 48 | Colab T4 | 3.9 T4-h | `outputs_ca/` | `matrix_ca.yaml` | 2b, if the Thu 12:00 gate passes |
 | S init (stretch) | `A_mvs … E_mvs` | 8 × seed 0 | 40 | A100 or Colab | ~4 T4-h | `outputs_mvs/` | `matrix_mvs.yaml` | 6 |
 
 **Core runs:** 224 on T4 (18.3 T4-h) + 160 on the A100.
@@ -147,7 +148,7 @@ One LLFF run takes about 4.9 min on a T4. All blocks run from tag `v1.0-exp`. Ea
 - Peak drop rates at iteration 6000 are 0.06 / 0.12 / 0.20 for γ = 0.1 / 0.2 / 1/3.
 
 ### 3.2 Matrix files
-Every variant uses the same three keys. The new `depth_render` values `hard_only` and `soft_only` need `check.sh` step 9 to accept them; that change goes in PR-A. Each file differs from `matrix.yaml` only in the lines shown:
+Every variant uses the same three keys, plus an optional fourth, `drop_mode`, in block CA (§5.1). The new `depth_render` values `hard_only` and `soft_only` need `check.sh` step 9 to accept them; that change goes in PR-A. Each file differs from `matrix.yaml` only in the lines shown:
 
 ```yaml
 # experiments/matrix_pass.yaml
@@ -303,9 +304,16 @@ B (published DNGaussian) is the fixed reference; we never pick "the better of B 
 
 ### 5.1 Addendum (3 Nov, tag `prereg-v2`, before any block-CA result): clamp-aware dropout
 
-**Method.** `--drop_mode clamp_aware` (`utils/dropout.py`): each Gaussian's drop rate is lowered to r_i = min(r, 1 − α_i/0.99), or 0 when α_i ≥ 0.99, where α_i is its opacity in that pass (0.95 in the hard-depth pass). Survivors are scaled by 1/(1 − r_i), so the compensated opacity never exceeds the rasterizer's alpha cap and Proposition 1 holds in every pass. All passes of an iteration threshold one uniform draw per Gaussian. The default `--drop_mode uniform` stays DropGaussian verbatim. (A fixed base opacity of 0.99(1 − r) in the hard pass is *not* a fix: its survivors land on exactly the clamped value, so it changes nothing.)
+**Method.** `--drop_mode clamp_aware` (`utils/dropout.py`): each Gaussian's drop rate is lowered to r_i = min(r, 1 − α_i/0.99), or 0 when α_i ≥ 0.99, where α_i is its opacity in that pass (0.95 in the hard-depth pass). Survivors are scaled by 1/(1 − r_i), so the compensated opacity never exceeds the rasterizer's alpha cap and Proposition 1 holds in every pass. All passes of an iteration threshold one uniform draw per Gaussian; the photometric mask is re-capped after the soft pass's optimizer step. The default `--drop_mode uniform` stays DropGaussian verbatim. (A fixed base opacity of 0.99(1 − r) in the hard pass is *not* a fix: its survivors land on exactly the clamped value, so it changes nothing.)
 
-**Block CA:** `C_ca`, `D_ca` (γ = 0.2), 8 scenes × seeds 0–2 = 48 runs on Colab T4, paired with T1's C, D and E (`experiments/matrix_ca.yaml`, output root `outputs_ca/`, tag `v1.1-exp`). A, B, C, D and E are unchanged in `v1.1-exp`.
+**Unbiasedness costs dose.** For a Gaussian with α ≥ 0.99(1 − r), no rescaling of the survivors' opacity can make dropout at rate r unbiased, since dropping it alone lets through light with probability r. The largest unbiased rate is 1 − α/0.99, and clamp-aware dropout uses exactly that. With the opacities we observe (median ≈ 0.99 in the smoke runs), clamp-aware is therefore a much **smaller** dose than DropGaussian's: about 0 for saturated Gaussians and at most 0.0404 in the hard pass. Uniform dropout keeps the dose and accepts the bias; clamp-aware removes the bias and gives up most of the dose. The two can't both be kept.
+
+**Recorded dose.**
+- `diag.csv`: `drop_rate_eff` (mean per-Gaussian rate of the soft/photometric mask) and `drop_rate_eff_hard`. Both equal `drop_rate_now` in uniform mode.
+- `train_stats.json`: `drop_rate_mean`, `drop_rate_eff_mean`, `drop_rate_eff_hard_mean` over all iterations.
+- `frac_over_cap`: the share of Gaussians that uniform compensation would push over the cap in the soft and photometric passes. The hard pass is fully exposed whenever r > 0.0404.
+
+**Block CA:** `C_ca`, `D_ca` (γ = 0.2), 8 scenes × seeds 0–2 = 48 runs on Colab T4, from tag `v1.1-exp` (`experiments/matrix_ca.yaml`, output root `outputs_ca/`). Paired with T1's C and D, with E and A as references. A–E, D_hard and D_soft are unchanged in `v1.1-exp`. Runs from `v1.0-exp` have no `drop_mode` key; it counts as `uniform`.
 
 **Gate (decided Thu 5 Nov 12:00, recorded in RUNLOG).** Run block CA only if both hold:
 1. T1 seeds 0 and 1 are complete (80 runs);
@@ -313,14 +321,17 @@ B (published DNGaussian) is the fixed reference; we never pick "the better of B 
 
 If the gate fails, block CA is not run, and the report states the measured exposure and probe values.
 
-**H7, clamp bias matters.**
-- H7a: C_ca − C > 0. Fixing the photometric pass helps DropGaussian itself.
-- H7b: D_ca − D > 0. If D < E (H2), then D_ca − E is equivalent to 0, so the clamp bias explains the D vs E gap.
-- **Falsified if** C_ca − C and D_ca − D are both equivalent to 0. In that case the bias is real (`frac_over_cap` in `diag.csv`, the probe) but harmless at the published dose.
+**H7: does DropGaussian's benefit need the biased, full-dose dropout of opaque Gaussians?**
+- **Dose reference.** C at nominal mean rates 0 (A), and γ = 0.1, 0.2, 1/3 (blocks G and T1, seed 0), is a uniform dose–response curve: PSNR against `drop_rate_mean`. C_ca is placed on it at its `drop_rate_eff_mean`, and D_ca is placed on the D curve the same way.
+- **H7a, C_ca vs C.** Report C_ca − C and the dose ratio (`drop_rate_eff_mean` of C_ca over that of C). Reading:
+  - C_ca − C ≥ 0 (equivalent or better): an unbiased dose a fraction of the size does at least as well, so the biased full-dose dropout of opaque Gaussians adds nothing.
+  - C_ca − C < 0, and C_ca at or below the uniform curve at its effective dose: the loss is explained by the dose; there is no evidence that the bias matters.
+  - C_ca − C < 0, but C_ca above the curve at its effective dose: unbiasedness helps at equal dose, but the dose cut costs more. Exploratory, since the curve is seed 0 only.
+- **H7b, D_ca vs D.** The same three readings on the D curve.
+- **D_ca − E** is reported but not read as evidence about the clamp bias: D_ca's depth passes get a much lower dose, so D_ca moves toward E by construction.
+- **Falsified if** C_ca − C and D_ca − D are both equivalent to 0. In that case DropGaussian's benefit does not depend on the biased dropout of opaque Gaussians.
 
-**Analysis.** §5 rules, paired by scene over seeds 0–2: 95 % t-intervals, δ = 0.25 dB, Holm across the three contrasts C_ca − C, D_ca − D and D_ca − E. A secondary check: `frac_over_cap` over training, uniform vs clamp-aware.
-
----
+**Analysis.** §5 rules, paired by scene over seeds 0–2: 95 % t-intervals, δ = 0.25 dB, Holm across the two contrasts C_ca − C and D_ca − D. The dose-curve placement is exploratory (seed 0, interpolation between the measured γ). Secondary: `frac_over_cap` and `drop_rate_eff` over training, uniform vs clamp-aware.
 
 ## 6. Testing and validation
 

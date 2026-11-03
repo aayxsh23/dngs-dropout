@@ -349,10 +349,18 @@ EOF
 fi
 
 step "18. Clamp-aware dropout (H7): uniform compensation is biased by the 0.99 alpha cap, clamp-aware is not; default stays verbatim"
-grep -q 'drop_comp = torch.nn.Dropout(p=drop_rate_now)(torch.ones(gaussians.get_xyz.shape\[0\], device="cuda"))' train_llff.py \
-  || echo "train_llff.py: the uniform (default) mask is no longer DropGaussian's verbatim torch.nn.Dropout" >"$TMP/ca.txt"
-if [ ${#PYA[@]} -eq 0 ]; then skip "clamp-aware dropout" "numpy unavailable"
-elif [ ! -s "$TMP/ca.txt" ] && "${PYA[@]}" - >>"$TMP/ca.txt" 2>&1 <<'EOF'; then pass; else cat "$TMP/ca.txt"; fail "clamp-aware dropout"; fi
+: >"$TMP/ca.txt"
+ca_need() { grep -qF -- "$2" "$1" || echo "$1: missing \`$2\` ($3)" >>"$TMP/ca.txt"; }
+ca_need train_llff.py 'drop_comp = torch.nn.Dropout(p=drop_rate_now)(torch.ones(gaussians.get_xyz.shape[0], device="cuda"))' "the default mask must stay DropGaussian verbatim"
+ca_need arguments/__init__.py 'self.drop_mode = "uniform"' "uniform must be the default"
+ca_need train_llff.py 'HARD_OPACITY = 0.95' "the hard pass's fixed opacity"
+ca_need gaussian_renderer/__init__.py 'value=0.95, drop_comp=None' "render_for_depth's opacity must equal HARD_OPACITY"
+ca_need train_llff.py 'hard_comp = hard_drop_comp if' "the hard pass gets its own clamp-aware mask"
+ca_need train_llff.py '"drop_rate_eff", "drop_rate_eff_hard"]' "diag.csv records the effective dose: H7 is confounded with dose otherwise"
+ca_need docs/PLAN_V2.md 'drop_rate_eff' "the H7 pre-registration reads the contrasts with the effective dose"
+if [ -s "$TMP/ca.txt" ]; then cat "$TMP/ca.txt"; fail "clamp-aware dropout wiring"
+elif [ ${#PYA[@]} -eq 0 ]; then skip "clamp-aware dropout Monte Carlo" "numpy unavailable"
+elif "${PYA[@]}" - >"$TMP/ca.txt" 2>&1 <<'EOF'; then pass; else cat "$TMP/ca.txt"; fail "clamp-aware dropout"; fi
 import importlib.util
 import numpy as np
 spec = importlib.util.spec_from_file_location("dropout", "utils/dropout.py")   # no utils/__init__ (it imports torch)
