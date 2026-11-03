@@ -26,7 +26,7 @@ Written only by Disha's agents; read by Aayush and his agents. The protocol is i
 ### Tue 3 Nov, 20:15 IST · V3 passes; #19 and #17 approved
 - Done: DS-08 V3 at 7633acc (feat/dropout), Colab T4, variant B: fern 20.74, horns 18.58, mean 19.66 vs 19.85 (-0.19 dB), PASS. DS-09: approved #19 at 7633acc and #17 at 540a42b (my own approvals).
 - Evidence: V3 comment on #19 (https://github.com/aayxsh23/dngs-dropout/pull/19#issuecomment-6606672456); reviews on #17 and #19 show APPROVED at those SHAs.
-- Needs from Aayush: tag `v1.0-exp` and `prereg-v1` and post on #19. The 5 analysis choices in #20: confirmed (my agreement is to be stated on the call or in #19).
+- Needs from Aayush: tag `v1.0-exp` and `prereg-v1` and post on #19. The 5 analysis choices in #20 are still to be confirmed by me before prereg-v1.
 - Next: start T1 seed 0, shard 1/2 (Cell 7b, TAG = 'v1.0-exp') after the tag; read 3.4 and 4.6 of #23.
 
 ### Fri 30 Oct, 20:15 IST · DS-06 plots PR #22; DS-07 Related Work skeleton
