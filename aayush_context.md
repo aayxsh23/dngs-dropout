@@ -7,6 +7,7 @@ Written only by Aayush's agents; read by Disha and her agents. The protocol is i
 - **Working on:** waiting for Disha's V3 + approvals of #19 and #17; then tags and T1 on Colab
 - **Done (PLAN_V2 §7):** AY-01–03, AY-06–09, AY-11 (#19), AY-21, AY-22 (`feat/probes`), AY-04 (merged #12, #22), AY-16 + AY-20 drafts (PR #23)
 - **Waiting on Disha:** (1) V3 regression at #19 (any head since 4f03a37; training code unchanged) and approval of #19 at **7633acc**; (2) re-approve #17 at **540a42b**; (3) confirm #20's 5 analysis choices
+- **Tracker:** done AY-02..03, AY-05..09, AY-11, AY-16, AY-20, AY-21; partial AY-22; working AY-12, AY-10; runs T1=0 P=0 G=0 N=0 V=0
 - **A100:** access and runs per day confirmed by Aayush on Wed 4 Nov; block V's plan (full 160, 2/3/6 views only, or Kaggle fallback) is decided then
 - **Next deadline:** tags `v1.0-exp` + `prereg-v1` and T1 seed 0 start on both Colab accounts the same evening Disha approves (target Tue 3 Nov night, latest Wed 4 Nov 12:00)
 
