@@ -312,6 +312,7 @@ B (published DNGaussian) is the fixed reference; we never pick "the better of B 
 - `diag.csv`: `drop_rate_eff` (mean per-Gaussian rate of the soft/photometric mask) and `drop_rate_eff_hard`. Both equal `drop_rate_now` in uniform mode.
 - `train_stats.json`: `drop_rate_mean`, `drop_rate_eff_mean`, `drop_rate_eff_hard_mean` over all iterations.
 - `frac_over_cap`: the share of Gaussians that uniform compensation would push over the cap in the soft and photometric passes. The hard pass is fully exposed whenever r > 0.0404.
+- Runs from `v1.0-exp` (T1, G: the uniform reference) don't have these fields. For them, `drop_rate_mean` is the schedule mean, 0.30005·γ over 6000 iterations, and the uniform `frac_over_cap` comes from the `v1.1-exp` smoke and probe runs. The `_hard` fields mean something only when `depth_scale` > 0 (no hard pass runs in C or C_ca).
 
 **Block CA:** `C_ca`, `D_ca` (γ = 0.2), 8 scenes × seeds 0–2 = 48 runs on Colab T4, from tag `v1.1-exp` (`experiments/matrix_ca.yaml`, output root `outputs_ca/`). Paired with T1's C and D, with E and A as references. A–E, D_hard and D_soft are unchanged in `v1.1-exp`. Runs from `v1.0-exp` have no `drop_mode` key; it counts as `uniform`.
 
@@ -327,7 +328,7 @@ If the gate fails, block CA is not run, and the report states the measured expos
   - C_ca − C ≥ 0 (equivalent or better): an unbiased dose a fraction of the size does at least as well, so the biased full-dose dropout of opaque Gaussians adds nothing.
   - C_ca − C < 0, and C_ca at or below the uniform curve at its effective dose: the loss is explained by the dose; there is no evidence that the bias matters.
   - C_ca − C < 0, but C_ca above the curve at its effective dose: unbiasedness helps at equal dose, but the dose cut costs more. Exploratory, since the curve is seed 0 only.
-- **H7b, D_ca vs D.** The same three readings on the D curve.
+- **H7b, D_ca vs D.** The same three readings on the D curve. The placement is one-dimensional and approximate: D_ca's hard pass also gets a lower dose (≤ 0.0404), which no point on the uniform D curve reproduces.
 - **D_ca − E** is reported but not read as evidence about the clamp bias: D_ca's depth passes get a much lower dose, so D_ca moves toward E by construction.
 - **Falsified if** C_ca − C and D_ca − D are both equivalent to 0. In that case DropGaussian's benefit does not depend on the biased dropout of opaque Gaussians.
 
