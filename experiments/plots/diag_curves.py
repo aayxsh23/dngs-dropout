@@ -3,6 +3,8 @@
 
 Example:
     python experiments/plots/diag_curves.py --out_root <drive>/sparse3dgs/outputs
+    python experiments/plots/diag_curves.py --out_root <drive>/sparse3dgs/outputs_pass \
+        --tables results/tables/pass --figures results/figures/pass        # other blocks: their own folders
 
 Panel (a): gap = loss_depth_used − loss_depth_clean vs iteration for C, D and E.
 Panel (b): depth_var_masks vs iteration for A–E.
@@ -15,19 +17,26 @@ Writes:
 Only finished runs count: a diag.csv is skipped (with a warning) when its folder has no metrics.json or its
 last row is below --final_iter, because a crashed run would bias the curves and the summary.
 Also runs the W4 sharp checks on every run separately, names each failing run, and exits non-zero if
-one fails (the figure and summary are still written; the summary's checks_ok column says so):
+one fails (the figure and summary are still written; the summary's checks_ok column says so). The checks are
+keyed by the run's own flags (drop_rate, depth_render, soft_depth_start in its config.json, or the factor
+table in experiments/factors.py when there is none), not by the variant letter, so they hold for every block:
+    the flags in config.json match the variant ID;
     every value is finite (a diverged run has NaN losses);
-    the gap is exactly 0 in A, B and E, and not identically 0 in C and D;
-    drop_rate_now is 0 in A and B and equals 0.2 * iter / 10000 in C, D and E (0.12 at iteration 6000);
+    the gap is exactly 0 when the mask never reaches a depth pass (drop_rate 0, or depth_render clean: A, B, E,
+    B_r*, E_g*), and not identically 0 when it does (C, D, D_hard, D_soft, C_g*, D_g*, D_r*);
+    with depth_render soft_only the gap is exactly 0 up to soft_depth_start, before the soft pass exists;
+    drop_rate_now equals drop_rate * iter / 10000 (0 without dropout; 0.12 at iteration 6000 for drop_rate 0.2);
     depth_var_masks is > 0 everywhere.
 Needs matplotlib >= 3.3 (Colab, or any Python >= 3.8 environment), not the laptop's Python 3.7 training env.
 """
-import argparse, glob, os, re, sys
+import argparse, glob, json, os, re, sys
 import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(1, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import style  # noqa: E402
+import factors as F  # noqa: E402
 
 COLUMNS = ["iter", "loss_rgb", "loss_depth_used", "loss_depth_clean", "depth_var_masks", "n_gaussians",
            "drop_rate_now", "iter_ms", "vram_peak_mb"]
@@ -61,28 +70,54 @@ def load_diag(out_root, n_views, final_iter):
             print(f"WARNING {f}: last iteration {d['iter'].max() if len(d) else None} < {final_iter}; skipped",
                   file=sys.stderr)
             continue
-        frames.append(d.assign(n_views=int(m[1]), variant=m[2], scene=m[3], seed=int(m[4])))
+        frames.append(d.assign(n_views=int(m[1]), variant=m[2], scene=m[3], seed=int(m[4]),
+                               **run_flags(os.path.dirname(f), m[2])))
     if not frames:
         return pd.DataFrame()
     d = pd.concat(frames, ignore_index=True)
     return d.assign(gap=d["loss_depth_used"] - d["loss_depth_clean"])
 
 
+def run_flags(run_dir, variant):
+    """The flags the sharp checks key on: from the run's config.json, else from the factor table of its ID."""
+    f = F.factors(variant)
+    cfg = {}
+    try:
+        cfg = json.load(open(os.path.join(run_dir, "config.json")))
+    except (OSError, ValueError):
+        pass
+    rate = cfg.get("drop_rate", f["drop_rate"] if f else None)
+    return dict(drop_rate=rate, depth_render=cfg.get("depth_render", f["depth_render"] if f else "shared"),
+                soft_depth_start=cfg.get("soft_depth_start", 1000),
+                flags_from="none" if rate is None else "config.json" if "drop_rate" in cfg else "ID",
+                flag_mismatch="; ".join(F.mismatches(variant, cfg)) if cfg and f else "")
+
+
 def sharp_checks(d):
-    """PLAN W4 sharp checks, per run (variant, scene, seed). Returns the set of failing (variant, scene, seed)."""
+    """PLAN W4 sharp checks, per run (variant, scene, seed), keyed by the run's flags (run_flags).
+    Returns {(variant, scene, seed): why} for the failing runs."""
     failed = {}
     for (v, scene, seed), r in d.groupby(["variant", "scene", "seed"]):
         why = []
+        first = r.iloc[0]
+        if first["flags_from"] == "none":
+            why.append("no config.json and %s is not in the factor table: can't tell what to check" % v)
+            failed[(v, scene, seed)] = "; ".join(why)
+            continue
+        if first["flag_mismatch"]:
+            why.append("config.json contradicts the ID: " + first["flag_mismatch"])
+        rate, render = float(first["drop_rate"]), first["depth_render"]
+        reaches = F.mask_reaches_depth(dict(drop_rate=rate, depth_render=render))
         if not np.isfinite(r[COLUMNS].to_numpy(dtype=float)).all():
             why.append("non-finite values")
-        if v in ("A", "B", "E") and (r["gap"] != 0).any():
-            why.append("gap should be exactly 0")
-        if v in ("C", "D") and (r["gap"] == 0).all():
+        if not reaches and (r["gap"] != 0).any():
+            why.append("gap should be exactly 0 (drop_rate %g, depth_render %s)" % (rate, render))
+        if reaches and (r["gap"] == 0).all():
             why.append("gap identically 0: the mask never reaches the depth passes")
-        if v in ("A", "B") and (r["drop_rate_now"] != 0).any():
-            why.append("drop rate should be 0")
-        if v in ("C", "D", "E") and not ((r["drop_rate_now"] - 0.2 * r["iter"] / 10000).abs() <= 1e-4).all():
-            why.append("drop rate departs from 0.2 * iter / 10000")
+        if reaches and render == "soft_only" and (r.loc[r["iter"] <= first["soft_depth_start"], "gap"] != 0).any():
+            why.append("gap before soft_depth_start: the mask reaches the hard pass too")
+        if not ((r["drop_rate_now"] - rate * r["iter"] / 10000).abs() <= 1e-4).all():
+            why.append("drop rate departs from %g * iter / 10000" % rate)
         if not (r["depth_var_masks"] > 0).all():
             why.append("depth_var_masks must be > 0")
         if why:
@@ -141,6 +176,10 @@ def main():
     n = d.groupby("variant")[["scene", "seed"]].nunique()
     print(f"{d.groupby(['variant', 'scene', 'seed']).ngroups} diag.csv files; scenes and seeds per variant:\n"
           + n.to_string())
+    src = d.groupby(["variant", "scene", "seed"])["flags_from"].first().value_counts()
+    print("flags for the sharp checks: " + ", ".join(f"{n} runs from {k}" for k, n in src.items())
+          + ("" if src.index.tolist() == ["config.json"] else
+             " (runs 'from ID' have no drop_rate in config.json, so their checks use the factor table)"))
     failed = sharp_checks(d)
 
     late = d[d["iter"] >= a.from_iter]
@@ -155,6 +194,11 @@ def main():
     summary.to_csv(out, index=False)
     print("wrote", out)
 
+    if not set(d["variant"]) & set(style.COLORS):
+        print("no A–E runs here, so no figure (the panels show the T1 variants); summary and checks done")
+        if failed:
+            sys.exit("sharp checks failed: fix the failing runs before using the summary")
+        return
     style.apply()
     fig, (ax1, ax2) = style.plt.subplots(1, 2, figsize=(7.0, 2.6), constrained_layout=True)
     panel(ax1, curves(d, "gap"), ["C", "D", "E"], "(a) depth-loss gap under the dropout mask",
