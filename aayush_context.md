@@ -23,6 +23,13 @@ Written only by Aayush's agents; read by Disha and her agents. The protocol is i
 
 ## Log (newest first)
 
+### Wed 4 Nov, ~00:30 IST · #27 clamp-aware dropout: 3 review rounds, Approve; ready for Disha
+- Done: review round 1 found that clamp-aware removes the bias by cutting the dose (opaque Gaussians get rate ~0). Fixed: diag.csv `drop_rate_eff`/`drop_rate_eff_hard`, train_stats mean rates, and PLAN_V2 §5.1 rewritten: H7 asks whether DropGaussian's benefit needs the biased full-dose dropout of opaque Gaussians, read against a uniform dose-response curve (A, G, T1). Photometric mask re-capped after the soft step; no hash-grid pass for the opacity. Rounds 2 and 3 Approve. Issue #28 (analysis: missing drop_mode = uniform; add C_ca/D_ca).
+- Evidence: GPU-SMOKE PASS 9d0cfa5 (B 17.80); L1 at ebff35b: effective photometric dose 43-50 % of nominal at 1100 it, frac_over_cap 0.55-0.62. agent-review set on 9d0cfa5.
+- Needs from Disha: approve #27 at 9d0cfa5 (then I tag v1.1-exp + prereg-v2); issue #28 before Thu 12:00; approvals of #17 (366bee2) and #24 (baad1be).
+- Next: T1 seed 0 shard 0/2; Thu 12:00 gate.
+- Message to Disha: see the chat message of Wed 4 Nov ~00:30.
+
 ### Tue 3 Nov, late · Clamp-aware dropout PR #27 (upgrade 1, gated runs)
 - Done: decisions recorded with Aayush: tooling freeze until Fri 23:59 (issues #15, #18, #21, #25, #26 wait); clamp-aware dropout = write code now, run only if the Thu 12:00 gate passes; DTU, second host, extra seeds wait for the core result. PR #27: `--drop_mode clamp_aware` (per-Gaussian rate min(r, 1 - opacity/0.99)), `frac_over_cap` in diag.csv, block CA matrix (C_ca, D_ca, 48 runs), PLAN_V2 §5.1 pre-registration addendum (to be tagged prereg-v2 with v1.1-exp).
 - Evidence: check.sh step 18 (Monte Carlo: uniform biased, clamp-aware unbiased; mutation caught). GPU-SMOKE PASS 26a2a33 (B 17.65). Smoke finding: median opacity 0.98-0.998, frac_over_cap 0.56-0.63 already at r = 0.022, so compensation is cut for most Gaussians in this host.
