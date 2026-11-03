@@ -27,7 +27,7 @@ This is the top-level session only: subagents such as `pr-reviewer` never touch 
      - what was done, with PR links;
      - exactly what they need to do next (review or approve PR #N, run a Colab shard or a check, look at a file or figure), with the PLAN_V2 task IDs;
      - by when;
-     - anything she should *not* do yet.
+     - anything they should *not* do yet.
 
      If nothing is needed from them, say so in the message and still summarize what changed. Write it in plain words they can act on without opening the repo first.
   3. Copy the same message into the log entry's "Message to …" field.
