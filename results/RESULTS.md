@@ -32,7 +32,9 @@ the lab PC on 11 Nov; their outputs are in `results/tables/geometry/<block>/` an
 Then, here:
 
 ```bash
-python experiments/stats.py ... --geometry $T/geometry/main/geometry_3v.csv     # same call as above, plus --geometry
+python experiments/stats.py --runs $T/runs.csv --tables $T --diag_summary $T/diag_summary_3v.csv \
+    --pass_runs $T/pass/runs.csv --dose_runs $T/dose/runs.csv --noise_runs $T/noise/runs.csv \
+    --geometry $T/geometry/main/geometry_3v.csv          # the stats.py call above, plus --geometry
 python experiments/probes_summary.py --out_root $R/main --tables $T --figures $F
 ```
 The qualitative grids use eval view 0 of every T1 seed-0 run (renders, GT and depth PNGs, 160 files, copied from the
@@ -76,7 +78,10 @@ Mean of the per-scene differences, 95% t-interval over 8 scenes. Classes use δ 
 
 **Verdict (`tables/verdict_3v.txt`): D = complementary; E = complementary.** Both beat B and C; the interaction
 terms are inconclusive in PSNR. Note the SSIM interactions are small but negative with CIs that exclude 0
-(SSIM has no δ), so the gains add up slightly less than additively in SSIM.
+(SSIM has no δ), so the gains add up slightly less than additively in SSIM. `verdict_3v.txt` still prints "PSNR, SSIM and LPIPS: no
+significant disagreement": its rule (PLAN_V2 §5, PR #20 choice 3) only flags two metrics with significant classes
+in *opposite* directions, and here PSNR is inconclusive, not significant, so the SSIM interactions don't trigger it.
+They are real but small, and the report should state them next to the verdict.
 
 Mechanism claims: "through the depth supervision" not supported (E − D not > 0; the gap of D is no larger than C's);
 condition 3 holds (E − D grows with γ in 7/8 scenes). "Through the opacity cap" not supported (D_hard − E not < 0).
