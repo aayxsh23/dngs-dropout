@@ -1,0 +1,11 @@
+experiments/matrix_noise.yaml: shard 0/1, seeds [0]: 8 of 8 runs, tag v1.0-exp, keeping checkpoints for seeds []
+done llff_3v/B_r1/fern/seed0  psnr 20.71  152 s
+done llff_3v/B_r2/fern/seed0  psnr 20.96  152 s
+done llff_3v/B_r3/fern/seed0  psnr 21.19  152 s
+done llff_3v/B_r4/fern/seed0  psnr 20.78  153 s
+done llff_3v/D_r1/fern/seed0  psnr 21.89  148 s
+done llff_3v/D_r2/fern/seed0  psnr 21.61  149 s
+done llff_3v/D_r3/fern/seed0  psnr 21.65  149 s
+done llff_3v/D_r4/fern/seed0  psnr 21.87  149 s
+
+summary: 8 done, 0 already done, 0 failed
