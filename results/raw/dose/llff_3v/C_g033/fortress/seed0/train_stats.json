@@ -1,0 +1,19 @@
+{
+  "train_time_s": 84.7,
+  "diag_time_s": 1.1,
+  "n_gaussians": 24299,
+  "vram_peak_mb": 578.0,
+  "model_size_mb": 61.97,
+  "drop_rate": 0.333333,
+  "depth_scale": 0.0,
+  "depth_render": "shared",
+  "seed": 0,
+  "torch_version": "1.12.1",
+  "opacity_q10": 0.4486,
+  "opacity_q50": 1.0,
+  "opacity_q90": 1.0,
+  "frac_opacity_gt_0_9": 0.78867,
+  "scale_max_q50": 0.470318,
+  "scale_max_q90": 2.287065,
+  "knn_dist_q50": 1.179251
+}
