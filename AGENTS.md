@@ -113,7 +113,7 @@ Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.
 | --- | --- | --- |
 | **Routine** | everything not listed in CODEOWNERS (docs, notebooks, `aggregate.py`, plots, results) | CI `checks` green + agent review Approve on the head commit. **Docs-only** PRs (every file under `docs/` or `*.md`, none in CODEOWNERS; `review_bundle.py` prints the class) need no reviewer: the pr-gate report and `agent-review` status say so |
 | **Experiment** | training, rendering, evaluation, extensions, runner, `experiments/*.yaml` | the above + `GPU-SMOKE PASS <head sha>` comment from `scripts/gpu_smoke.sh` + approval from the **other** teammate. After `v1.0-exp`: also a new tag and a RUNLOG entry |
-| **Gate** | `.github/`, `.claude/`, `scripts/check.sh`, `scripts/gpu_smoke.sh`, `scripts/pr_ready.py`, `scripts/hooks/`, `scripts/setup_repo_rules.sh`, AGENTS/CLAUDE/GEMINI.md | the routine requirements + approval from the **other** teammate |
+| **Gate** | `.github/`, `.claude/`, `scripts/check.sh`, `scripts/gpu_smoke.sh`, `scripts/pr_ready.py`, `scripts/tracker.py`, `scripts/hooks/`, `scripts/setup_repo_rules.sh`, AGENTS/CLAUDE/GEMINI.md | the routine requirements + approval from the **other** teammate |
 
 **Agents never submit APPROVE reviews** (`gh pr review --approve` is blocked by the hook). Approvals are a human's decision; an agent posts its review report as a comment and sets the `agent-review` status.
 
@@ -166,7 +166,16 @@ Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.
 
 ## How to work here
 
-- Read `docs/PLAN.md` first. The status table at its top is the single place where progress is recorded, so update it when you finish something.
+- Read `docs/PLAN_V2.md` first. Progress is recorded by task ID in the `**Tracker:**` line of your own context file; the generated tracker shows it ("Project tracker" below). PLAN.md's old status table is no longer updated.
 - Write code that matches the surrounding style: argparse groups in `arguments/`, the same comment density, minimal diffs. Don't refactor upstream code you don't need to touch; it keeps our diff against DNGaussian reviewable.
 - Test changes with `bash scripts/check.sh` (seconds, no GPU) and, for training code, `bash scripts/gpu_smoke.sh` (1100 iterations on `fern` per variant). Then check that the defaults (variant B) still behave like upstream.
 - When you change behaviour, say in the PR which variants it affects and how you tested it.
+
+## Project tracker
+
+- **What:** four generated files on the `tracker` branch answer "what is the plan, how much is done, what is left, what could we add": `PLAN.md`, `PROGRESS.md` (overall, per person, per phase, run counts, coverage of the course rubric), `REMAINING.md` (overdue, next 48 h, who waits on whom, critical path to submission) and `FUTURE.md` (prospects, READY when they fit). `.github/workflows/tracker.yml` regenerates them hourly and on every push to `main`, from `docs/tracker/plan.yaml` plus evidence. Nobody edits them.
+- **Start of a session:** `git fetch -q origin tracker && git show origin/tracker:REMAINING.md`, or `python3 scripts/tracker.py --fetch --summary` for the live state.
+- **Status comes only from evidence:** merged PRs, tags and files on `main` named in a task's `done_when`, plus one machine-readable line in the Status block of each person's own context file, which that person's agent keeps current (cumulative lists):
+  `- **Tracker:** done AY-01..03, AY-05; partial AY-22; working AY-12; runs T1=40 P=0 G=0 N=0 V=0`
+  IDs are the task IDs in `plan.yaml` (also `EXP-T1`, `FREEZE`, `DRAFT`, ...). `runs` counts the finished runs in **your own** output folders per block (`python3 scripts/tracker.py --count_runs <outputs> <outputs_pass> ...` prints it); the two files are summed.
+- **Changing the plan** (dates, tasks, adopting a prospect once FUTURE.md says READY and both agree): edit `docs/tracker/plan.yaml` in a docs-only PR. `bash scripts/check.sh` validates it (step 10b).

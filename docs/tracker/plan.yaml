@@ -1,0 +1,197 @@
+# Project tracker: the single machine-readable plan (PLAN_V2 §7, re-dated 3 Nov after the code freeze slipped).
+#
+# scripts/tracker.py reads this file plus the evidence (merged PRs, tags, files on main, the **Tracker:** line in
+# both context files on the team-context branch) and writes PLAN.md, PROGRESS.md, REMAINING.md and FUTURE.md to
+# the `tracker` branch every hour (.github/workflows/tracker.yml). Edit dates, tasks and prospects here, in a
+# docs-only PR. Status is never written here: it comes from the evidence.
+#
+# A task is done when ANY of its `done_when` items holds:
+#   pr: N | prs: [N, ...]     PR(s) merged          tag: name     tag exists on origin
+#   file: path                file exists on main   runs: {block: T1, n: 120}   summed run count reached
+# and also when its ID is listed after "done" on a context file's **Tracker:** line. "partial" there counts half.
+# Times are IST. weight: share of the overall percentage (default 1).
+
+project: "Where Should Dropout Act? Depth Priors and Gaussian Dropout in Sparse-View 3DGS"
+repo: aayxsh23/dngs-dropout
+submit: "2026-11-11T23:59:00+05:30"      # team target (hard deadline Sun 15 Nov)
+hard_deadline: "2026-11-15T23:59:00+05:30"
+
+blocks:                                   # experiment blocks: planned runs (PLAN_V2 §3.1)
+  T1: 120
+  P: 48
+  G: 48
+  N: 8
+  V: 160
+
+phases:
+  - {id: setup,    name: "Code, tests and freeze"}
+  - {id: runs,     name: "Experiments (freeze Fri 6 Nov 23:59)"}
+  - {id: analysis, name: "Analysis and figures"}
+  - {id: writing,  name: "Report, README, website"}
+  - {id: submit,   name: "Submission and viva"}
+
+tasks:
+  # ---- setup (29 Oct - 4 Nov) ----
+  - {id: AY-01, owner: aayush, phase: setup, due: "2026-10-29T21:30:00+05:30", title: "Merge PLAN_V2 (#16) and the team-context PR (#17)", deps: [DS-01], done_when: [{prs: [16, 17]}]}
+  - {id: AY-02, owner: aayush, phase: setup, due: "2026-10-29T12:00:00+05:30", title: "Rebase feat/dropout onto main"}
+  - {id: AY-03, owner: aayush, phase: setup, due: "2026-10-29T23:59:00+05:30", title: "Dropout port (D1) + clean/hard_only/soft_only routing; L1 tests", deps: [AY-02]}
+  - {id: AY-04, owner: aayush, phase: setup, due: "2026-10-29T23:59:00+05:30", title: "Merge #11, #14, #12 after Disha's reviews", deps: [DS-01, DS-02], done_when: [{prs: [11, 14, 12]}]}
+  - {id: AY-05, owner: aayush, phase: setup, due: "2026-10-29T23:59:00+05:30", title: "A100 go-bag (bundle, data tar, questions for the lab)"}
+  - {id: AY-06, owner: aayush, phase: setup, due: "2026-10-30T15:00:00+05:30", title: "diag.csv, train_stats structure stats, W7 temp point cloud", deps: [AY-03]}
+  - {id: AY-07, owner: aayush, phase: setup, due: "2026-10-30T17:00:00+05:30", title: "Raw depth + cameras.json in render.py", deps: [AY-03]}
+  - {id: AY-08, owner: aayush, phase: setup, due: "2026-10-30T18:00:00+05:30", title: "Sample run folder on Drive", deps: [AY-06, AY-07]}
+  - {id: AY-09, owner: aayush, phase: setup, due: "2026-10-30T19:00:00+05:30", title: "Open PR-A (#19) with GPU-smoke line and opus review", deps: [AY-06, AY-07, AY-08]}
+  - {id: AY-10, owner: aayush, phase: setup, due: "2026-11-04T21:30:00+05:30", title: "A100: access, environment, minutes per run for 1/2/4 slots", deps: [AY-05]}
+  - {id: AY-11, owner: aayush, phase: setup, due: "2026-10-31T12:00:00+05:30", title: "Runner and all matrix files (in #19)", deps: [AY-09]}
+  - {id: AY-12, owner: aayush, phase: setup, due: "2026-11-04T12:00:00+05:30", title: "Merge #19; tag v1.0-exp and prereg-v1", deps: [DS-08, DS-09], weight: 2, done_when: [{tag: v1.0-exp}]}
+  - {id: AY-21, owner: aayush, phase: setup, due: "2026-11-03T23:59:00+05:30", title: "geometry.py (MVC@5%) with synthetic test", deps: [AY-07]}
+  - {id: AY-22, owner: aayush, phase: setup, due: "2026-11-04T23:59:00+05:30", title: "probes.py PR (robustness curve, Monte-Carlo depth bias)", deps: [AY-12], done_when: [{file: experiments/probes.py}]}
+  - {id: DS-01, owner: disha, phase: setup, due: "2026-10-29T21:30:00+05:30", title: "Read PLAN_V2; approve #12 and #17"}
+  - {id: DS-02, owner: disha, phase: setup, due: "2026-10-29T18:00:00+05:30", title: "Reviewer reports on #11 and #14"}
+  - {id: DS-03, owner: disha, phase: setup, due: "2026-10-30T18:00:00+05:30", title: "stats.py v2, factor table, config-keyed sharp checks (#20)", done_when: [{pr: 20}]}
+  - {id: DS-04, owner: disha, phase: setup, due: "2026-10-29T23:59:00+05:30", title: "Kaggle smoke test (yes, 4.4 min/run)"}
+  - {id: DS-05, owner: disha, phase: setup, due: "2026-10-30T23:59:00+05:30", title: "Review PR-A (#19)", deps: [AY-09]}
+  - {id: DS-06, owner: disha, phase: setup, due: "2026-10-31T12:00:00+05:30", title: "Plots: dose, views with A, forest, pass localization (#22)", deps: [DS-03], done_when: [{pr: 22}]}
+  - {id: DS-07, owner: disha, phase: setup, due: "2026-10-30T23:59:00+05:30", title: "Related Work skeleton and source list"}
+  - {id: DS-08, owner: disha, phase: setup, due: "2026-11-03T23:59:00+05:30", title: "V3 regression on Colab (B on fern+horns within 0.5 dB of 19.85)", deps: [AY-09]}
+  - {id: DS-09, owner: disha, phase: setup, due: "2026-11-03T23:59:00+05:30", title: "Approve #19 (and re-approve #17)", deps: [DS-08], done_when: [{pr: 19}]}
+
+  # ---- runs (4 - 6 Nov) ----
+  - {id: AY-13, owner: aayush, phase: runs, due: "2026-11-04T12:00:00+05:30", title: "Colab A: T1 seed 0, shard 0/2", deps: [AY-12]}
+  - {id: DS-10, owner: disha,  phase: runs, due: "2026-11-04T12:00:00+05:30", title: "Colab D: T1 seed 0, shard 1/2", deps: [AY-12]}
+  - {id: AY-14, owner: aayush, phase: runs, due: "2026-11-04T18:00:00+05:30", title: "L4 pilot on the first 10 runs", deps: [AY-13]}
+  - {id: AY-15, owner: aayush, phase: runs, due: "2026-11-04T23:59:00+05:30", title: "Colab A: T1 seeds 1-2, shard 0/2", deps: [AY-13]}
+  - {id: DS-12, owner: disha,  phase: runs, due: "2026-11-04T23:59:00+05:30", title: "Colab D: T1 seeds 1-2, shard 1/2; block N on Kaggle", deps: [DS-10]}
+  - {id: DS-11, owner: disha,  phase: runs, due: "2026-11-04T23:59:00+05:30", title: "aggregate.py on the first real runs", deps: [AY-13]}
+  - {id: EXP-T1, owner: both,  phase: runs, due: "2026-11-04T23:59:00+05:30", title: "Block T1 complete (120 runs)", deps: [AY-12], weight: 6, done_when: [{runs: {block: T1, n: 120}}]}
+  - {id: EXP-N,  owner: disha, phase: runs, due: "2026-11-05T12:00:00+05:30", title: "Block N complete (8 runs, Kaggle)", deps: [AY-12], weight: 1, done_when: [{runs: {block: N, n: 8}}]}
+  - {id: AY-18, owner: aayush, phase: runs, due: "2026-11-05T23:59:00+05:30", title: "Colab A: blocks P and G, shard 0/2", deps: [AY-15]}
+  - {id: DS-15, owner: disha,  phase: runs, due: "2026-11-05T23:59:00+05:30", title: "Colab D: blocks P and G, shard 1/2", deps: [DS-12]}
+  - {id: EXP-P,  owner: both,  phase: runs, due: "2026-11-05T23:59:00+05:30", title: "Block P complete (48 runs)", deps: [EXP-T1], weight: 3, done_when: [{runs: {block: P, n: 48}}]}
+  - {id: EXP-G,  owner: both,  phase: runs, due: "2026-11-05T23:59:00+05:30", title: "Block G complete (48 runs)", deps: [EXP-T1], weight: 3, done_when: [{runs: {block: G, n: 48}}]}
+  - {id: AY-17, owner: aayush, phase: runs, due: "2026-11-06T23:59:00+05:30", title: "A100 visits: block V (2-view first)", deps: [AY-10, AY-12]}
+  - {id: EXP-V,  owner: aayush, phase: runs, due: "2026-11-06T23:59:00+05:30", title: "Block V complete (160 runs; 120 if 9-view is cut)", deps: [AY-17], weight: 4, done_when: [{runs: {block: V, n: 160}}]}
+  - {id: FREEZE, owner: both,  phase: runs, due: "2026-11-06T23:59:00+05:30", title: "Experiments frozen; everything on Drive", deps: [EXP-T1, EXP-P, EXP-G, EXP-N, EXP-V]}
+
+  # ---- analysis (5 - 7 Nov) ----
+  - {id: AY-19, owner: both,   phase: analysis, due: "2026-11-05T23:59:00+05:30", title: "First T1 analysis: stats.py on 3 seeds, preliminary verdict", deps: [EXP-T1]}
+  - {id: DS-14, owner: disha,  phase: analysis, due: "2026-11-05T23:59:00+05:30", title: "scene_factors.py: DPT reliability, texture, depth range (8 scenes)"}
+  - {id: DS-16, owner: disha,  phase: analysis, due: "2026-11-05T23:59:00+05:30", title: "Tables T1-T3 + forest plot from real T1 data", deps: [EXP-T1]}
+  - {id: AY-24, owner: aayush, phase: analysis, due: "2026-11-05T23:59:00+05:30", title: "Figure F1: iteration diagram (D, E, D_hard, D_soft)"}
+  - {id: AY-23, owner: aayush, phase: analysis, due: "2026-11-07T12:00:00+05:30", title: "probes.py on T1 seed-0 checkpoints; geometry.py on all runs", deps: [AY-22, EXP-T1]}
+  - {id: DS-17, owner: disha,  phase: analysis, due: "2026-11-07T12:00:00+05:30", title: "Dose (G), pass-localization (P) and views (V) figures", deps: [EXP-P, EXP-G, EXP-V]}
+  - {id: DS-18, owner: disha,  phase: analysis, due: "2026-11-07T18:00:00+05:30", title: "Per-scene moderators table T5", deps: [DS-14, DS-16]}
+  - {id: DS-25, owner: disha,  phase: analysis, due: "2026-11-07T18:00:00+05:30", title: "Dataset exploration: LLFF scene table + figure (views, split, depth range, DPT reliability)", deps: [DS-14]}
+  - {id: AY-25, owner: aayush, phase: analysis, due: "2026-11-07T23:59:00+05:30", title: "Mechanism analysis + final verdict; L6 cross-check of Disha's numbers", deps: [AY-23, FREEZE], weight: 2}
+  - {id: DS-19, owner: disha,  phase: analysis, due: "2026-11-07T23:59:00+05:30", title: "All tables/figures regenerated by script from frozen outputs; L6 cross-check", deps: [FREEZE], weight: 2}
+
+  # ---- writing (1 - 10 Nov) ----
+  - {id: AY-16, owner: aayush, phase: writing, due: "2026-11-01T23:59:00+05:30", title: "Report §3 Method draft (PR #23)", done_when: [{file: docs/report/03_method.md}]}
+  - {id: AY-20, owner: aayush, phase: writing, due: "2026-11-02T23:59:00+05:30", title: "Report §4 Experimental setup draft (PR #23)", done_when: [{file: docs/report/04_setup.md}]}
+  - {id: DS-13, owner: disha,  phase: writing, due: "2026-11-05T23:59:00+05:30", title: "Related Work draft (1.5 pages)", deps: [DS-07]}
+  - {id: AY-32, owner: aayush, phase: writing, due: "2026-11-08T23:59:00+05:30", title: "Spiral videos for 2-3 scenes (B, D, E) for the website", deps: [EXP-T1]}
+  - {id: AY-26, owner: aayush, phase: writing, due: "2026-11-08T23:59:00+05:30", title: "Write Mechanism + Verdict (best-variant justification, recipe) + Discussion", deps: [AY-25], weight: 2}
+  - {id: DS-20, owner: disha,  phase: writing, due: "2026-11-08T23:59:00+05:30", title: "Write Introduction + Results", deps: [DS-19], weight: 2}
+  - {id: AY-27, owner: aayush, phase: writing, due: "2026-11-08T23:59:00+05:30", title: "Limitations + failure cases (2-3 scenes, RGB + depth)", deps: [AY-25]}
+  - {id: DS-21, owner: disha,  phase: writing, due: "2026-11-08T23:59:00+05:30", title: "Results text, captions, efficiency table T4", deps: [DS-19]}
+  - {id: DRAFT,  owner: both,  phase: writing, due: "2026-11-09T21:30:00+05:30", title: "Full draft: sections swapped and reviewed; abstract + conclusion (AY-28 + DS-22)", deps: [AY-26, DS-20, AY-27, DS-21, DS-13], weight: 2}
+  - {id: AY-31, owner: aayush, phase: writing, due: "2026-11-10T21:30:00+05:30", title: "README for our project: problem, variants, results, how to reproduce", deps: [AY-25]}
+  - {id: DS-26, owner: disha,  phase: writing, due: "2026-11-10T21:30:00+05:30", title: "Project website (GitHub Pages): abstract, F1, results, forest plot, videos, links", deps: [DS-19, AY-32], weight: 2}
+
+  # ---- submit (10 - 15 Nov) ----
+  - {id: AY-29, owner: aayush, phase: submit, due: "2026-11-10T23:59:00+05:30", title: "L6 regeneration from scratch; L7 checklist; tag v1.0-report", deps: [DRAFT], done_when: [{tag: v1.0-report}]}
+  - {id: DS-23, owner: disha,  phase: submit, due: "2026-11-10T23:59:00+05:30", title: "Citations check; L7 checklist", deps: [DRAFT]}
+  - {id: SUBMIT, owner: both,  phase: submit, due: "2026-11-11T23:59:00+05:30", title: "Submit report, code link, website link", deps: [AY-29, DS-23, AY-31, DS-26], weight: 2}
+  - {id: VIVA,   owner: both,  phase: submit, due: "2026-11-13T21:30:00+05:30", title: "Viva slides and rehearsal (AY-30 + DS-24, PLAN_V2 §10.3)", deps: [SUBMIT]}
+
+# The professor's rubric (minimum / expected / advanced for A/A* targets) mapped to the tasks that deliver it.
+# PROGRESS.md shows how much of each item is done; an item with no tasks is a gap.
+rubric:
+  - {level: minimum,  item: "Clearly defined problem",                                tasks: [AY-16, DS-20]}
+  - {level: minimum,  item: "Dataset understanding and preprocessing",                tasks: [AY-20, DS-14, DS-25]}
+  - {level: minimum,  item: "At least two methods compared, or a research gap addressed", tasks: [EXP-T1, DS-16]}
+  - {level: minimum,  item: "Experimental evaluation and comparison",                 tasks: [EXP-T1, EXP-P, EXP-G, DS-16, DS-17]}
+  - {level: minimum,  item: "Complete executable code and report (reproducibility stated)", tasks: [AY-12, AY-29, AY-31, SUBMIT]}
+  - {level: expected, item: "At least three models studied and compared (A-E, D_hard, D_soft)", tasks: [EXP-T1, EXP-P, DS-16]}
+  - {level: expected, item: "Feature engineering and normalization (depth normalization, inputs, scene factors)", tasks: [AY-16, DS-14, DS-25]}
+  - {level: expected, item: "Hyperparameter tuning or understanding (dropout dose; depth weight)", tasks: [EXP-G, DS-17]}
+  - {level: expected, item: "Detailed analysis with intermediate results (why and how)", tasks: [AY-23, AY-25, DS-19]}
+  - {level: expected, item: "Justification of the best-performing variant by the metrics", tasks: [AY-26, DS-21]}
+  - {level: advanced, item: "Research problem and gap clearly defined",               tasks: [AY-16, DS-13, DS-20]}
+  - {level: advanced, item: "Novel formulation or meaningful extension (placement, clamp theory)", tasks: [AY-16, EXP-P, AY-25]}
+  - {level: advanced, item: "Advanced optimization (decoupled recipe; clamp-safe variant)", tasks: [AY-26]}
+  - {level: advanced, item: "Robust experimental validation (8x3, Holm, margin, noise floor, pre-registration)", tasks: [AY-12, EXP-T1, EXP-N, AY-25, DS-19]}
+  - {level: advanced, item: "Explainability and interpretation",                     tasks: [AY-23, AY-25, AY-26]}
+  - {level: advanced, item: "Potential for further research or publication",           tasks: [AY-27, DRAFT]}
+  - {level: advanced, item: "Reproducibility of code and results",                    tasks: [AY-12, AY-29, DS-19]}
+  - {level: advanced, item: "GitHub repo with a proper README",                       tasks: [AY-31]}
+  - {level: advanced, item: "Project website with details and results",              tasks: [DS-26, AY-32]}
+  - {level: advanced, item: "Communicate approach, findings and limitations",         tasks: [AY-27, DRAFT, VIVA]}
+
+# Future prospects. READY means: every `requires` task is done, nothing is overdue, and it is before
+# `latest_start`. To adopt one, copy it into `tasks` (docs-only PR). After `latest_start` it moves to the
+# publication path (PLAN_V2 §11).
+prospects:
+  - id: FP-1
+    title: "Clamp-safe dropout (variant F): in the hard-depth pass use base opacity min(0.95, 0.99(1-r)) under the mask, so compensation never hits the 0.99 cap"
+    why: "A causal test of H2 and a candidate fix: diagnosis plus remedy is what moves this from a study to a method contribution"
+    cost: "0.5 person-day code + 24 runs (8 scenes x 3 seeds) = 2 T4-h; needs tag v1.1-exp"
+    requires: [EXP-P, AY-19]
+    latest_start: "2026-11-06T12:00:00+05:30"
+    value: high
+  - id: FP-2
+    title: "Depth-weight sensitivity: B and E at depth_scale 0.5 and 2 (seed 0, 8 scenes)"
+    why: "Hyperparameter understanding for the second regularizer, not only for dropout"
+    cost: "32 runs = 2.6 T4-h; matrix file only"
+    requires: [EXP-T1]
+    latest_start: "2026-11-06T12:00:00+05:30"
+    value: medium
+  - id: FP-3
+    title: "Region-stratified error (H5): D's excess error over E in flat-depth, low-texture and depth-edge regions"
+    why: "Explainability: where in the image the interference lives; analysis only, on saved renders"
+    cost: "0.5 person-day, no GPU"
+    requires: [FREEZE]
+    latest_start: "2026-11-08T12:00:00+05:30"
+    value: medium
+  - id: FP-4
+    title: "Statistics robustness: bootstrap CIs and Wilcoxon tests next to the t-intervals"
+    why: "Reviewers ask whether 8-scene t-intervals hold; analysis only"
+    cost: "0.5 person-day, no GPU"
+    requires: [AY-19]
+    latest_start: "2026-11-08T12:00:00+05:30"
+    value: medium
+  - id: FP-5
+    title: "Dense initialization (block S): A-E from MVS point clouds"
+    why: "Tests whether the interaction survives a stronger initialization (H6)"
+    cost: "40 runs = 3.3 T4-h"
+    requires: [FREEZE]
+    latest_start: "2026-11-06T23:59:00+05:30"
+    value: medium
+  - id: FP-6
+    title: "Second dataset: DTU 3-view (or Blender 8-view), variants A-E"
+    why: "Single-dataset results are the first thing an A/A* reviewer rejects"
+    cost: "75-120 runs, DTU masks and evaluation; 2-3 person-days"
+    requires: [SUBMIT]
+    latest_start: "2026-12-15T23:59:00+05:30"
+    value: high
+  - id: FP-7
+    title: "Second host method (FSGS or CoR-GS) with the same placement study"
+    why: "Shows the placement rule is general, not a DNGaussian quirk"
+    cost: "Port + 120 runs; about 1 week"
+    requires: [SUBMIT]
+    latest_start: "2026-12-31T23:59:00+05:30"
+    value: high
+  - id: FP-8
+    title: "Prior-quality axis: Depth Anything V2 depth in place of DPT (new archive, new md5)"
+    why: "Does the interaction depend on how good the depth prior is? (B5)"
+    cost: "Depth generation + 40 runs"
+    requires: [SUBMIT]
+    latest_start: "2026-12-31T23:59:00+05:30"
+    value: medium
+  - id: FP-9
+    title: "Release: archive of all run outputs + arXiv-style paper"
+    why: "Reproducibility and visibility; the path to a workshop or conference submission"
+    cost: "2 person-days"
+    requires: [SUBMIT]
+    latest_start: "2027-01-31T23:59:00+05:30"
+    value: high

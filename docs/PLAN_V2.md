@@ -320,6 +320,8 @@ B (published DNGaussian) is the fixed reference; we never pick "the better of B 
 
 ## 7. Who does what, and by when
 
+> **3 Nov:** the code freeze slipped from Sat 31 Oct, so the dates below are superseded by `docs/tracker/plan.yaml` (freeze Fri 6 Nov 23:59, full draft Mon 9, submit Wed 11). The generated tracker on the `tracker` branch shows what is done and what is left (AGENTS.md, "Project tracker").
+
 **How to use this section**
 - Task IDs: **AY-nn** for Aayush, **DS-nn** for Disha.
 - When a task is done, record its ID in your context file. Your agent does that, plus the "Message to Disha" on Aayush's side.
