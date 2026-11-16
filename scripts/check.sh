@@ -119,7 +119,7 @@ assert not missing, "%s: missing keys %s" % (sys.argv[1], missing)
 for name, v in cfg["variants"].items():
     assert set(v) - {"drop_mode"} == {"depth_scale", "drop_rate", "depth_render"}, "%s variant %s: %s" % (sys.argv[1], name, v)
     assert v["depth_render"] in ("shared", "clean", "hard_only", "soft_only"), (sys.argv[1], name)
-    assert v.get("drop_mode", "uniform") in ("uniform", "clamp_aware"), (sys.argv[1], name)
+    assert v.get("drop_mode", "uniform") in ("uniform", "clamp_aware", "nc"), (sys.argv[1], name)
 print("ok", sys.argv[1], len(cfg["scenes"]) * len(cfg["seeds"]) * len(cfg["n_views"]) * len(cfg["variants"]), "runs")
 EOF
   done
@@ -388,6 +388,25 @@ lo, hi = d.compensated_mask(u, np.full(n, 0.03)) > 0, d.compensated_mask(u, np.f
 assert (lo | ~hi).all(), "a Gaussian kept at the higher rate must be kept at the lower one"
 print("clamp-aware ok")
 EOF
+
+step "20. No-compensation dropout (nc): same draw as uniform, survivors never divided by (1 - r); new blocks' dry-run counts"
+nc_ok=1
+nc_block=$(awk '/if opt.drop_mode == "nc":/{f=1} f{print} /hard_drop_comp = drop_comp/{if(f) exit}' train_llff.py)
+if [ -z "$nc_block" ]; then echo "train_llff.py: no nc branch"; nc_ok=0
+elif printf '%s\n' "$nc_block" | sed 's/#.*//' | grep -qE '/|1 *- *drop_rate_now|1\.0 *-'; then
+  echo "train_llff.py: the nc branch rescales the survivors:"; printf '%s\n' "$nc_block"; nc_ok=0; fi
+printf '%s\n' "$nc_block" | grep -qF 'drop_comp = (drop_comp > 0).float()' || { echo "nc must reuse the uniform draw: (drop_comp > 0).float()"; nc_ok=0; }
+grep -qF 'DROP_MODES = ("uniform", "clamp_aware", "nc")' train_llff.py || { echo "train_llff.py: DROP_MODES must list nc"; nc_ok=0; }
+if [ ${#PYA[@]} -gt 0 ]; then
+  for mc in "matrix_comp.yaml 96" "matrix_depthdose.yaml 96" "matrix_noise2.yaml 48"; do
+    set -- $mc
+    [ -f "experiments/$1" ] || { echo "missing experiments/$1"; nc_ok=0; continue; }
+    got=$("${PYA[@]}" experiments/run_matrix.py --matrix "experiments/$1" --data_root /nonexistent --out_root "$TMP/out19" \
+          --dry_run --allow_untagged 2>&1 | head -1 | grep -oE '[0-9]+ of [0-9]+ runs' | awk '{print $3}')
+    [ "$got" = "$2" ] || { echo "experiments/$1: dry run lists ${got:-?} runs, expected $2"; nc_ok=0; }
+  done
+fi
+if [ $nc_ok -eq 1 ]; then pass; else fail "no-compensation dropout / new matrix files"; fi
 
 printf '\n== Summary\n'
 [ ${#SKIPPED[@]} -gt 0 ] && echo "Skipped locally: ${SKIPPED[*]}"

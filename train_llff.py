@@ -39,7 +39,8 @@ except ImportError:
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 DEPTH_RENDER_MODES = ("shared", "clean", "hard_only", "soft_only")
-DROP_MODES = ("uniform", "clamp_aware")   # uniform = DropGaussian verbatim; clamp_aware = our per-Gaussian rate cap (H7)
+DROP_MODES = ("uniform", "clamp_aware", "nc")   # uniform = DropGaussian verbatim; clamp_aware = our per-Gaussian rate cap (H7);
+                                               # nc = the same drops, no 1/(1-r) compensation (prereg-v3)
 HARD_OPACITY = 0.95   # render_for_depth's fixed opacity (its `value` default)
 DIAG_EVERY = 100   # diag.csv row interval (PLAN W4)
 DIAG_PATCH = 11    # fixed patch size (middle of DNGaussian's 5..17) so used and clean are comparable
@@ -166,6 +167,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             hard_drop_comp = compensated_mask(u, rate_eff_hard)
         elif drop_rate_now > 0:
             drop_comp = torch.nn.Dropout(p=drop_rate_now)(torch.ones(gaussians.get_xyz.shape[0], device="cuda"))
+            if opt.drop_mode == "nc":   # same draw as uniform; survivors keep their opacity (x 1, not x 1/(1-r))
+                drop_comp = (drop_comp > 0).float()
             hard_drop_comp = drop_comp
         hard_comp = hard_drop_comp if opt.depth_render in ("shared", "hard_only") else None
         soft_comp = drop_comp if opt.depth_render in ("shared", "soft_only") else None

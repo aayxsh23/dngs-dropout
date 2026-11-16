@@ -21,6 +21,7 @@ Every experimental variant is the **same code with different command-line flags*
 | D_hard | 1 | 0.2 | hard_only | Only the hard-depth pass sees the mask (PLAN_V2 block P) |
 | D_soft | 1 | 0.2 | soft_only | Only the soft-depth pass sees the mask (PLAN_V2 block P) |
 | C_ca, D_ca | 0, 1 | 0.2 | shared | C and D with `--drop_mode clamp_aware`: each Gaussian's rate is capped so its compensated opacity never exceeds the 0.99 alpha cap (block CA, H7) |
+| C_nc, D_nc | 0, 1 | 0.2 | shared | C and D with `--drop_mode nc`: the same drops as uniform, but survivors keep their opacity (no 1/(1−r) compensation; block COMP, prereg-v3) |
 
 The main benchmark is LLFF 3-view (8 scenes × 5 variants × 3 seeds = 120 runs).
 
@@ -91,7 +92,7 @@ Experiment runner (PLAN W8, PLAN_V2 §3): `python experiments/run_matrix.py --ma
 4. **One GPU type per seed.** All five variants of a given seed run on the same GPU type. `metrics.json` records `gpu` and `shared_gpu`. Efficiency numbers come only from runs with `shared_gpu: false`.
 5. **Experiments run only from a tag** (`v1.0-exp`, then `v1.1-exp` for fixes). `config.json` records the commit. Don't run the matrix from a branch.
 6. **Same data everywhere:** `llff_with_depth.tar`, checked by md5.
-7. Port DropGaussian, don't reinvent it. The official code (`gaussian_renderer/__init__.py` in their repo) is: `compensation = torch.nn.Dropout(p=r)(torch.ones(N))`, then `opacity = opacity * compensation[:, None]`, with `r = 0.2 * iteration / 10000`, where 10000 is their total iteration count. We keep it verbatim, `r = drop_rate * iteration / 10000`, even though we train for 6000 iterations, so with `--drop_rate 0.2` the rate peaks at 0.12 (decision D1, 13 Oct). The full spec is in PLAN W2. `--drop_mode clamp_aware` (block CA) is our own extension, never the default: `--drop_mode uniform` must stay the verbatim port above (`scripts/check.sh` step 18).
+7. Port DropGaussian, don't reinvent it. The official code (`gaussian_renderer/__init__.py` in their repo) is: `compensation = torch.nn.Dropout(p=r)(torch.ones(N))`, then `opacity = opacity * compensation[:, None]`, with `r = 0.2 * iteration / 10000`, where 10000 is their total iteration count. We keep it verbatim, `r = drop_rate * iteration / 10000`, even though we train for 6000 iterations, so with `--drop_rate 0.2` the rate peaks at 0.12 (decision D1, 13 Oct). The full spec is in PLAN W2. `--drop_mode clamp_aware` and `--drop_mode nc` (blocks CA and COMP) are our own extensions, never the default: `--drop_mode uniform` must stay the verbatim port above (`scripts/check.sh` step 18).
 
 ## Git and ownership
 

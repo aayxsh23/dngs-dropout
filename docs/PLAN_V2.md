@@ -133,7 +133,9 @@ One LLFF run takes about 4.9 min on a T4. All blocks run from tag `v1.0-exp`, ex
 | **G dose** | `C_g010 D_g010 E_g010 C_g033 D_g033 E_g033` | 8 × seed 0 | 48 | Colab T4 ×2 | 3.9 T4-h | `outputs_dose/` | `matrix_dose.yaml` | 3 |
 | **N noise** | `B_r1..B_r4`, `D_r1..D_r4` | fern × seed 0 | 8 | Colab T4 | 0.7 T4-h | `outputs_noise/` | `matrix_noise.yaml` | 4 |
 | **V views** | A–E, self-contained | 8 × seed 0 at 2, 3, 6, 9 views | 160 | **A100** (`--shared_gpu`) | 2–3 visits (middle case) | `outputs_views/` | `matrix_views_a100.yaml` | 5 |
-| **CA clamp-aware** (§5.1, gated) | `C_ca`, `D_ca` (γ = 0.2, `drop_mode: clamp_aware`) | 8 × 3 | 48 | Colab T4 | 3.9 T4-h | `outputs_ca/` | `matrix_ca.yaml` | 2b, if the Thu 12:00 gate passes |
+| **COMP compensation** (§5.1 + §5.2) | `C_ca`, `D_ca` (`drop_mode: clamp_aware`), `C_nc`, `D_nc` (`drop_mode: nc`), γ = 0.2 | 8 × 3 | 96 | lab A4000 | ~2 h (3 slots) | `outputs_comp/` | `matrix_comp.yaml` | from `v1.1-exp` (16 Nov: replaces block CA) |
+| **DDOSE depth dose** (§5.2) | `B_ds050`, `D_ds050`, `B_ds200`, `D_ds200` (depth_scale 0.5 / 2) | 8 × 3 | 96 | lab A4000 | ~2 h (3 slots) | `outputs_depthdose/` | `matrix_depthdose.yaml` | from `v1.1-exp` |
+| **NOISE2** (§5.2.7) | `A_r1..4`, `B_r1..4`, `C_r1..4`, `D_r1..4`, seed 0 | room, horns, trex (drawn) × 1 | 48 | lab A4000 | ~1 h (3 slots) | `outputs_noise2/` | `matrix_noise2.yaml` | from `v1.1-exp` |
 | S init (stretch) | `A_mvs … E_mvs` | 8 × seed 0 | 40 | A100 or Colab | ~4 T4-h | `outputs_mvs/` | `matrix_mvs.yaml` | 6 |
 
 **Core runs:** 224 on T4 (18.3 T4-h) + 160 on the A100.
@@ -314,7 +316,7 @@ B (published DNGaussian) is the fixed reference; we never pick "the better of B 
 - `frac_over_cap`: the share of Gaussians that uniform compensation would push over the cap in the soft and photometric passes. The hard pass is fully exposed whenever r > 0.0404.
 - Runs from `v1.0-exp` (T1, G: the uniform reference) don't have these fields. For them, `drop_rate_mean` is the schedule mean, 0.30005·γ over 6000 iterations, and the uniform `frac_over_cap` comes from the `v1.1-exp` smoke and probe runs. The `_hard` fields mean something only when `depth_scale` > 0 (no hard pass runs in C or C_ca).
 
-**Block CA:** `C_ca`, `D_ca` (γ = 0.2), 8 scenes × seeds 0–2 = 48 runs on Colab T4, from tag `v1.1-exp` (`experiments/matrix_ca.yaml`, output root `outputs_ca/`). Paired with T1's C and D, with E and A as references. A–E, D_hard and D_soft are unchanged in `v1.1-exp`. Runs from `v1.0-exp` have no `drop_mode` key; it counts as `uniform`.
+**Block CA:** `C_ca`, `D_ca` (γ = 0.2), 8 scenes × seeds 0–2 = 48 runs on Colab T4, from tag `v1.1-exp` (`experiments/matrix_ca.yaml`, output root `outputs_ca/`). *(16 Nov: block CA is folded into block COMP, `experiments/matrix_comp.yaml`, output root `outputs_comp/`, which adds `C_nc`/`D_nc`; the gate below is superseded by EXECUTION_PLAN_15-21Nov W5, which runs it unconditionally.)* Paired with T1's C and D, with E and A as references. A–E, D_hard and D_soft are unchanged in `v1.1-exp`. Runs from `v1.0-exp` have no `drop_mode` key; it counts as `uniform`.
 
 **Gate (decided Thu 5 Nov 12:00, recorded in RUNLOG).** Run block CA only if both hold:
 1. T1 seeds 0 and 1 are complete (80 runs);
