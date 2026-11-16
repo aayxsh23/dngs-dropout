@@ -1,0 +1,27 @@
+# Block DTU: A-E x 15 scans x seeds 0-2, 3 views (225 runs, tag v1.2-exp; EXECUTION_PLAN W1/W3, prereg-v3 §5.2).
+# Protocol frozen from scripts/run_dtu.sh (DNGaussian's DTU settings), except: no spiral video, eval-only render,
+# explicit seed, variant flags, and masked metrics by experiments/eval_dtu.py (results_eval.json, "masked": true).
+# --data_root is data/dtu (COLMAP-converted scans + DPT depth); masks in <data_root>/submission_data/idrmasks/<scan>.
+# Output root: outputs_dtu/ -> dtu_3v/<variant>/<scan>/seed<k>/.
+dataset: dtu
+scenes: [scan8, scan21, scan30, scan31, scan34, scan38, scan40, scan41, scan45, scan55, scan63, scan82, scan103, scan110, scan114]
+seeds: [0, 1, 2]
+n_views: [3]
+keep_ckpt_seeds: [0]
+variants:
+  A: {depth_scale: 0, drop_rate: 0.0, depth_render: shared}
+  B: {depth_scale: 1, drop_rate: 0.0, depth_render: shared}
+  C: {depth_scale: 0, drop_rate: 0.2, depth_render: shared}
+  D: {depth_scale: 1, drop_rate: 0.2, depth_render: shared}
+  E: {depth_scale: 1, drop_rate: 0.2, depth_render: clean}
+train_flags: >-
+  -r 4 --eval --rand_pcd --iterations 6000 --lambda_dssim 0.6
+  --densify_grad_threshold 0.001 --prune_threshold 0.01 --densify_until_iter 6000 --percent_dense 0.1
+  --position_lr_init 0.0016 --position_lr_final 0.000016 --position_lr_max_steps 5500 --position_lr_start 500
+  --test_iterations 100 1000 2000 3000 4500 6000 --save_iterations 100 500 1000 3000 6000
+  --error_tolerance 0.01 --opacity_lr 0.05 --scaling_lr 0.003
+  --shape_pena 0.005 --opa_pena 0.001 --scale_pena 0.005
+steps:
+  - "{python} train_dtu.py --dataset DTU -s {scene_dir} --model_path {work} --n_sparse {n_views} --seed {seed} {variant_flags} {train_flags}"
+  - "{python} render.py -s {scene_dir} --model_path {work} -r 4 --skip_train --skip_test"
+  - "{python} experiments/eval_dtu.py --model_path {work} --mask_dir {data_root}/submission_data/idrmasks/{scene}"

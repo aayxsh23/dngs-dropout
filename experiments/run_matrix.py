@@ -4,7 +4,8 @@
     python experiments/run_matrix.py --matrix experiments/matrix.yaml --data_root data/llff \\
         --out_root outputs --shard 0/2 --seeds 0 [--work_root /content/work] [--keep_ckpt_seeds 0] [--dry_run]
 
-Each run is (n_views, seed, variant, scene) -> <out_root>/llff_<n>v/<variant>/<scene>/seed<k>/. A run is done when
+Each run is (n_views, seed, variant, scene) -> <out_root>/<dataset>_<n>v/<variant>/<scene>/seed<k>/, where <dataset> is
+the matrix's optional top-level `dataset` key (default llff, so LLFF paths are unchanged). A run is done when
 its metrics.json exists; that file is written last, so a run killed or half-copied is redone next time. A STOP file
 in the repo root lets the run in progress finish and starts no new one. The runner refuses to run unless HEAD is
 exactly at a tag (AGENTS.md invariant 5); --allow_untagged is for smoke tests only. Python 3.7 compatible; it
@@ -131,6 +132,7 @@ def main():
     keep = a.keep_ckpt_seeds if a.keep_ckpt_seeds is not None else cfg.get("keep_ckpt_seeds", [])
     seeds = a.seeds if a.seeds else cfg["seeds"]
     i, n = (int(x) for x in a.shard.split("/"))
+    dataset = str(cfg.get("dataset", "llff"))   # v1.2-exp: dtu_3v/..., blender_8v/... (additions to the frozen layout)
     runs = runs_for(cfg, seeds)
     mine = runs[i::n]
     tag = code_tag(a.allow_untagged or a.dry_run)   # a dry run only prints, so it may preview an untagged checkout
@@ -143,7 +145,7 @@ def main():
         if os.path.exists(os.path.join(REPO, "STOP")):
             print("STOP file found: no new runs", flush=True)
             break
-        rel = os.path.join("llff_%dv" % nv, variant, scene, "seed%d" % seed)
+        rel = os.path.join("%s_%dv" % (dataset, nv), variant, scene, "seed%d" % seed)
         out, work = os.path.join(a.out_root, rel), os.path.join(work_root, rel)
         if os.path.exists(os.path.join(out, "metrics.json")):
             skipped += 1
@@ -151,7 +153,7 @@ def main():
         flags = " ".join("--%s %s" % (k, v) for k, v in cfg["variants"][variant].items())
         q = shlex.quote   # paths may contain spaces ("/content/drive/My Drive"); the steps go through shlex.split
         fill = dict(python=q(sys.executable), scene_dir=q(os.path.join(a.data_root, scene)), work=q(work), n_views=nv,
-                    seed=seed, variant_flags=flags, train_flags=" ".join(str(cfg.get("train_flags", "")).split()))
+                    seed=seed, scene=scene, dataset=dataset, data_root=q(a.data_root), variant_flags=flags, train_flags=" ".join(str(cfg.get("train_flags", "")).split()))
         cmds = [step.format(**fill) for step in cfg["steps"]]
         if a.dry_run:
             print("\n".join(">> " + c for c in cmds), flush=True)

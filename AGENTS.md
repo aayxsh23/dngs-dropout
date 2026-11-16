@@ -4,7 +4,7 @@ Instructions for any AI coding agent working in this repository (Claude Code, Ge
 
 ## What this project is
 
-This is a two-person course research project (Aayush and Disha) with a deadline of **Tue 20 Oct 2026**. It asks whether two sparse-view 3D Gaussian Splatting regularizers are **complementary, redundant or interfering**:
+This is a two-person course research project (Aayush and Disha) with a submission deadline of **Sat 21 Nov 2026, 20:00** (moved from 20 Oct and 15 Nov; see `docs/EXECUTION_PLAN_15-21Nov.md`). It asks whether two sparse-view 3D Gaussian Splatting regularizers are **complementary, redundant or interfering**:
 
 - **DNGaussian** (CVPR 2024): monocular-depth regularization. This repo is a fork of [Fictionarry/DNGaussian](https://github.com/Fictionarry/DNGaussian).
 - **DropGaussian** (CVPR 2025): randomly drops Gaussians during training. It is ported from [DCVL-3D/DropGaussian_release](https://github.com/DCVL-3D/DropGaussian_release).
@@ -23,7 +23,7 @@ Every experimental variant is the **same code with different command-line flags*
 | C_ca, D_ca | 0, 1 | 0.2 | shared | C and D with `--drop_mode clamp_aware`: each Gaussian's rate is capped so its compensated opacity never exceeds the 0.99 alpha cap (block CA, H7) |
 | C_nc, D_nc | 0, 1 | 0.2 | shared | C and D with `--drop_mode nc`: the same drops as uniform, but survivors keep their opacity (no 1/(1−r) compensation; block COMP, prereg-v3) |
 
-The main benchmark is LLFF 3-view (8 scenes × 5 variants × 3 seeds = 120 runs).
+The main benchmark is LLFF 3-view (8 scenes × 5 variants × 3 seeds = 120 runs). From `v1.2-exp` the same A–E also run on DTU 3-view (15 scans, `train_dtu.py`, masked metrics by `experiments/eval_dtu.py`) and Blender 8-view (8 objects, the non-SH path of `train_blender.py` only).
 
 **Read these before planning any work:**
 - [docs/PLAN.md](docs/PLAN.md): the current plan, status, decisions, specs and schedule. **It overrides the playbook wherever they differ.**
@@ -35,7 +35,7 @@ The main benchmark is LLFF 3-view (8 scenes × 5 variants × 3 seeds = 120 runs)
 | --- | --- | --- | --- | --- | --- |
 | Laptop (WSL2 Ubuntu 24.04) | **3.7.13** | **1.12.1** | 11.3, gcc 9 | RTX 3050 Ti, 4 GB, sm_86 | conda env `dngaussian`; see `setup_env.sh` |
 | Colab | 3.13 | 2.11 | 13.0 | T4, 16 GB, sm_75 | `notebooks/colab_runner.ipynb`; extension wheels cached on Drive |
-| A100 lab machine | ? | ? | ? | A100, sm_80 | Physical access only; optional (see PLAN) |
+| Lab PC (`/home/snu/dngs-dropout`) | ? | 1.12.1 | ? | RTX A4000, 16 GB, sm_86 | Physical access only; every v1.0-exp result ran here; jobs run in `tmux` |
 
 Consequences for the code:
 - **Python 3.7 syntax only** in anything the training pipeline imports: no walrus `:=`, no `f"{x=}"`, no `list[int]` or `dict[str, int]` annotations, no `dict | dict`, no `match`.
@@ -88,7 +88,7 @@ Experiment runner (PLAN W8, PLAN_V2 §3): `python experiments/run_matrix.py --ma
 
 1. **Dropout runs only inside the training loop.** `render.py`, `metrics.py`, `spiral.py`, `training_report`, `clean_views` and every evaluation path must never apply a mask. Render functions take an optional per-Gaussian compensation vector that defaults to `None` (no dropout).
 2. **Flag defaults reproduce DNGaussian exactly.** `--depth_scale 1 --drop_rate 0 --depth_render shared` must be the upstream behaviour (variant B). When `drop_rate` is 0, do not even create a mask.
-3. **The output layout and file formats are frozen** (agreed 12 Oct): `outputs/llff_<n>v/<variant>/<scene>/seed<k>/` containing `config.json`, `diag.csv`, `metrics.json`, `train_stats.json`, `render_stats.json`, `results_eval.json`, `eval/`. You may **add** keys or columns. Never rename or remove them: `experiments/aggregate.py` and the figure scripts depend on them.
+3. **The output layout and file formats are frozen** (agreed 12 Oct): `outputs/<dataset>_<n>v/<variant>/<scene>/seed<k>/` (`<dataset>` is `llff`, and from `v1.2-exp` also `dtu` or `blender`, set by the matrix's `dataset` key) containing `config.json`, `diag.csv`, `metrics.json`, `train_stats.json`, `render_stats.json`, `results_eval.json`, `eval/`. You may **add** keys or columns. Never rename or remove them: `experiments/aggregate.py` and the figure scripts depend on them.
 4. **One GPU type per seed.** All five variants of a given seed run on the same GPU type. `metrics.json` records `gpu` and `shared_gpu`. Efficiency numbers come only from runs with `shared_gpu: false`.
 5. **Experiments run only from a tag** (`v1.0-exp`, then `v1.1-exp` for fixes). `config.json` records the commit. Don't run the matrix from a branch.
 6. **Same data everywhere:** `llff_with_depth.tar`, checked by md5.

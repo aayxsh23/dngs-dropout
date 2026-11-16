@@ -40,7 +40,7 @@ TRAIN_PATHS=(train_llff.py render.py metrics.py spiral.py gaussian_renderer util
 [ -f experiments/run_matrix.py ] && TRAIN_PATHS+=(experiments/run_matrix.py)
 # Also run in the laptop's Python 3.7 env.
 for f in experiments/geometry.py scripts/peak_vram.py; do [ -f "$f" ] && TRAIN_PATHS+=("$f"); done
-EVAL_PATHS=(render.py render_sh.py metrics.py metrics_dtu.py metrics_count.py spiral.py)
+EVAL_PATHS=(render.py render_sh.py metrics.py metrics_dtu.py metrics_count.py spiral.py experiments/eval_dtu.py)
 step "1. Syntax errors and undefined names (ruff E9,F63,F7,F82)"
 if ruff_ check --no-cache --quiet --select E9,F63,F7,F82 --target-version py37 \
      --exclude submodules,dpt,lpipsPyTorch . ; then pass; else fail "ruff critical errors"; fi
@@ -230,7 +230,11 @@ fi
 
 step "15. Dropout schedule (D1) and random point-cloud path (W7) match the agreed design"
 sched_ok=1
-grep -q 'drop_rate_now = opt.drop_rate \* iteration / 10000' train_llff.py || { echo "train_llff.py: schedule is not drop_rate * iteration / 10000 (D1)"; sched_ok=0; }
+for t in train_llff.py train_dtu.py train_blender.py; do
+  grep -q 'drop_rate_now = opt.drop_rate \* iteration / 10000' $t || { echo "$t: schedule is not drop_rate * iteration / 10000 (D1)"; sched_ok=0; }
+done
+awk '/^def readNerfSyntheticInfo/{f=1;next} f&&/^def /{exit} f' scene/dataset_readers.py | grep -q 'tempfile.mkdtemp' \
+  || { echo "scene/dataset_readers.py: the Blender random cloud must go to a temp dir, not the dataset folder (W7)"; sched_ok=0; }
 grep -q 'iteration / opt.iterations' AGENTS.md && { echo "AGENTS.md still states the rescaled schedule (/ opt.iterations); D1 keeps / 10000"; sched_ok=0; }
 grep -q 'r = drop_rate \* iteration / 10000' AGENTS.md || { echo "AGENTS.md invariant 7 does not state the D1 schedule"; sched_ok=0; }
 if grep -rn 'sparse/0/points3D_random' scene/; then echo "the random cloud is written into the dataset folder again (W7)"; sched_ok=0; fi
@@ -407,6 +411,30 @@ if [ ${#PYA[@]} -gt 0 ]; then
   done
 fi
 if [ $nc_ok -eq 1 ]; then pass; else fail "no-compensation dropout / new matrix files"; fi
+
+step "21. Multi-dataset port (v1.2-exp): run paths, SH guard, uniform-only DTU/Blender, depth passes get the routed masks"
+md_ok=1
+grep -qF 'raise SystemExit("dropout, --depth_render and --depth_scale are only ported to the non-SH path' train_blender.py \
+  || { echo "train_blender.py: the --use_SH guard is missing"; md_ok=0; }
+for t in train_dtu.py train_blender.py; do
+  for need in 'render_for_depth(viewpoint_cam, gaussians, pipe, background, drop_comp=hard_comp)' \
+              'render_for_opa(viewpoint_cam, gaussians, pipe, background, drop_comp=soft_comp)' \
+              'render(viewpoint_cam, gaussians, pipe, background, drop_comp=drop_comp)' \
+              'assert opt.drop_mode == "uniform"' 'safe_state(args.quiet, args.seed)' 'write_run_config(args)'; do
+    grep -qF -- "$need" $t || { echo "$t: missing \`$need\`"; md_ok=0; }
+  done
+done
+if [ ${#PYA[@]} -gt 0 ]; then
+  for mp in "matrix.yaml llff_3v/A/fern/seed0 120" "matrix_dtu.yaml dtu_3v/A/scan103/seed0 225" \
+            "matrix_blender.yaml blender_8v/A/chair/seed0 120"; do
+    set -- $mp
+    "${PYA[@]}" experiments/run_matrix.py --matrix "experiments/$1" --data_root /nonexistent --out_root /o20 \
+        --dry_run --allow_untagged >"$TMP/dry20.txt" 2>&1
+    grep -q -- "--model_path /o20/$2 " "$TMP/dry20.txt" || { echo "experiments/$1: run path is not /o20/$2"; md_ok=0; }
+    head -1 "$TMP/dry20.txt" | grep -q " $3 of $3 runs" || { echo "experiments/$1: expected $3 runs"; head -1 "$TMP/dry20.txt"; md_ok=0; }
+  done
+fi
+if [ $md_ok -eq 1 ]; then pass; else fail "multi-dataset port"; fi
 
 printf '\n== Summary\n'
 [ ${#SKIPPED[@]} -gt 0 ] && echo "Skipped locally: ${SKIPPED[*]}"
