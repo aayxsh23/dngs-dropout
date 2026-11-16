@@ -47,6 +47,7 @@ Update this table whenever something changes. It is the single place where statu
 | 19 | Review/merge gate: CI `checks`, `scripts/check.sh`, GPU smoke, `pr-reviewer` agent, `pr-gate` skill, Bash hook, CODEOWNERS, ruleset script | Aayush | ✅ Merged (#5, #6); ruleset active since 13 Oct | AGENTS.md "Change workflow". GitHub now requires `checks`, `agent-review` and code-owner review on `main`; squash-only merges |
 | 20 | Analysis scripts: `experiments/stats.py` (T3, §6 verdict), `plots/diag_curves.py` (F2), `plots/qual_grid.py` (F3/F4), `plots/views.py` (F5) | Disha | ✅ Merged (#9) 14 Oct | CI coverage in #12 (`check.sh` step 12, gate class). Re-check on a real sample `diag.csv` once W4 lands |
 | 21 | Deadline moved to Sun 15 Nov; target submission Tue 10 – Wed 11 Nov | Both | 🔄 Redrafting | First a research-scope analysis (improvements within the core question), then the redrafted plan |
+| 22 | Pre-registration v3 (15–21 Nov plan D1): DTU/Blender protocol, error budget BV1–BV6, N4, N5, noise2 scene draw, power, audit, compensation | Disha | 🔄 PR open; tag `prereg-v3` after merge | [PREREG_V3.md](PREREG_V3.md) |
 
 Pull requests:
 

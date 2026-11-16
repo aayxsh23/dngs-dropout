@@ -250,6 +250,8 @@ That is about 23 h. **Cut order if Fri 21:30 shows a slip:**
 
 ## 5. Analysis rules v2 (pre-registered; tagged `prereg-v1` before the first Tier 1 metric)
 
+> **§5.2, pre-registration v3 (tag `prereg-v3`, 16 Nov):** DTU and Blender protocol, replication rules, the error budget (BV1–BV6), N4, N5, noise2 scene draw, power, the evidence audit and the compensation contrasts are in [PREREG_V3.md](PREREG_V3.md). It adds rules and changes none of §5.
+
 **Unit.** For each variant and scene, average over seeds. Every comparison is paired by scene: report the mean of the per-scene differences, a 95 % t-interval over the 8 scenes (df = 7), and wins out of 8.
 
 **Primary** (T1, γ = 0.2, PSNR; Holm correction across the three):
