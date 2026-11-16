@@ -347,6 +347,11 @@ print("runner ok")
 EOF
 fi
 
+step "18. bias_variance.py self-test: N1 error budget recovers a known bias and variance; mse = bias2 + var (PREREG_V3 §4)"
+if [ ${#PYP[@]} -eq 0 ]; then skip "bias_variance self-test" "pandas/matplotlib unavailable"
+elif "${PYP[@]}" experiments/bias_variance.py --self_test >"$TMP/bv.log" 2>&1 && grep -q "BIAS-VARIANCE SELF-TEST PASSED" "$TMP/bv.log"; then pass
+else tail -15 "$TMP/bv.log"; fail "bias_variance self-test"; fi
+
 printf '\n== Summary\n'
 [ ${#SKIPPED[@]} -gt 0 ] && echo "Skipped locally: ${SKIPPED[*]}"
 if [ ${#FAILED[@]} -gt 0 ]; then
