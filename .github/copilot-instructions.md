@@ -1,6 +1,6 @@
 # Copilot instructions
 
-The full agent guide is [AGENTS.md](../AGENTS.md), and the current plan is [docs/PLAN.md](../docs/PLAN.md). Read both for anything non-trivial. The rules that matter most when completing code:
+The full agent guide is [AGENTS.md](../AGENTS.md), and the current plan is [docs/PLAN_V2.md](../docs/PLAN_V2.md) (build specs in [docs/PLAN.md](../docs/PLAN.md) §5). Read them for anything non-trivial. Each person's progress is in `aayush_context.md` / `disha_context.md` on the `team-context` branch (AGENTS.md, "Team context files"). The rules that matter most when completing code:
 
 - This is a DNGaussian fork used for a controlled experiment. Variants A–E differ **only** by the flags `--depth_scale`, `--drop_rate` and `--depth_render`. Default flags must reproduce upstream DNGaussian exactly.
 - Gaussian dropout (ported from DropGaussian) runs **only in the training loop**. Never add it to `render.py`, `metrics.py`, `spiral.py` or evaluation helpers.
