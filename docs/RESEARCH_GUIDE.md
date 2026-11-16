@@ -418,26 +418,46 @@ This is the new plan's timeline (§3 there) with the audit's findings folded in.
   Also task A10 (his audit half) and task A12 (Method/Setup). **[adj]** A12 must rewrite #23's Setup: everything ran on the A4000, and V has 120 runs + T1.
 - Disha: task D6 (N1 on views, BV4), task D7 (power, noise bands), task D8 (her audit half), DTU tables as runs land.
 
-**Thu 19**
-- 12:00 all runs stop.
-- Aayush: task A10 κ subset; task A11 sync to Drive with md5s; RUNLOG counts per block.
-- Disha: task D6 (BV6), task D9 (pooled), task D10 (figures), task D11 (N3 only if time).
-- 23:59 analysis freeze.
+**Thu 19 (lab buffer day; changed 16 Nov)**
+- Lab visit: start any block that missed Wednesday (for example, Blender if `v1.2-exp` was late) plus reruns, and let it run overnight.
+- 12:00 DTU throughput check: below about 150/225 means Blender runs seeds 0–1 only.
+- Aayush: task A10 κ subset; task A12 Method/Setup drafts; **[adj]** the F1 iteration diagram (from PLAN_V2 AY-24, still undone).
+- Disha: task D6 on views and on DTU as it lands; tasks D7/D8 finish; figure scripts run on the data landed so far.
 
 **Fri 20**
-- Aayush: task A12 Method / Setup / Limitations / reproducibility appendix; **[adj]** the F1 iteration diagram (from PLAN_V2 AY-24, still undone).
-- Disha: task D12 Results; task D13 README + site. **[adj]** Gap G-d: the README is still upstream's, so write a project README.
+- Lab visit: final counts, last reruns. **12:00 all runs stop.**
+- Aayush: task A11 sync to Drive with md5s; RUNLOG counts per block; task A12 Limitations and reproducibility appendix.
+- Disha: task D6 (BV6), task D9 (pooled), task D10 (figures), task D11 (N3 only if time).
+- **20:00 analysis freeze.** Report writing starts Fri night: task D12 Results.
 
 **Sat 21**
-- Aayush: task A13 number cross-check.
+- Aayush: task A12 final; task A13 number cross-check.
+- Disha: task D12 final; task D13 README + site. **[adj]** Gap G-d: the README is still upstream's, so it needs a project README.
 - Both: final read; submit 20:00; tag `v1.0-report`; RUNLOG final.
 
+Moving the run stop to Friday leaves only about 24 hours for the report. So write everything that doesn't depend on new numbers Tue–Thu, before the freeze:
+- Method, Setup, Related Work, Introduction;
+- the LLFF results;
+- figure scripts tested on fixtures.
+
 ### 6.3 Critical path and fallbacks
-`prereg-v3` → (task A7 + task A8) → `v1.2-exp` / `v1.1-exp` → lab queue (about 18 GPU-hours with 3 slots) → Thu 12:00 stop → D6/D9/D10 → writing.
+`prereg-v3` → (task A7 + task A8) → `v1.2-exp` / `v1.1-exp` → lab queue (about 18 GPU-hours with 3 slots) → Fri 12:00 stop → D6/D9/D10 → Fri 20:00 freeze → writing.
 
-(inference) The queue assumes the lab PC runs overnight Tue–Thu. Task A2 should have confirmed that, and the repo has no record that it did.
+**Lab visits (one a day; the PC runs unattended overnight in `tmux`, confirmed by Aayush 16 Nov):**
 
-**Decision table (new plan §7), unchanged:**
+| Visit | Start (chained, so the GPU never idles) | Needs before the visit |
+| --- | --- | --- |
+| Tue | Views seeds 1–2, then comp → depth-dose → noise2 | `v1.1-exp` tagged (otherwise views only) |
+| Wed | DTU → Blender, plus Tuesday's leftovers | `v1.2-exp` tagged; DTU and Blender tars on the lab PC |
+| Thu | Late blocks and reruns (buffer) | — |
+| Fri (before 12:00) | Last reruns, then stop; copy outputs to Drive | — |
+
+**Lab checklist:**
+- Before leaving: dry-run every block, then watch the first 2–3 runs finish.
+- Keep the PC from sleeping and rebooting; lock the screen, but don't log out.
+- New worktrees have no `data/`. Pass `--data_root /home/snu/dngs-dropout/data/<dataset>`, or link `data` into each worktree.
+
+**Decision table (new plan §7; its run-stop deadline is now Fri 12:00):**
 - DTU no-go → Blender is required.
 - A Blender port problem → DTU-only PR, Blender follows in `v1.3-exp`.
 - Both fail → GT-camera fallback for DTU. It is a documented protocol deviation, decided at the call.
@@ -685,6 +705,8 @@ Add a RUNLOG line in the same hour.
 | ~4–6 Nov | All blocks run on the lab RTX A4000 instead of Colab/A100; V in its 120-run fallback form (the date is inference; no record) | `results/raw/README.md` only |
 | 11 Nov | Probes and geometry run at the lab; results v1 merged (#29–#31) | RESULTS.md, raw README |
 | 15 Nov | New plan: error-budget framing; DTU required, Blender added; dropped: variant F, the separate co-adaptation score, DTU compensation arms, DAv2, the init moderator, region-stratified error, a second host; submission Sat 21 Nov | EXECUTION_PLAN §0 (the deadline change is not in RUNLOG) |
+| 16 Nov | Run stop moved Thu 12:00 → **Fri 12:00**; analysis freeze Thu 23:59 → **Fri 20:00**; DTU throughput check Wed 12:00 → Thu 12:00; report written Fri night + Sat (Aayush) | EXECUTION_PLAN §0 note; this guide §6.2 |
+| 16 Nov | Lab PC may run unattended overnight in `tmux`; one visit per day (Aayush) | this guide §6.3 |
 | 16 Nov | (pending) DTU go/no-go | — |
 
 ### 10.3 File index
