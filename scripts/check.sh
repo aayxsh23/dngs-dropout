@@ -236,6 +236,10 @@ EOF
            "${T}_pooled/pooled.csv" "${T}_pooled/verdict_pooled.txt"; do
     [ -s "$f" ] || { echo "missing output: $f"; an_ok=0; }
   done
+  # A scan excluded by the pre-registered rule is dropped from every output, not only from missing.txt.
+  "${PYP[@]}" experiments/aggregate.py --out_root "$F"_dtu --tables "${T}_dtu_ex" --exclude scan21 >>"$TMP/an.log" 2>&1 || an_ok=0
+  if grep -q ",scan21," "${T}_dtu_ex/runs.csv" 2>/dev/null || grep -q "scan21" "${T}_dtu_ex/missing.txt" 2>/dev/null \
+     || grep -q "scan21" "${T}_dtu_ex/per_scene_dtu_3v.csv" 2>/dev/null; then echo "--exclude scan21 left it in an output"; an_ok=0; fi
   grep -qx "dtu_3v/D/scan30/seed2" "${T}_dtu/missing.txt" 2>/dev/null || { echo "DTU missing.txt lacks the removed run"; an_ok=0; }
   [ "$(tail -c 9 <(head -1 "$T/runs.csv"))" = ",dataset" ] || { echo "runs.csv: dataset is not the last column"; an_ok=0; }
   grep -q "^X5 .*-> supported$" "${T}_pooled/verdict_pooled.txt" 2>/dev/null \
@@ -363,7 +367,7 @@ print("runner ok")
 EOF
 fi
 
-step "18. bias_variance.py and interaction_scales.py self-tests: N1 recovers a known bias and variance (mse = bias2 + var); N4 flags a dB-only interaction"
+step "19. bias_variance.py and interaction_scales.py self-tests: N1 recovers a known bias and variance (mse = bias2 + var); N4 flags a dB-only interaction"
 if [ ${#PYP[@]} -eq 0 ]; then skip "bias_variance self-test" "pandas/matplotlib unavailable"
 elif "${PYP[@]}" experiments/bias_variance.py --self_test >"$TMP/bv.log" 2>&1 && grep -q "BIAS-VARIANCE SELF-TEST PASSED" "$TMP/bv.log" \
   && "${PYP[@]}" experiments/interaction_scales.py --self_test >>"$TMP/bv.log" 2>&1 \

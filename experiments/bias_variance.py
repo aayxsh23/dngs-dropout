@@ -194,13 +194,13 @@ def check_identity(row, where):
 
 # ---------------------------------------------------------------- collection and contrasts
 
-def collect(out_root, dataset, n_views, variants, seeds, mask_root):
+def collect(out_root, dataset, n_views, variants, seeds, mask_root, exclude=()):
     base = os.path.join(out_root, "{}_{}v".format(dataset, n_views))
     if not os.path.isdir(base):
         sys.exit("no folder {}".format(base))
     rows, skipped, runs = [], [], []
     scenes = sorted({os.path.basename(p) for v in variants for p in glob.glob(os.path.join(base, v, "*"))
-                     if os.path.isdir(p)})
+                     if os.path.isdir(p) and os.path.basename(p) not in exclude})
     for scene in scenes:
         for v in variants:
             dirs = []
@@ -259,6 +259,17 @@ def get(res, key, q):
     return None if r.empty else r.iloc[0]
 
 
+def bv3_reading(r):
+    """BV3 is in the Holm family, so its CI counts as excluding 0 only when the Holm-adjusted p < 0.05 (§5)."""
+    if not (r["p_holm"] < S.ALPHA):
+        return "contains 0 (after Holm): D is at B's bias floor"
+    if r["ci_hi"] < 0:
+        return "below 0: dropout also reduces bias"
+    if r["ci_lo"] > 0:
+        return "above 0: D keeps variance above B's bias floor"
+    return "contains 0: D is at B's bias floor"
+
+
 def verdicts(res):
     """PLAN_V2 §5.2.4 decision rules for BV1, BV2, BV3 and BV5 (BV4/BV6 need several tables)."""
     out = []
@@ -272,7 +283,7 @@ def verdicts(res):
         ok = m["mean"] < 0 and ratio > 0.5 and p["p_holm"] < S.ALPHA and not (p["ci_lo"] <= 0 <= p["ci_hi"])
         out.append("{}: {} share of {} = {:.2f} (Δmse {:+.3g}, Δ{} {:+.3g} [{:+.3g}, {:+.3g}], Holm p {}) -> {}".format(
             name, label, key, ratio, m["mean"], part, p["mean"], p["ci_lo"], p["ci_hi"], S.fmt_p(p["p_holm"]),
-            "HOLDS" if ok else "FAILS"))
+            "HOLDS" if ok else "FAILS" + (" (refuted: dropout is not a variance reducer here)" if name == "BV2" else "")))
 
     share("B-A", "bias2", "Δbias2", "BV1")
     share("C-A", "var", "Δvar", "BV2")
@@ -280,8 +291,7 @@ def verdicts(res):
     if r is None or pd.isna(r["ci_lo"]):
         out.append("BV3: not computed")
     else:
-        where = "below 0: dropout also reduces bias" if r["ci_hi"] < 0 else \
-            "above 0: D keeps variance above B's bias floor" if r["ci_lo"] > 0 else "contains 0: D is at B's bias floor"
+        where = bv3_reading(r)
         out.append("BV3: mse(D) - bias2(B) = {:+.3g} [{:+.3g}, {:+.3g}] (Holm p {}) -> CI {}".format(
             r["mean"], r["ci_lo"], r["ci_hi"], S.fmt_p(r["p_holm"]), where))
     for key in ("I_D", "I_E"):
@@ -296,7 +306,8 @@ def verdicts(res):
 
 def run(a):
     print("error budget: {} {}v, variants {}, seeds {}".format(a.dataset, a.n_views, a.variants, a.seeds))
-    budget, runs = collect(a.out_root, a.dataset, a.n_views, a.variants, a.seeds, a.mask_root)
+    budget, runs = collect(a.out_root, a.dataset, a.n_views, a.variants, a.seeds, a.mask_root,
+                           getattr(a, "exclude", None) or ())
     os.makedirs(a.tables, exist_ok=True)
     tag = "{}_{}v".format(a.dataset, a.n_views)
     budget.to_csv(os.path.join(a.tables, "error_budget_{}.csv".format(tag)), index=False)
@@ -432,7 +443,16 @@ def self_test():
             cnt += c
         if cnt >= 2 * h * w * 3 or abs(dtu.iloc[0]["bias2"] - tot / cnt) > 1e-9 * abs(tot / cnt):
             sys.exit("self-test: DTU masked budget is not the left-half budget")
-        # 4. A GT that differs between seeds must stop the run.
+        # 4. BV3 is read after Holm: a raw CI that excludes 0 with Holm p >= 0.05 "contains 0".
+        if "contains 0 (after Holm)" not in bv3_reading(dict(mean=0.1, ci_lo=0.01, ci_hi=0.2, p=0.03, p_holm=0.09)):
+            sys.exit("self-test: BV3 ignored the Holm adjustment")
+        if "above 0" not in bv3_reading(dict(mean=0.1, ci_lo=0.01, ci_hi=0.2, p=0.01, p_holm=0.03)):
+            sys.exit("self-test: BV3 should be above 0")
+        # 5. An excluded scene is left out.
+        b2, _ = collect(tmp, "llff", 3, list("AB"), [0, 1, 2], None, exclude=("s0",))
+        if "s0" in set(b2["scene"]) or b2.empty:
+            sys.exit("self-test: --exclude did not drop the scene")
+        # 6. A GT that differs between seeds must stop the run.
         bad = os.path.join(tmp, "llff_3v", "B", "s0", "seed1", "eval", "ours_6000", "gt", "00000.png")
         write_png8(bad, 0.5 * np.ones((h, w, 3)))
         try:
@@ -455,6 +475,7 @@ def main():
     ap.add_argument("--variants", nargs="+", default=list("ABCDE"))
     ap.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
     ap.add_argument("--mask_root", help="DTU: idrmasks folder, used when a run has no mask/ copy")
+    ap.add_argument("--exclude", nargs="*", default=[], help="scenes excluded by a pre-registered rule (§5.2.1)")
     ap.add_argument("--tables", default="results/tables/error_budget")
     ap.add_argument("--self_test", action="store_true")
     a = ap.parse_args()

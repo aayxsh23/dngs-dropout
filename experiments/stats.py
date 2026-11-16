@@ -516,7 +516,9 @@ def pooled_main(a):
     res["replication"] = res.apply(replicates, axis=1) if len(res) else []
     os.makedirs(a.tables, exist_ok=True)
     res.to_csv(os.path.join(a.tables, "pooled.csv"), index=False)
-    lines = ["Pooled across datasets (PLAN_V2 §5.2.2; PSNR; DerSimonian–Laird; τ² and Q are descriptive):"]
+    lines = ["Pooled across datasets (PLAN_V2 §5.2.2; PSNR; DerSimonian–Laird; τ² and Q are descriptive).",
+             "Per-dataset p here is unadjusted; the Holm-corrected classes of each dataset are in "
+             "verdict_<dataset>_<n>v.txt (stats.py --dataset).", ""]
     for key in POOLED:
         for _, r in res[(res["metric"] == "psnr") & (res["comparison"] == key)].iterrows():
             extra = (f"  τ² {r['tau2']:.3f}, Q {r['Q']:.2f} (p {fmt_p(r['p_Q'])})" if r["level"] == "pooled"
@@ -735,8 +737,9 @@ def main():
                 lines.append(f"  γ = {gamma:.3g}: " + ", ".join(cells))
     if noise_lines:
         lines += ["", "Noise floor (block N):"] + noise_lines
-    lines += ["", "Power: with 8 scenes x 3 seeds, interactions smaller than about 0.35–0.5 dB are below the detection "
-                  "limit (RESEARCH_ANALYSIS §5.3)."]
+    if DATASET == "llff":
+        lines += ["", "Power: with 8 scenes x 3 seeds, interactions smaller than about 0.35–0.5 dB are below the "
+                      "detection limit (RESEARCH_ANALYSIS §5.3)."]
     open(os.path.join(a.tables, f"verdict_{tg}.txt"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
     print(open(base + ".md", encoding="utf-8").read())
     print("\n".join(lines))

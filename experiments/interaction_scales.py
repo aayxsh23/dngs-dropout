@@ -73,7 +73,7 @@ def analyse(table):
 
 def self_test():
     """A Loftus case: PSNR-additive effects (I = 0 in dB) give a non-zero interaction in MSE; the script must call it
-    scale-dependent. A crossover interaction must stay robust."""
+    scale-dependent; the main effects E − D and D − B must stay robust."""
     rng = np.random.RandomState(0)
     rows = []
     for s in range(8):

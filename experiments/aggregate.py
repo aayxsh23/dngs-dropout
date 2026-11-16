@@ -83,7 +83,7 @@ def main_table(df, scenes=SCENES):
         if len(complete) < per_seed.ngroups:
             print(f"NOTE variant {var}: seeds {sorted(set(per_seed.groups) - set(complete))} incomplete, "
                   "left out of mean ± std", file=sys.stderr)
-        g = g[g["seed"].isin(complete)]
+        g = g[g["seed"].isin(complete) & g["scene"].isin(scenes)]
         row = {"variant": var, "n_seeds": len(complete)}
         if complete:
             seed_means = g.groupby("seed")[[c for c in METRICS + OPTIONAL_METRICS if c in g]].mean()
@@ -138,13 +138,18 @@ def main():
                     help="SSIM in the main table: ssim (3DGS) or ssim_sk (sklearn); runs.csv keeps both")
     ap.add_argument("--exclude", nargs="*", default=[],
                     help="scenes excluded by a pre-registered rule (e.g. a DTU scan with < 49 registered images); "
-                         "they are not expected in complete seeds or in missing.txt")
+                         "their runs are dropped from every output (runs.csv too, so stats.py never sees them)")
     a = ap.parse_args()
 
     os.makedirs(a.tables, exist_ok=True)
     df = load_runs(a.out_root)
     if df.empty:
         sys.exit(f"No metrics.json found under {a.out_root}")
+    if a.exclude:
+        dropped = df["scene"].isin(a.exclude)
+        print(f"NOTE --exclude: dropping {int(dropped.sum())} runs of {sorted(set(df.loc[dropped, 'scene']))}",
+              file=sys.stderr)
+        df = df[~dropped]
     # `dataset` last: the other columns keep the order (and LLFF runs.csv the content) they had before it existed
     df = df[[c for c in df if c not in ("dataset", "path")] + ["dataset", "path"]]
     df.drop(columns=["path"]).to_csv(os.path.join(a.tables, "runs.csv"), index=False)
