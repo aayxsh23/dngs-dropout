@@ -363,10 +363,12 @@ print("runner ok")
 EOF
 fi
 
-step "18. bias_variance.py self-test: N1 error budget recovers a known bias and variance; mse = bias2 + var (PREREG_V3 §4)"
+step "18. bias_variance.py and interaction_scales.py self-tests: N1 recovers a known bias and variance (mse = bias2 + var); N4 flags a dB-only interaction"
 if [ ${#PYP[@]} -eq 0 ]; then skip "bias_variance self-test" "pandas/matplotlib unavailable"
-elif "${PYP[@]}" experiments/bias_variance.py --self_test >"$TMP/bv.log" 2>&1 && grep -q "BIAS-VARIANCE SELF-TEST PASSED" "$TMP/bv.log"; then pass
-else tail -15 "$TMP/bv.log"; fail "bias_variance self-test"; fi
+elif "${PYP[@]}" experiments/bias_variance.py --self_test >"$TMP/bv.log" 2>&1 && grep -q "BIAS-VARIANCE SELF-TEST PASSED" "$TMP/bv.log" \
+  && "${PYP[@]}" experiments/interaction_scales.py --self_test >>"$TMP/bv.log" 2>&1 \
+  && grep -q "INTERACTION-SCALES SELF-TEST PASSED" "$TMP/bv.log"; then pass
+else tail -15 "$TMP/bv.log"; fail "bias_variance / interaction_scales self-test"; fi
 
 printf '\n== Summary\n'
 [ ${#SKIPPED[@]} -gt 0 ] && echo "Skipped locally: ${SKIPPED[*]}"
