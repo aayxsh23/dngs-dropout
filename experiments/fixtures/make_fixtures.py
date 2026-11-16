@@ -178,7 +178,7 @@ for scene in ["fern", "horns", "trex"]:
         write_png(f"{ev}/renders/00000.png", W, H, lambda x, y: tuple(min(255, c + 6 * k) for c in gt(x, y)))
         write_png(f"{ev}/depth/00000.png", W, H, lambda x, y: (4 * y,) * 3)
         write_png(f"{ev}/depth/color_00000.png", W, H, lambda x, y: (4 * y, 120, 255 - 4 * y))
-# DTU 3-view (15 scans) and Blender 8-view (8 objects), A-E x seeds 0-2 (PREREG_V3 §1), each from its own stream.
+# DTU 3-view (15 scans) and Blender 8-view (8 objects), A-E x seeds 0-2 (PLAN_V2 §5.2.1), each from its own stream.
 # Dropout helps more on DTU than on LLFF (X5), and most on Blender (H-PD); scan30 is missing from seed 2 of D.
 DTU_SCANS = ["scan8", "scan21", "scan30", "scan31", "scan34", "scan38", "scan40", "scan41", "scan45", "scan55",
              "scan63", "scan82", "scan103", "scan110", "scan114"]

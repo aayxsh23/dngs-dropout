@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""N4 (PREREG_V3 §5): are the interaction and the combination contrasts the same on every error scale?
+"""N4 (PLAN_V2 §5.2.5): are the interaction and the combination contrasts the same on every error scale?
 
     python experiments/interaction_scales.py --runs results/tables/runs.csv \\
         --budget_runs results/tables/error_budget/error_budget_runs_llff_3v.csv --dataset llff --n_views 3 \\

@@ -34,7 +34,7 @@ Method (PLAN_V2 §5, fixed before results):
     significant classes in opposite directions (better vs worse) on X − B, X − C or I_X, the verdict is
     "metric-dependent".
 
-Other datasets (PREREG_V3 §1–3): `--dataset dtu|blender` runs the same §5 analysis on that dataset's runs (runs.csv
+Other datasets (PLAN_V2 §5.2.1–3): `--dataset dtu|blender` runs the same §5 analysis on that dataset's runs (runs.csv
 from aggregate.py on its block) and tags the outputs <dataset>_<n>v; LLFF keeps <n>v. `--pooled llff=<runs.csv>
 dtu=<runs.csv> blender=<runs.csv>` instead runs the cross-dataset analysis: per dataset the seven contrasts B − A,
 C − A, D − B, E − B, I_D, I_E, E − D (paired by scene), "replicates / contradicts / not informative" against LLFF,
@@ -72,7 +72,7 @@ DATASET_SCENES = dict(
          "scan82", "scan103", "scan110", "scan114"],
     blender=["chair", "drums", "ficus", "hotdog", "lego", "materials", "mic", "ship"])
 DATASET = "llff"   # set by --dataset; runs.csv files without a `dataset` column are LLFF
-# Pooled across datasets (PREREG_V3 §2): the replication contrasts
+# Pooled across datasets (PLAN_V2 §5.2.2): the replication contrasts
 POOLED = ["B-A", "C-A", "D-B", "E-B", "I_D", "I_E", "E-D"]
 
 # two-sided 95% t quantiles, used when scipy is not installed (df 1..30)
@@ -465,7 +465,7 @@ def welch_one_sided(a, b):
 
 
 def pooled_main(a):
-    """PREREG_V3 §2–3: per-dataset contrasts, DerSimonian–Laird pooling, X5 and H-PD."""
+    """PLAN_V2 §5.2.2–3: per-dataset contrasts, DerSimonian–Laird pooling, X5 and H-PD."""
     global DATASET
     comps = {k: (label, f) for k, label, _, f in PRIMARY + SECONDARY}
     per_ds, per_scene_db, rows = {}, {}, []
@@ -516,7 +516,7 @@ def pooled_main(a):
     res["replication"] = res.apply(replicates, axis=1) if len(res) else []
     os.makedirs(a.tables, exist_ok=True)
     res.to_csv(os.path.join(a.tables, "pooled.csv"), index=False)
-    lines = ["Pooled across datasets (PREREG_V3 §2; PSNR; DerSimonian–Laird; τ² and Q are descriptive):"]
+    lines = ["Pooled across datasets (PLAN_V2 §5.2.2; PSNR; DerSimonian–Laird; τ² and Q are descriptive):"]
     for key in POOLED:
         for _, r in res[(res["metric"] == "psnr") & (res["comparison"] == key)].iterrows():
             extra = (f"  τ² {r['tau2']:.3f}, Q {r['Q']:.2f} (p {fmt_p(r['p_Q'])})" if r["level"] == "pooled"
@@ -573,7 +573,7 @@ def main():
     ap.add_argument("--dataset", choices=sorted(DATASET_SCENES), default="llff",
                     help="analyse only this dataset's runs; outputs get the tag <dataset>_<n>v (LLFF keeps <n>v)")
     ap.add_argument("--pooled", nargs="+", metavar="DATASET=RUNS_CSV",
-                    help="PREREG_V3 §2–3 instead of §5: per-dataset contrasts, DerSimonian–Laird pooling, X5, H-PD "
+                    help="PLAN_V2 §5.2.2–3 instead of §5: per-dataset contrasts, DerSimonian–Laird pooling, X5, H-PD "
                          "(e.g. llff=results/tables/runs.csv dtu=results/tables/dtu/runs.csv)")
     ap.add_argument("--blender_views", type=int, default=8, help="view count of the Blender block in --pooled")
     a = ap.parse_args()

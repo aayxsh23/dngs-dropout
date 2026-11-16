@@ -5,7 +5,7 @@ Example:
     python experiments/aggregate.py --out_root <drive>/sparse3dgs/outputs --tables results/tables
 
 Expects outputs/<dataset>_<n>v/<variant>/<scene>/seed<k>/metrics.json, dataset one of llff, dtu, blender (the
-layout agreed on Mon 12 Oct; the dataset prefix is the multi-dataset runner's, PREREG_V3 §1).
+layout agreed on Mon 12 Oct; the dataset prefix is the multi-dataset runner's, PLAN_V2 §5.2.1).
 Missing runs and missing keys produce warnings, never a crash, so a half-finished matrix still aggregates.
 
 Writes to --tables (<tag> is <n>v for LLFF, as before, and <dataset>_<n>v for DTU and Blender):
@@ -23,7 +23,7 @@ OPTIONAL_METRICS = ["ssim_sk"]                          # sklearn SSIM; --ssim s
 EFFICIENCY = ["train_time_s", "fps", "n_gaussians", "model_size_mb", "vram_peak_mb"]
 SCENES = ["fern", "flower", "fortress", "horns", "leaves", "orchids", "room", "trex"]
 VARIANTS = ["A", "B", "C", "D", "E"]
-# Per dataset: the scenes a complete seed needs, and the view count of its main block (PREREG_V3 §1).
+# Per dataset: the scenes a complete seed needs, and the view count of its main block (PLAN_V2 §5.2.1).
 DATASETS = {
     "llff": dict(scenes=SCENES, n_views=3),
     "dtu": dict(scenes=["scan8", "scan21", "scan30", "scan31", "scan34", "scan38", "scan40", "scan41", "scan45",

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""N1 error budget (PREREG_V3 §4): split each variant's pixel error into squared bias and run-to-run variance.
+"""N1 error budget (PLAN_V2 §5.2.4): split each variant's pixel error into squared bias and run-to-run variance.
 
     python experiments/bias_variance.py --out_root <block root> --dataset llff --n_views 3 \\
         --variants A B C D E --seeds 0 1 2 --tables results/tables/error_budget
@@ -27,8 +27,8 @@ Writes to --tables:
     error_budget_contrasts_<dataset>_<n>v.csv  B-A, C-A, D-B, E-B, I_D, I_E on mse, bias2 and var, and BV3 =
                                                mse(D) - bias2(B); paired by scene, 95% t-interval; Holm across the
                                                three BV tests (BV1: bias2 of B-A, BV2: var of C-A, BV3)
-    error_budget_verdict_<dataset>_<n>v.txt    BV1, BV2, BV3 and BV5 by the PREREG_V3 §4 rules
-BV4 (trend over views) and BV6 (agreement across datasets) compare several of these outputs (PREREG_V3 §4, D6).
+    error_budget_verdict_<dataset>_<n>v.txt    BV1, BV2, BV3 and BV5 by the PLAN_V2 §5.2.4 rules
+BV4 (trend over views) and BV6 (agreement across datasets) compare several of these outputs (PLAN_V2 §5.2.4, D6).
 """
 import argparse, glob, math, os, re, shutil, sys, tempfile
 
@@ -260,7 +260,7 @@ def get(res, key, q):
 
 
 def verdicts(res):
-    """PREREG_V3 §4 decision rules for BV1, BV2, BV3 and BV5 (BV4/BV6 need several tables)."""
+    """PLAN_V2 §5.2.4 decision rules for BV1, BV2, BV3 and BV5 (BV4/BV6 need several tables)."""
     out = []
 
     def share(key, part, label, name):
@@ -305,7 +305,7 @@ def run(a):
     res.to_csv(os.path.join(a.tables, "error_budget_contrasts_{}.csv".format(tag)), index=False)
     lines = verdicts(res)
     with open(os.path.join(a.tables, "error_budget_verdict_{}.txt".format(tag)), "w") as f:
-        f.write("Error budget {} (PREREG_V3 §4), {} scenes\n".format(tag, budget["scene"].nunique()))
+        f.write("Error budget {} (PLAN_V2 §5.2.4), {} scenes\n".format(tag, budget["scene"].nunique()))
         f.write("\n".join(lines) + "\n")
     print("\n".join(lines))
     print("wrote error_budget_{0}.csv, error_budget_contrasts_{0}.csv, error_budget_verdict_{0}.txt to {1}".format(

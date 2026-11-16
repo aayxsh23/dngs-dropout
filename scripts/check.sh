@@ -224,7 +224,7 @@ EOF
   if "${PYP[@]}" experiments/plots/diag_curves.py --out_root "$F" --tables "$T/neg" --figures "$G/neg" >"$TMP/an_neg.log" 2>&1; then
     echo "diag_curves.py passed a D run whose gap is identically 0"; an_ok=0
   elif ! grep -q "FAIL D/fern/seed0: gap identically 0" "$TMP/an_neg.log"; then echo "diag_curves.py failed but did not name the failing run"; an_ok=0; fi
-  # Dataset factor (PREREG_V3 §1–3): DTU and Blender blocks aggregate under their own tag, stats.py --dataset
+  # Dataset factor (PLAN_V2 §5.2.1–3): DTU and Blender blocks aggregate under their own tag, stats.py --dataset
   # analyses one of them, --pooled pools all three. LLFF file names and contents are unchanged by the factor.
   for b in _dtu _blender; do
     "${PYP[@]}" experiments/aggregate.py --out_root "$F$b" --tables "$T$b" >>"$TMP/an.log" 2>&1 || an_ok=0
