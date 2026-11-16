@@ -238,6 +238,19 @@ mkdir -p /home/snu/dngs-dropout/output
 | Aayush → Disha | `eval_T1.tgz` / `eval_views.tgz` (+ md5), only if D-3 says the renders aren't on Drive | Wed |
 | Both | 21:30 sync: done / blocked / tomorrow, plus RUNLOG lines | daily |
 
-## 7. Status tonight (Claude, Mon 16 Nov)
+## 7. Status tonight (Claude, Mon 16 Nov, ~00:15 IST)
 
-Filled in at the end of tonight's session. See the bottom of this file.
+Everything below is **local only**: nothing has been pushed, tagged or opened as a PR.
+
+| Item | Where | State |
+| --- | --- | --- |
+| A-3 `v1.1-exp` code | branch `feat/clamp-aware` (worktree `~/projects/dngs-ca`), commit `ffe8e65` on top of #27 rebased onto `main` | Done. `--drop_mode nc` (same draw as uniform, `(mask > 0).float()`); `matrix_comp.yaml` (96: C_ca, D_ca, C_nc, D_nc); `matrix_depthdose.yaml` (96); check.sh step 9 accepts `nc`; new step 19 (no rescaling in the `nc` branch, mutation-tested; dry-run counts); AGENTS variant row; PLAN_V2 §3.1 rows. `check.sh`: ALL PASSED. **Needs:** GPU smoke on this head, `matrix_noise2.yaml` once the draw exists, pr-gate, Disha |
+| A-4 `v1.2-exp` code | branch `feat/multi-dataset` (worktree `~/projects/dngs-md`), commit `71e3d39`, stacked on A-3 | Done; not yet run on a GPU. Ports `train_dtu.py` and `train_blender.py` (non-SH): seed, depth_scale, D1 mask routing, diag.csv/train_stats.json via the train_llff helpers, config.json; uniform mode only; the DTU background-alpha pass never sees the mask; the Blender `--use_SH` guard; Blender cloud in a temp dir; runner `dataset` key + `{scene}`, `{dataset}`, `{data_root}`; `experiments/eval_dtu.py`; `matrix_dtu.yaml` (225), `matrix_blender.yaml` (120); CODEOWNERS; check.sh steps 4, 15, 20 (mutation-tested); AGENTS.md deadline, lab PC, layout. **Needs:** DTU + Blender smokes, GPU smoke, pr-gate, Disha |
+| A-5 lab kit | `~/lab_kit/` (`lab_queue.sh`, `lab_check.sh`, `README.txt`) | Done; dry-run tested against local copies of the tags |
+| A-2 DTU data | `~/dtu_raw/Rectified/` (5 parallel downloads, logs `~/dtu_raw/extract_*.log`); COLMAP env `colmap` (4.2.1) + wrapper `~/dtu_prep/colmap`; prep script `~/dtu_prep/prep_dtu.sh` | Downloading. When it finishes, run `bash ~/dtu_prep/prep_dtu.sh ~/dtu_raw/Rectified` from the repo root (CPU only). It organizes, runs COLMAP, retries PINHOLE once, and writes `data/dtu/registration.txt` |
+| probes.py on main | branch `chore/probes-script` (worktree `~/projects/dngs-probes`), commit `a81f943` | Done: the exact file from 9f8d55f (md5 matches RESULTS.md). Routine PR |
+| RUNLOG back-fill | this branch (`docs/research-guide`) | Done: 3–16 Nov |
+
+**Two design choices in A-4 for review:**
+- The DTU background-alpha pass (`alpha[bg_mask]²`) gets no mask, in every variant.
+- The Blender matrix keeps setting 1's `--test_iterations`/`--save_iterations`. The host skips densification on those iterations, so leaving them out would change the protocol.
