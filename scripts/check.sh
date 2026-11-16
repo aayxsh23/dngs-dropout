@@ -224,6 +224,22 @@ EOF
   if "${PYP[@]}" experiments/plots/diag_curves.py --out_root "$F" --tables "$T/neg" --figures "$G/neg" >"$TMP/an_neg.log" 2>&1; then
     echo "diag_curves.py passed a D run whose gap is identically 0"; an_ok=0
   elif ! grep -q "FAIL D/fern/seed0: gap identically 0" "$TMP/an_neg.log"; then echo "diag_curves.py failed but did not name the failing run"; an_ok=0; fi
+  # Dataset factor (PREREG_V3 §1–3): DTU and Blender blocks aggregate under their own tag, stats.py --dataset
+  # analyses one of them, --pooled pools all three. LLFF file names and contents are unchanged by the factor.
+  for b in _dtu _blender; do
+    "${PYP[@]}" experiments/aggregate.py --out_root "$F$b" --tables "$T$b" >>"$TMP/an.log" 2>&1 || an_ok=0
+  done
+  { "${PYP[@]}" experiments/stats.py --runs "${T}_dtu/runs.csv" --dataset dtu --tables "${T}_dtu" \
+    && "${PYP[@]}" experiments/stats.py --pooled llff="$T/runs.csv" dtu="${T}_dtu/runs.csv" \
+         blender="${T}_blender/runs.csv" --tables "${T}_pooled"; } >>"$TMP/an.log" 2>&1 || an_ok=0
+  for f in "${T}_dtu/main_dtu_3v.md" "${T}_blender/main_blender_8v.md" "${T}_dtu/verdict_dtu_3v.txt" \
+           "${T}_pooled/pooled.csv" "${T}_pooled/verdict_pooled.txt"; do
+    [ -s "$f" ] || { echo "missing output: $f"; an_ok=0; }
+  done
+  grep -qx "dtu_3v/D/scan30/seed2" "${T}_dtu/missing.txt" 2>/dev/null || { echo "DTU missing.txt lacks the removed run"; an_ok=0; }
+  [ "$(tail -c 9 <(head -1 "$T/runs.csv"))" = ",dataset" ] || { echo "runs.csv: dataset is not the last column"; an_ok=0; }
+  grep -q "^X5 .*-> supported$" "${T}_pooled/verdict_pooled.txt" 2>/dev/null \
+    || { echo "pooled verdict on the fixtures changed: $(grep '^X5' "${T}_pooled/verdict_pooled.txt" 2>/dev/null)"; an_ok=0; }
   if [ $an_ok -eq 1 ]; then pass; else tail -15 "$TMP/an.log"; tail -5 "$TMP/an_neg.log" 2>/dev/null; fail "analysis scripts on fixtures"; fi
 fi
 

@@ -105,13 +105,13 @@ def write_diag(out, var, rng):
                      f"{round(f['drop_rate'] * it / 10000, 6)},{40 + rng.random():.2f},1650.0,{var_m / 10:.6f}\n")
 
 
-def write_block(block_root, means, seeds, block_scenes, rng, sd=0.3):
+def write_block(block_root, means, seeds, block_scenes, rng, sd=0.3, dataset="llff", n_views=3):
     for seed in seeds:
         for var, p in means.items():
             for scene in block_scenes:
-                out = f"{block_root}/llff_3v/{var}/{scene}/seed{seed}"
+                out = f"{block_root}/{dataset}_{n_views}v/{var}/{scene}/seed{seed}"
                 os.makedirs(out, exist_ok=True)
-                m = dict(variant=var, scene=scene, n_views=3, seed=seed, psnr=round(p + rng.gauss(0, sd), 3),
+                m = dict(variant=var, scene=scene, n_views=n_views, seed=seed, psnr=round(p + rng.gauss(0, sd), 3),
                          ssim=round(0.6 + (p - 19) / 50 + rng.gauss(0, 0.02), 4),
                          lpips=round(0.29 - (p - 19) / 50 + rng.gauss(0, 0.02), 4),
                          train_time_s=600, gpu="Tesla T4", shared_gpu=False, **flags(var))
@@ -178,4 +178,14 @@ for scene in ["fern", "horns", "trex"]:
         write_png(f"{ev}/renders/00000.png", W, H, lambda x, y: tuple(min(255, c + 6 * k) for c in gt(x, y)))
         write_png(f"{ev}/depth/00000.png", W, H, lambda x, y: (4 * y,) * 3)
         write_png(f"{ev}/depth/color_00000.png", W, H, lambda x, y: (4 * y, 120, 255 - 4 * y))
-print("fixtures written to", root, "and", ", ".join(root + x for x in ("_pass", "_dose", "_noise")))
+# DTU 3-view (15 scans) and Blender 8-view (8 objects), A-E x seeds 0-2 (PREREG_V3 §1), each from its own stream.
+# Dropout helps more on DTU than on LLFF (X5), and most on Blender (H-PD); scan30 is missing from seed 2 of D.
+DTU_SCANS = ["scan8", "scan21", "scan30", "scan31", "scan34", "scan38", "scan40", "scan41", "scan45", "scan55",
+             "scan63", "scan82", "scan103", "scan110", "scan114"]
+BLENDER = ["chair", "drums", "ficus", "hotdog", "lego", "materials", "mic", "ship"]
+write_block(root + "_dtu", dict(A=17.6, B=18.9, C=18.4, D=19.6, E=19.8), [0, 1, 2], DTU_SCANS, random.Random(5),
+            dataset="dtu", n_views=3)
+os.remove(f"{root}_dtu/dtu_3v/D/scan30/seed2/metrics.json")
+write_block(root + "_blender", dict(A=21.0, B=21.5, C=22.3, D=23.0, E=23.1), [0, 1, 2], BLENDER, random.Random(6),
+            dataset="blender", n_views=8)
+print("fixtures written to", root, "and", ", ".join(root + x for x in ("_pass", "_dose", "_noise", "_dtu", "_blender")))

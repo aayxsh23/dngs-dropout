@@ -34,6 +34,14 @@ Method (PLAN_V2 §5, fixed before results):
     significant classes in opposite directions (better vs worse) on X − B, X − C or I_X, the verdict is
     "metric-dependent".
 
+Other datasets (PREREG_V3 §1–3): `--dataset dtu|blender` runs the same §5 analysis on that dataset's runs (runs.csv
+from aggregate.py on its block) and tags the outputs <dataset>_<n>v; LLFF keeps <n>v. `--pooled llff=<runs.csv>
+dtu=<runs.csv> blender=<runs.csv>` instead runs the cross-dataset analysis: per dataset the seven contrasts B − A,
+C − A, D − B, E − B, I_D, I_E, E − D (paired by scene), "replicates / contradicts / not informative" against LLFF,
+DerSimonian–Laird pooling with τ² and Q, X5 (one-sided Welch on per-scene D − B, DTU > LLFF), H-PD (rank of D − B),
+and a mixed model psnr ~ variant × dataset + (1 | scene) if statsmodels is installed. It writes pooled.csv and
+verdict_pooled.txt.
+
 Writes to --tables:
     factors.csv                   the factor table: every planned variant ID, its flags, and runs found per input
     scene_means_<n>v.csv          T1 variant x scene, mean over seeds, for every metric
@@ -58,6 +66,14 @@ ALPHA = 0.05
 T1_IDS, PASS_IDS = ["A", "B", "C", "D", "E"], ["D_hard", "D_soft"]
 DOSE = [(0.1, "_g010"), (0.2, ""), (1 / 3, "_g033")]   # γ and the suffix of its C/D/E IDs (0.2: T1's own)
 SCENES = ["fern", "flower", "fortress", "horns", "leaves", "orchids", "room", "trex"]
+DATASET_SCENES = dict(
+    llff=SCENES,
+    dtu=["scan8", "scan21", "scan30", "scan31", "scan34", "scan38", "scan40", "scan41", "scan45", "scan55", "scan63",
+         "scan82", "scan103", "scan110", "scan114"],
+    blender=["chair", "drums", "ficus", "hotdog", "lego", "materials", "mic", "ship"])
+DATASET = "llff"   # set by --dataset; runs.csv files without a `dataset` column are LLFF
+# Pooled across datasets (PREREG_V3 §2): the replication contrasts
+POOLED = ["B-A", "C-A", "D-B", "E-B", "I_D", "I_E", "E-D"]
 
 # two-sided 95% t quantiles, used when scipy is not installed (df 1..30)
 T975 = [12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228, 2.201, 2.179, 2.160, 2.145,
@@ -185,7 +201,8 @@ def load(path, n_views, what):
     runs = pd.read_csv(path)
     if "psnr" not in runs:
         sys.exit(f"{path} has no psnr column")
-    runs = runs[runs["n_views"] == n_views].copy()
+    ds = runs["dataset"] if "dataset" in runs else pd.Series("llff", index=runs.index)
+    runs = runs[(runs["n_views"] == n_views) & (ds == DATASET)].copy()
     unknown = sorted(set(runs["variant"]) - set(F.PLANNED))
     if unknown:
         print(f"NOTE {what}: ignoring IDs that are not in the factor table: {unknown}", file=sys.stderr)
@@ -399,7 +416,151 @@ def claim(ok):
     return "open (no condition failed; some are pending or their data failed a check)"
 
 
+def chi2_sf(x, df):
+    """P(chi2_df > x) for integer df (closed forms; scipy if installed)."""
+    try:
+        from scipy.stats import chi2
+        return float(chi2.sf(x, df))
+    except ImportError:
+        pass
+    if x <= 0:
+        return 1.0
+    h = x / 2.0
+    if df % 2 == 0:
+        term, tot = 1.0, 1.0
+        for i in range(1, df // 2):
+            term *= h / i
+            tot += term
+        return math.exp(-h) * tot
+    tot, term = math.erfc(math.sqrt(h)), math.sqrt(h) / math.sqrt(math.pi) * 2 * math.exp(-h)
+    for i in range(1, (df + 1) // 2):
+        tot += term
+        term *= h / (i + 0.5)
+    return min(1.0, tot)
+
+
+def dersimonian_laird(y, v):
+    """Random-effects pooling of estimates y with variances v: (pooled, se, tau2, Q, p_Q)."""
+    w = [1.0 / x for x in v]
+    sw = sum(w)
+    fe = sum(wi * yi for wi, yi in zip(w, y)) / sw
+    q = sum(wi * (yi - fe) ** 2 for wi, yi in zip(w, y))
+    k = len(y)
+    c = sw - sum(wi * wi for wi in w) / sw
+    tau2 = max(0.0, (q - (k - 1)) / c) if k > 1 and c > 0 else 0.0
+    ws = [1.0 / (x + tau2) for x in v]
+    pooled = sum(wi * yi for wi, yi in zip(ws, y)) / sum(ws)
+    return pooled, math.sqrt(1.0 / sum(ws)), tau2, q, chi2_sf(q, k - 1) if k > 1 else float("nan")
+
+
+def welch_one_sided(a, b):
+    """H1: mean(a) > mean(b). Returns (difference, t, df, one-sided p)."""
+    na, nb = len(a), len(b)
+    va, vb = a.var(ddof=1) / na, b.var(ddof=1) / nb
+    diff = a.mean() - b.mean()
+    t = diff / math.sqrt(va + vb)
+    df = (va + vb) ** 2 / (va ** 2 / (na - 1) + vb ** 2 / (nb - 1))
+    p2 = t_pvalue(t, df)
+    return diff, t, df, p2 / 2 if t > 0 else 1 - p2 / 2
+
+
+def pooled_main(a):
+    """PREREG_V3 §2–3: per-dataset contrasts, DerSimonian–Laird pooling, X5 and H-PD."""
+    global DATASET
+    comps = {k: (label, f) for k, label, _, f in PRIMARY + SECONDARY}
+    per_ds, per_scene_db, rows = {}, {}, []
+    for spec in a.pooled:
+        ds, path = spec.split("=", 1)
+        if ds not in DATASET_SCENES:
+            sys.exit(f"--pooled {spec}: dataset must be one of {sorted(DATASET_SCENES)}")
+        DATASET = ds
+        nv = a.n_views if ds != "blender" else a.blender_views
+        runs = load(path, nv, ds)
+        runs = runs[runs["variant"].isin(T1_IDS)]
+        metrics = [m for m in METRICS if m in runs]
+        means = scene_means(runs, metrics, ds)
+        sc = complete_scenes(means["psnr"], T1_IDS)
+        if len(sc) < 2:
+            sys.exit(f"{ds}: need 2 scenes with A–E; have {sc}")
+        per_ds[ds] = (means, sc, metrics)
+        per_scene_db[ds] = comps["D-B"][1](means["psnr"].loc[sc], IDENTITY)
+    for m in METRICS:
+        for key in POOLED:
+            label, f = comps[key]
+            ys, vs = [], []
+            for ds, (means, sc, metrics) in per_ds.items():
+                if m not in metrics:
+                    continue
+                r = paired(f(means[m].loc[sc], IDENTITY), HIGHER_IS_BETTER[m])
+                rows.append(dict(level=ds, metric=m, comparison=key, label=label, n=r["n"], mean=r["mean"],
+                                 se=r["sd"] / math.sqrt(r["n"]), ci_lo=r["ci_lo"], ci_hi=r["ci_hi"], p=r["p"]))
+                ys.append(r["mean"])
+                vs.append((r["sd"] ** 2) / r["n"])
+            if len(ys) >= 2:
+                est, se, tau2, q, pq = dersimonian_laird(ys, vs)
+                rows.append(dict(level="pooled", metric=m, comparison=key, label=label, n=len(ys), mean=est, se=se,
+                                 ci_lo=est - 1.959964 * se, ci_hi=est + 1.959964 * se, tau2=tau2, Q=q, p_Q=pq))
+    res = pd.DataFrame(rows)
+    # Replication of LLFF (same sign and overlapping CIs), per dataset and contrast
+    llff = res[res["level"] == "llff"].set_index(["metric", "comparison"])
+
+    def replicates(r):
+        if r["level"] in ("llff", "pooled") or (r["metric"], r["comparison"]) not in llff.index:
+            return ""
+        L = llff.loc[(r["metric"], r["comparison"])]
+        if (r["mean"] > 0) == (L["mean"] > 0) and r["ci_lo"] <= L["ci_hi"] and L["ci_lo"] <= r["ci_hi"]:
+            return "replicates"
+        if (r["mean"] > 0) != (L["mean"] > 0) and (r["ci_lo"] > 0 or r["ci_hi"] < 0) and (L["ci_lo"] > 0 or L["ci_hi"] < 0):
+            return "contradicts"
+        return "not informative"
+    res["replication"] = res.apply(replicates, axis=1) if len(res) else []
+    os.makedirs(a.tables, exist_ok=True)
+    res.to_csv(os.path.join(a.tables, "pooled.csv"), index=False)
+    lines = ["Pooled across datasets (PREREG_V3 §2; PSNR; DerSimonian–Laird; τ² and Q are descriptive):"]
+    for key in POOLED:
+        for _, r in res[(res["metric"] == "psnr") & (res["comparison"] == key)].iterrows():
+            extra = (f"  τ² {r['tau2']:.3f}, Q {r['Q']:.2f} (p {fmt_p(r['p_Q'])})" if r["level"] == "pooled"
+                     else f"  {r['replication']}" if r["replication"] else "")
+            lines.append(f"  {key:<5} {r['level']:<8} {fmt_ci(r, 2):<26} n {int(r['n'])}{extra}")
+    if "dtu" in per_scene_db and "llff" in per_scene_db:
+        d, t, df, p = welch_one_sided(per_scene_db["dtu"].dropna(), per_scene_db["llff"].dropna())
+        lines += ["", f"X5 (one-sided Welch, D − B on DTU > on LLFF): difference {d:+.2f} dB, t = {t:.2f}, "
+                      f"df = {df:.1f}, p = {fmt_p(p)} -> {'supported' if p < ALPHA else 'not supported'}"]
+    have = [x for x in ("llff", "dtu", "blender") if x in per_scene_db]
+    if len(have) >= 2:
+        db = {x: per_scene_db[x].mean() for x in have}
+        order = all(db[have[i]] <= db[have[i + 1]] for i in range(len(have) - 1))
+        lines += [f"H-PD (exploratory; D − B rank {' ≤ '.join(have)}): "
+                  + ", ".join(f"{x} {db[x]:+.2f}" for x in have) + f" -> {'holds' if order else 'does not hold'}"]
+    mixed = mixed_model(per_ds)
+    if mixed:
+        lines += ["", mixed]
+    open(os.path.join(a.tables, "verdict_pooled.txt"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
+    print("\n".join(lines))
+
+
+def mixed_model(per_ds):
+    """Robustness check: psnr ~ variant × dataset + (1 | scene), only if statsmodels is installed."""
+    try:
+        import statsmodels.formula.api as smf
+    except ImportError:
+        return "Mixed model: skipped (statsmodels not installed)."
+    frames = []
+    for ds, (means, sc, _) in per_ds.items():
+        t = means["psnr"].loc[sc, T1_IDS].stack().rename("psnr").reset_index()
+        t["dataset"], t["scene"] = ds, ds + "/" + t["scene"]
+        frames.append(t)
+    df = pd.concat(frames)
+    try:
+        fit = smf.mixedlm("psnr ~ C(variant, Treatment('B')) * C(dataset, Treatment('llff'))", df,
+                          groups=df["scene"]).fit()
+    except Exception as e:  # noqa: BLE001  (a robustness check must not stop the main analysis)
+        return f"Mixed model: failed ({e})."
+    return "Mixed model (psnr ~ variant × dataset + (1 | scene), reference B, LLFF):\n" + fit.summary().as_text()
+
+
 def main():
+    global SCENES, DATASET
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", default="results/tables/runs.csv", help="block T1: aggregate.py on outputs/")
     ap.add_argument("--tables", default="results/tables")
@@ -409,13 +570,24 @@ def main():
     ap.add_argument("--dose_runs", default=None, help="block G: aggregate.py's runs.csv for outputs_dose/")
     ap.add_argument("--noise_runs", default=None, help="block N: aggregate.py's runs.csv for outputs_noise/")
     ap.add_argument("--geometry", default=None, help="geometry_<n>v.csv from geometry.py on T1 (MVC@5%%)")
+    ap.add_argument("--dataset", choices=sorted(DATASET_SCENES), default="llff",
+                    help="analyse only this dataset's runs; outputs get the tag <dataset>_<n>v (LLFF keeps <n>v)")
+    ap.add_argument("--pooled", nargs="+", metavar="DATASET=RUNS_CSV",
+                    help="PREREG_V3 §2–3 instead of §5: per-dataset contrasts, DerSimonian–Laird pooling, X5, H-PD "
+                         "(e.g. llff=results/tables/runs.csv dtu=results/tables/dtu/runs.csv)")
+    ap.add_argument("--blender_views", type=int, default=8, help="view count of the Blender block in --pooled")
     a = ap.parse_args()
+    if a.pooled:
+        pooled_main(a)
+        return
     nv = a.n_views
+    DATASET, SCENES = a.dataset, DATASET_SCENES[a.dataset]
+    tg = f"{nv}v" if DATASET == "llff" else f"{DATASET}_{nv}v"
 
     runs = load(a.runs, nv, "T1")
     metrics = [m for m in METRICS if m in runs]
     if runs.empty:
-        sys.exit(f"No {nv}-view runs in {a.runs}")
+        sys.exit(f"No {DATASET} {nv}-view runs in {a.runs}")
     absent = [x for x in T1_IDS if x not in set(runs["variant"])]
     if absent:
         sys.exit(f"Variants {absent} have no {nv}-view runs yet; every T1 contrast needs all five")
@@ -426,7 +598,7 @@ def main():
     t1 = runs[runs["variant"].isin(T1_IDS)]
     means = scene_means(t1, metrics, "T1")
     os.makedirs(a.tables, exist_ok=True)
-    pd.concat(means, axis=1).round(4).to_csv(os.path.join(a.tables, f"scene_means_{nv}v.csv"))
+    pd.concat(means, axis=1).round(4).to_csv(os.path.join(a.tables, f"scene_means_{tg}.csv"))
     complete = complete_scenes(means["psnr"], T1_IDS)
     if len(complete) < len(SCENES):
         print(f"NOTE paired over {len(complete)} scenes with all five variants: {complete}", file=sys.stderr)
@@ -465,9 +637,9 @@ def main():
             print(f"NOTE geometry needs 2 scenes with A–E in {a.geometry}; have {geo_scenes}", file=sys.stderr)
 
     res = pd.DataFrame(rows)
-    base = os.path.join(a.tables, f"paired_{nv}v")
+    base = os.path.join(a.tables, f"paired_{tg}")
     write_tables(res, metrics, base)
-    pd.DataFrame(ps).round(3).to_csv(os.path.join(a.tables, f"paired_per_scene_{nv}v.csv"))
+    pd.DataFrame(ps).round(3).to_csv(os.path.join(a.tables, f"paired_per_scene_{tg}.csv"))
 
     dose_ps = None
     if a.dose_runs:
@@ -489,8 +661,8 @@ def main():
                 dose_ps[(gamma, label)] = d
                 dps_rows += [dict(gamma=gamma, comparison=label, scene=s, psnr_delta=x) for s, x in d.items()]
         if drows:
-            pd.DataFrame(drows).to_csv(os.path.join(a.tables, f"dose_{nv}v.csv"), index=False)
-            pd.DataFrame(dps_rows).round(4).to_csv(os.path.join(a.tables, f"dose_per_scene_{nv}v.csv"), index=False)
+            pd.DataFrame(drows).to_csv(os.path.join(a.tables, f"dose_{tg}.csv"), index=False)
+            pd.DataFrame(dps_rows).round(4).to_csv(os.path.join(a.tables, f"dose_per_scene_{tg}.csv"), index=False)
 
     noise_lines = []
     if a.noise_runs:
@@ -509,7 +681,7 @@ def main():
                 noise_lines.append(f"  {X} {scene}: {len(vals)} same-seed runs, SD {vals.std(ddof=1):.3f} dB "
                                    f"(T1 between-seed SD, pooled over scenes: {pooled:.3f} dB)")
         if out:
-            pd.DataFrame(out).round(4).to_csv(os.path.join(a.tables, f"noise_floor_{nv}v.csv"), index=False)
+            pd.DataFrame(out).round(4).to_csv(os.path.join(a.tables, f"noise_floor_{tg}.csv"), index=False)
 
     ftab = pd.DataFrame([F.factors(x) for x in F.PLANNED])
     for name, r in inputs.items():
@@ -565,7 +737,7 @@ def main():
         lines += ["", "Noise floor (block N):"] + noise_lines
     lines += ["", "Power: with 8 scenes x 3 seeds, interactions smaller than about 0.35–0.5 dB are below the detection "
                   "limit (RESEARCH_ANALYSIS §5.3)."]
-    open(os.path.join(a.tables, f"verdict_{nv}v.txt"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
+    open(os.path.join(a.tables, f"verdict_{tg}.txt"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
     print(open(base + ".md", encoding="utf-8").read())
     print("\n".join(lines))
 
