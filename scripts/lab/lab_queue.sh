@@ -8,6 +8,9 @@
 # LAB_WAIT_HOURS=h: when a block's tag (v1.1-exp, v1.2-exp) is not checked out yet, poll GitHub every 10 min for up to
 # h hours; as soon as the tag exists, add its worktree (~/dngs-v1.x) and run the block. 0 (default) = skip at once.
 # So the queue can be left running before a tag is pushed: nobody has to be at the lab when it lands.
+# LAB_BLOCKS="comp depthdose noise2": run only these blocks (overrides the day's order).
+# LAB_AFTER=matrix_views.yaml: first wait (polling every 5 min) until no run_matrix.py process for that matrix is left,
+# e.g. views shards started by hand, so the two never share the GPU at once.
 #
 # The runner skips runs whose metrics.json exists, so re-running a day is safe; a STOP file in a worktree root lets
 # the run in progress finish and starts no new one in that block.
@@ -54,6 +57,14 @@ case $DAY in
   thu|fri) ORDER="dtu blender views comp depthdose noise2" ;;
   *) echo "day must be tue, wed, thu or fri"; exit 2 ;;
 esac
+[ -n "${LAB_BLOCKS:-}" ] && ORDER=$LAB_BLOCKS
+
+if [ -n "${LAB_AFTER:-}" ] && [ "$ARG" != "--dry_run" ]; then
+  while pgrep -f "run_matrix\.py.*${LAB_AFTER}" >/dev/null; do
+    echo "$(date '+%a %H:%M') waiting for the running ${LAB_AFTER} jobs to finish"
+    sleep 300
+  done
+fi
 
 for name in $ORDER; do
   line=$(printf '%s\n' "$BLOCKS" | grep "^$name|")
