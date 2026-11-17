@@ -2,7 +2,8 @@
 # What finished, what failed, what is running (EXECUTION_PLAN A9: twice a day).   bash lab_check.sh
 REPO=${LAB_REPO:-/home/snu/dngs-dropout}
 echo "== running"; pgrep -af "python.*(run_matrix|train_|render\.py|metrics\.py|eval_dtu)" || echo "(nothing)"
-echo "== tmux"; tmux ls 2>/dev/null || echo "(no sessions)"
+TMUXBIN=$(command -v tmux || echo "$HOME/miniconda3/bin/tmux")   # the lab has tmux only in conda base
+echo "== tmux"; "$TMUXBIN" ls 2>/dev/null || echo "(no sessions)"
 echo "== finished runs (metrics.json) per block"
 printf '%-18s %8s %8s\n' block done expected
 for b in "outputs_views:llff_*v/*/*/seed[12]:240" "outputs_comp:llff_3v/*/*/seed*:96" \
