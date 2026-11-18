@@ -10,6 +10,8 @@
 #
 
 import os
+import json
+import time
 import torch
 import torchvision
 from os import makedirs
@@ -24,6 +26,10 @@ import sys
 from scene import Scene, GaussianModel,  GaussianModelSH
 
 from utils.general_utils import safe_state, load_checkpoint
+# Shared with the LLFF port (PLAN W2-W5): routing modes, diag.csv and train_stats.json helpers, config.json
+from train_llff import (DEPTH_RENDER_MODES, DIAG_EVERY, DIAG_COLUMNS, depth_diag, mask_variances, structure_stats,
+                        write_run_config)
+from utils.dropout import ALPHA_MAX
 import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
@@ -38,7 +44,9 @@ except ImportError:
 
 # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
-def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
+def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from, seed=0):
+    assert opt.depth_render in DEPTH_RENDER_MODES, "--depth_render must be one of %s" % (DEPTH_RENDER_MODES,)
+    assert opt.drop_mode == "uniform", "train_blender.py ports only --drop_mode uniform (DropGaussian verbatim)"
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset, opt)
     gaussians = GaussianModel(dataset.sh_degree)
@@ -63,6 +71,18 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     patch_range = (5, 17) # LLFF
 
+    # Diagnostics (PLAN W4), as in train_llff.py: one diag.csv row every DIAG_EVERY iterations, from a separate RNG
+    diag_gen = torch.Generator(device="cuda")
+    diag_gen.manual_seed(1000 + seed)
+    diag_cam = scene.getTrainCameras()[0]
+    diag_file = open(os.path.join(scene.model_path, "diag.csv"), "w")
+    diag_file.write(",".join(DIAG_COLUMNS) + "\n")
+    diag_file.flush()
+    torch.cuda.synchronize()
+    t_train0 = t_row = time.time()
+    diag_time = 0.0
+    rate_sum = 0.0
+
     for iteration in range(first_iter, opt.iterations + 1):        
 
         iter_start.record()
@@ -79,6 +99,16 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
         gt_image = viewpoint_cam.original_image.cuda()
 
+        # DropGaussian schedule, verbatim from the official code (0.2 * iteration / 10000); D1: not rescaled to opt.iterations.
+        # One mask per iteration, routed to the depth passes exactly as in train_llff.py (non-SH path only).
+        drop_rate_now = opt.drop_rate * iteration / 10000
+        drop_comp = None
+        if drop_rate_now > 0:
+            drop_comp = torch.nn.Dropout(p=drop_rate_now)(torch.ones(gaussians.get_xyz.shape[0], device="cuda"))
+        hard_comp = drop_comp if opt.depth_render in ("shared", "hard_only") else None
+        soft_comp = drop_comp if opt.depth_render in ("shared", "soft_only") else None
+        rate_sum += drop_rate_now
+
         # Render
         if (iteration - 1) == debug_from:
             pipe.debug = True
@@ -87,8 +117,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         bg_mask = (gt_image.min(0, keepdim=True).values > 254/255)
 
         # -------------------------------------------------- hard --------------------------------------------
-        if iteration > opt.hard_depth_start and iteration < opt.densify_until_iter and iteration % 10 == 0:
-            render_pkg = render_for_depth(viewpoint_cam, gaussians, pipe, background)
+        if opt.depth_scale > 0 and iteration > opt.hard_depth_start and iteration < opt.densify_until_iter and iteration % 10 == 0:
+            render_pkg = render_for_depth(viewpoint_cam, gaussians, pipe, background, drop_comp=hard_comp)
             depth = render_pkg["depth"]
 
             # Depth loss
@@ -103,7 +133,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             loss_global = patch_norm_mse_loss_global(depth[None,...], depth_mono[None,...], randint(patch_range[0], patch_range[1]), opt.error_tolerance)
             loss_hard += 1 * loss_global
 
-            loss_hard.backward()
+            (opt.depth_scale * loss_hard).backward()
 
             # Optimizer step
             if iteration < opt.iterations:
@@ -113,8 +143,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
 
         # -------------------------------------------------- soft --------------------------------------------
-        if iteration > opt.soft_depth_start and iteration < opt.densify_until_iter and iteration % 10 == 0:
-            render_pkg = render_for_opa(viewpoint_cam, gaussians, pipe, background)
+        if opt.depth_scale > 0 and iteration > opt.soft_depth_start and iteration < opt.densify_until_iter and iteration % 10 == 0:
+            render_pkg = render_for_opa(viewpoint_cam, gaussians, pipe, background, drop_comp=soft_comp)
             viewspace_point_tensor, visibility_filter = render_pkg["viewspace_points"], render_pkg["visibility_filter"]
             depth, alpha = render_pkg["depth"], render_pkg["alpha"]
 
@@ -129,7 +159,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             loss_global = patch_norm_mse_loss_global(depth[None,...], depth_mono[None,...], randint(patch_range[0], patch_range[1]), opt.error_tolerance)
             loss_pnt += 1 * loss_global
 
-            loss_pnt.backward()
+            (opt.depth_scale * loss_pnt).backward()
 
             # Optimizer step
             if iteration < opt.iterations:
@@ -146,7 +176,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         # ---------------------------------------------- Photometric --------------------------------------------
         
-        render_pkg = render(viewpoint_cam, gaussians, pipe, background)
+        render_pkg = render(viewpoint_cam, gaussians, pipe, background, drop_comp=drop_comp)
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
         # depth
         depth, opacity, alpha = render_pkg["depth"], render_pkg["opacity"], render_pkg['alpha']  # [visibility_filter]
@@ -154,6 +184,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # Loss
         Ll1 = l1_loss(image, gt_image)
         loss = Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
+        loss_rgb = loss.detach()
 
 
         # Reg
@@ -175,6 +206,26 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # ================================================================================
 
         iter_end.record()
+
+        if iteration % DIAG_EVERY == 0:  # before densification, which changes the Gaussian count on the same multiples
+            with torch.no_grad():
+                torch.cuda.synchronize()
+                t_diag0 = time.time()
+                iter_ms = (t_diag0 - t_row) * 1000.0 / DIAG_EVERY
+                clean = depth_diag(viewpoint_cam, gaussians, pipe, background, iteration, opt, None, None)
+                used = clean if hard_comp is None and soft_comp is None else \
+                    depth_diag(viewpoint_cam, gaussians, pipe, background, iteration, opt, hard_comp, soft_comp)
+                var_depth, var_rgb = mask_variances(diag_cam, gaussians, pipe, background, diag_gen)
+                over_cap = (gaussians.get_opacity_ / (1 - drop_rate_now) > ALPHA_MAX).float().mean().item() \
+                    if drop_rate_now > 0 else 0.0
+                row = [iteration, loss_rgb.item(), used, clean, var_depth, gaussians.get_xyz.shape[0], drop_rate_now,
+                       iter_ms, torch.cuda.max_memory_reserved() / 2**20, var_rgb, over_cap, float(drop_rate_now),
+                       float(drop_rate_now)]
+                diag_file.write(",".join("%.6g" % v if isinstance(v, float) else str(v) for v in row) + "\n")
+                diag_file.flush()
+                torch.cuda.synchronize()
+                t_row = time.time()  # diagnostics time is excluded from the next row's iter_ms
+                diag_time += t_row - t_diag0
 
         with torch.no_grad():
             # Progress bar
@@ -234,6 +285,23 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt_latest.pth")
 
+    diag_file.close()
+    torch.cuda.synchronize()
+    # train_stats.json (PLAN W5 + PLAN_V2 C3), the same keys as train_llff.py
+    stats = dict(
+        train_time_s=round(time.time() - t_train0, 1), diag_time_s=round(diag_time, 1),
+        n_gaussians=int(gaussians.get_xyz.shape[0]),
+        vram_peak_mb=round(torch.cuda.max_memory_reserved() / 2**20, 1),
+        model_size_mb=round(sum(p.numel() * p.element_size()
+                                for g in gaussians.optimizer.param_groups for p in g["params"]) / 2**20, 2),
+        drop_rate=opt.drop_rate, depth_scale=opt.depth_scale, depth_render=opt.depth_render, drop_mode=opt.drop_mode,
+        drop_rate_mean=round(rate_sum / opt.iterations, 6), drop_rate_eff_mean=round(rate_sum / opt.iterations, 6),
+        drop_rate_eff_hard_mean=round(rate_sum / opt.iterations, 6),
+        seed=seed, torch_version=torch.__version__)
+    with torch.no_grad():
+        stats.update(structure_stats(gaussians))
+    with open(os.path.join(scene.model_path, "train_stats.json"), "w") as f:
+        json.dump(stats, f, indent=2)
 
 
 
@@ -513,14 +581,18 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
     parser.add_argument("--use_SH", action="store_true")
+    parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args(sys.argv[1:])
+    if args.use_SH and (args.drop_rate > 0 or args.depth_render != "shared" or args.depth_scale != 1 or args.drop_mode != "uniform"):
+        raise SystemExit("dropout, --depth_render and --depth_scale are only ported to the non-SH path (drop --use_SH)")
     args.save_iterations.append(args.iterations)
     # args.checkpoint_iterations.append(args.iterations)
     
     print("Optimizing " + args.model_path)
 
     # Initialize system state (RNG)
-    safe_state(args.quiet)
+    safe_state(args.quiet, args.seed)
+    write_run_config(args)
 
     # Start GUI server, configure and run training
     # network_gui.init(args.ip, args.port)
@@ -528,7 +600,7 @@ if __name__ == "__main__":
     if args.use_SH:
         training_sh(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
     else:
-        training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
+        training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from, args.seed)
 
     # All done
     print("\nTraining complete.")

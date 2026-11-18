@@ -124,7 +124,7 @@ Derivation: RESEARCH_ANALYSIS.md §6.
 ## 3. Experiment matrix
 
 ### 3.1 Blocks
-One LLFF run takes about 4.9 min on a T4. All blocks run from tag `v1.0-exp`, except block CA (`v1.1-exp`, §5.1). Each block has its own output root, so Tier 1's tables stay clean.
+One LLFF run takes about 4.9 min on a T4. All blocks run from tag `v1.0-exp`, except blocks COMP, DDOSE and NOISE2 (`v1.1-exp`, §5.1–§5.2) and DTU and Blender (`v1.2-exp`, §5.2). Each block has its own output root, so Tier 1's tables stay clean.
 
 | Block | Variants | Scenes × seeds | Runs | Where | Hours | Output root | Matrix file | Priority |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -150,7 +150,7 @@ One LLFF run takes about 4.9 min on a T4. All blocks run from tag `v1.0-exp`, ex
 - Peak drop rates at iteration 6000 are 0.06 / 0.12 / 0.20 for γ = 0.1 / 0.2 / 1/3.
 
 ### 3.2 Matrix files
-Every variant uses the same three keys, plus an optional fourth, `drop_mode`, in block CA (§5.1). The new `depth_render` values `hard_only` and `soft_only` need `check.sh` step 9 to accept them; that change goes in PR-A. Each file differs from `matrix.yaml` only in the lines shown:
+Every variant uses the same three keys, plus an optional fourth, `drop_mode`, in block COMP (§5.1, §5.2). The new `depth_render` values `hard_only` and `soft_only` need `check.sh` step 9 to accept them; that change goes in PR-A. Each file differs from `matrix.yaml` only in the lines shown:
 
 ```yaml
 # experiments/matrix_pass.yaml
@@ -311,7 +311,7 @@ B (published DNGaussian) is the fixed reference; we never pick "the better of B 
 **Unbiasedness costs dose.** For a Gaussian with α ≥ 0.99(1 − r), no rescaling of the survivors' opacity can make dropout at rate r unbiased, since dropping it alone lets through light with probability r. The largest unbiased rate is 1 − α/0.99, and clamp-aware dropout uses exactly that. With the opacities we observe (median ≈ 0.99 in the smoke runs), clamp-aware is therefore a much **smaller** dose than DropGaussian's: about 0 for saturated Gaussians and at most 0.0404 in the hard pass. Uniform dropout keeps the dose and accepts the bias; clamp-aware removes the bias and gives up most of the dose. The two can't both be kept.
 
 **Recorded dose.**
-- `diag.csv`: `drop_rate_eff` (mean per-Gaussian rate of the soft/photometric mask) and `drop_rate_eff_hard`. Both equal `drop_rate_now` in uniform mode.
+- `diag.csv`: `drop_rate_eff` (mean per-Gaussian rate of the soft/photometric mask) and `drop_rate_eff_hard`. Both equal `drop_rate_now` in uniform mode. *(Clarified 18 Nov, #35: `drop_rate_eff_hard` is the rate of the hard-pass mask as drawn, recorded whether or not that pass is masked (`clean`, `soft_only`) or run at all (`depth_scale` 0); read it together with `depth_render` and `depth_scale`. Diagnostic only; no pre-registered contrast uses it.)*
 - `train_stats.json`: `drop_rate_mean`, `drop_rate_eff_mean`, `drop_rate_eff_hard_mean` over all iterations.
 - `frac_over_cap`: the share of Gaussians that uniform compensation would push over the cap in the soft and photometric passes. The hard pass is fully exposed whenever r > 0.0404.
 - Runs from `v1.0-exp` (T1, G: the uniform reference) don't have these fields. For them, `drop_rate_mean` is the schedule mean, 0.30005·γ over 6000 iterations, and the uniform `frac_over_cap` comes from the `v1.1-exp` smoke and probe runs. The `_hard` fields mean something only when `depth_scale` > 0 (no hard pass runs in C or C_ca).
@@ -380,6 +380,8 @@ paired by scene, 95 % t-intervals over scenes, δ = 0.25 dB on PSNR, the class o
   Our B on Blender is therefore not expected to match the published number; that is stated, not tuned away.
 - Metrics: unmasked PSNR, SSIM, SSIM_sk, LPIPS from `metrics.py` on white background.
 - Data: DPT depth run **once**; `blender_with_depth.tar` frozen by md5 and recorded.
+
+**Diagnostics on DTU and Blender** *(noted 18 Nov, review of #36)*: `diag.csv`'s `loss_depth_used` / `loss_depth_clean` use the LLFF-form depth loss (`train_llff.depth_diag`: no background handling, smoothness after 3000, no DTU EMA gate), so they compare variants **within** a dataset only, never across datasets. No pre-registered test uses them.
 
 **Both datasets:** variants A–E with the LLFF flags of the table in AGENTS.md (`drop_rate 0.2`, schedule
 `r = drop_rate · iteration / 10000`, decision D1), seeds 0, 1, 2, one GPU type per seed. **No hyperparameter is tuned on

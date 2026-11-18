@@ -9,6 +9,10 @@
 # [experiment] training, rendering, evaluation and experiment configuration.
 # Also needs a GPU smoke test on the PR head (scripts/gpu_smoke.sh) before merge.
 /train_llff.py                @aayxsh23 @DishaSingghh
+/train_dtu.py                 @aayxsh23 @DishaSingghh
+/train_blender.py             @aayxsh23 @DishaSingghh
+/metrics_dtu.py               @aayxsh23 @DishaSingghh
+/experiments/eval_dtu.py      @aayxsh23 @DishaSingghh
 /render.py                    @aayxsh23 @DishaSingghh
 /metrics.py                   @aayxsh23 @DishaSingghh
 /spiral.py                    @aayxsh23 @DishaSingghh
