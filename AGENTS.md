@@ -20,7 +20,7 @@ Every experimental variant is the **same code with different command-line flags*
 | E | 1 | 0.2 | clean | Decoupled: the depth passes never see the mask |
 | D_hard | 1 | 0.2 | hard_only | Only the hard-depth pass sees the mask (PLAN_V2 block P) |
 | D_soft | 1 | 0.2 | soft_only | Only the soft-depth pass sees the mask (PLAN_V2 block P) |
-| C_ca, D_ca | 0, 1 | 0.2 | shared | C and D with `--drop_mode clamp_aware`: each Gaussian's rate is capped so its compensated opacity never exceeds the 0.99 alpha cap (block CA, H7) |
+| C_ca, D_ca | 0, 1 | 0.2 | shared | C and D with `--drop_mode clamp_aware`: each Gaussian's rate is capped so its compensated opacity never exceeds the 0.99 alpha cap (block COMP, H7) |
 | C_nc, D_nc | 0, 1 | 0.2 | shared | C and D with `--drop_mode nc`: the same drops as uniform, but survivors keep their opacity (no 1/(1−r) compensation; block COMP, prereg-v3) |
 
 The main benchmark is LLFF 3-view (8 scenes × 5 variants × 3 seeds = 120 runs). From `v1.2-exp` the same A–E also run on DTU 3-view (15 scans, `train_dtu.py`, masked metrics by `experiments/eval_dtu.py`) and Blender 8-view (8 objects, the non-SH path of `train_blender.py` only).

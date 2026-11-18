@@ -436,6 +436,8 @@ if [ ${#PYA[@]} -gt 0 ]; then
           --dry_run --allow_untagged 2>&1 | head -1 | grep -oE '[0-9]+ of [0-9]+ runs' | awk '{print $3}')
     [ "$got" = "$2" ] || { echo "experiments/$1: dry run lists ${got:-?} runs, expected $2"; nc_ok=0; }
   done
+else
+  skip "new-block dry-run counts" "python/yaml unavailable"
 fi
 if [ $nc_ok -eq 1 ]; then pass; else fail "no-compensation dropout / new matrix files"; fi
 
