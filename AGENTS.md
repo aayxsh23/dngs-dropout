@@ -74,7 +74,7 @@ Experiment runner (PLAN W8, PLAN_V2 §3): `python experiments/run_matrix.py --ma
   2. **Soft depth:** `render_for_opa`, from iteration 1000 on. Positions, scales and rotations are detached; gradients flow to opacity only.
   3. **Photometric:** `render`. Opacity and colour come from the neural field (`gridencoder`/`shencoder`). It computes L1 + D-SSIM plus the shape, scale and opacity penalties.
 
-  The depth losses never use the photometric render. `--depth_scale 0` skips steps 1 and 2 entirely.
+  The depth losses never use the photometric render. `--depth_scale 0` skips steps 1 and 2 entirely. (`train_dtu.py` also has a background-alpha pass, `alpha[bg_mask]²`, which runs in every variant and never sees the dropout mask.)
 - `gaussian_renderer/__init__.py`: `render`, `render_for_depth`, `render_for_opa` (plus `_sh` variants used by Blender/DTU, which we don't touch).
 - `arguments/__init__.py`: `ModelParams`, `OptimizationParams`, `PipelineParams`. A new training option goes in `OptimizationParams`, so it is recorded in `opt_args` automatically.
 - `utils/general_utils.py`: `safe_state(silent, seed)` seeds `random`, `numpy` and `torch`. `load_checkpoint()`.
@@ -90,8 +90,8 @@ Experiment runner (PLAN W8, PLAN_V2 §3): `python experiments/run_matrix.py --ma
 2. **Flag defaults reproduce DNGaussian exactly.** `--depth_scale 1 --drop_rate 0 --depth_render shared` must be the upstream behaviour (variant B). When `drop_rate` is 0, do not even create a mask.
 3. **The output layout and file formats are frozen** (agreed 12 Oct): `outputs/<dataset>_<n>v/<variant>/<scene>/seed<k>/` (`<dataset>` is `llff`, and from `v1.2-exp` also `dtu` or `blender`, set by the matrix's `dataset` key) containing `config.json`, `diag.csv`, `metrics.json`, `train_stats.json`, `render_stats.json`, `results_eval.json`, `eval/`. You may **add** keys or columns. Never rename or remove them: `experiments/aggregate.py` and the figure scripts depend on them.
 4. **One GPU type per seed.** All five variants of a given seed run on the same GPU type. `metrics.json` records `gpu` and `shared_gpu`. Efficiency numbers come only from runs with `shared_gpu: false`.
-5. **Experiments run only from a tag** (`v1.0-exp`, then `v1.1-exp` for fixes). `config.json` records the commit. Don't run the matrix from a branch.
-6. **Same data everywhere:** `llff_with_depth.tar`, checked by md5.
+5. **Experiments run only from a tag** (`v1.0-exp`; `v1.1-exp` for blocks COMP/DDOSE/NOISE2; `v1.2-exp` for DTU and Blender). `config.json` records the commit. Don't run the matrix from a branch.
+6. **Same data everywhere:** `llff_with_depth.tar` (md5 `0f6bd7bdae837ec58ad757c7c00b0561`), `dtu_with_depth.tar` (`dc8df470e9cf6e46cd024cb34d19c175`) and `blender_with_depth.tar` (`e7597085f8682b660699a39f63d5957f`), checked by md5.
 7. Port DropGaussian, don't reinvent it. The official code (`gaussian_renderer/__init__.py` in their repo) is: `compensation = torch.nn.Dropout(p=r)(torch.ones(N))`, then `opacity = opacity * compensation[:, None]`, with `r = 0.2 * iteration / 10000`, where 10000 is their total iteration count. We keep it verbatim, `r = drop_rate * iteration / 10000`, even though we train for 6000 iterations, so with `--drop_rate 0.2` the rate peaks at 0.12 (decision D1, 13 Oct). The full spec is in PLAN W2. `--drop_mode clamp_aware` and `--drop_mode nc` (blocks CA and COMP) are our own extensions, never the default: `--drop_mode uniform` must stay the verbatim port above (`scripts/check.sh` step 18).
 
 ## Git and ownership

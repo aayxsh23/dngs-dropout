@@ -72,7 +72,7 @@ def cleanup(work, seed, keep_ckpt_seeds):
         shutil.rmtree(os.path.join(work, "point_cloud"), ignore_errors=True)
 
 
-def build_metrics(work, variant, scene, n_views, seed, wall, tag, shared_gpu):
+def build_metrics(work, variant, scene, n_views, seed, wall, tag, shared_gpu, dataset="llff"):
     res = load_json(os.path.join(work, "results_eval.json"))
     if len(res) != 1:
         raise RuntimeError("results_eval.json must hold exactly one ours_* entry, found %d" % len(res))
@@ -91,7 +91,8 @@ def build_metrics(work, variant, scene, n_views, seed, wall, tag, shared_gpu):
     rec.update(variant=variant, scene=scene, n_views=n_views, seed=seed,
                psnr=m.get("PSNR"), ssim=m.get("SSIM"), ssim_sk=m.get("SSIM_sk"), lpips=m.get("LPIPS"),
                fps=rstats.get("fps"), wall_time_s=round(wall, 1), git_commit=config.get("git_commit"),
-               code_tag=tag, gpu=config.get("gpu"), shared_gpu=shared_gpu)
+               code_tag=tag, gpu=config.get("gpu"), shared_gpu=shared_gpu,
+               dataset=dataset, masked=bool(m.get("masked", False)))   # v1.2-exp: added keys (DTU metrics are masked)
     for k in ("drop_rate", "depth_scale", "depth_render", "drop_mode"):
         rec.setdefault(k, config.get(k))
     for k in METRICS_KEYS:
@@ -178,7 +179,7 @@ def main():
             print("FAILED %s (%s, %.0f s)" % (rel, status, wall), flush=True)
             continue
         try:
-            rec = build_metrics(work, variant, scene, nv, seed, wall, tag, a.shared_gpu)
+            rec = build_metrics(work, variant, scene, nv, seed, wall, tag, a.shared_gpu, dataset)
         except Exception as e:  # a run without usable results is a failure, not a done run
             mark_failed(work, out, "results: %s" % e)
             failed.append(rel)

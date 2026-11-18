@@ -39,7 +39,7 @@ else PYP=(); fi
 TRAIN_PATHS=(train_llff.py render.py metrics.py spiral.py gaussian_renderer utils scene arguments)
 [ -f experiments/run_matrix.py ] && TRAIN_PATHS+=(experiments/run_matrix.py)
 # Also run in the laptop's Python 3.7 env.
-for f in experiments/geometry.py scripts/peak_vram.py; do [ -f "$f" ] && TRAIN_PATHS+=("$f"); done
+for f in experiments/geometry.py scripts/peak_vram.py train_dtu.py train_blender.py experiments/eval_dtu.py; do [ -f "$f" ] && TRAIN_PATHS+=("$f"); done
 EVAL_PATHS=(render.py render_sh.py metrics.py metrics_dtu.py metrics_count.py spiral.py experiments/eval_dtu.py)
 step "1. Syntax errors and undefined names (ruff E9,F63,F7,F82)"
 if ruff_ check --no-cache --quiet --select E9,F63,F7,F82 --target-version py37 \
@@ -462,7 +462,12 @@ if [ ${#PYA[@]} -gt 0 ]; then
     grep -q -- "--model_path /o20/$2 " "$TMP/dry20.txt" || { echo "experiments/$1: run path is not /o20/$2"; md_ok=0; }
     head -1 "$TMP/dry20.txt" | grep -q " $3 of $3 runs" || { echo "experiments/$1: expected $3 runs"; head -1 "$TMP/dry20.txt"; md_ok=0; }
   done
+else
+  skip "multi-dataset run paths" "python/yaml unavailable"
 fi
+# Design choice (PR #36): DTU's background-alpha pass never sees the dropout mask, in any variant.
+awk '/render_pkg = render_for_opa\(viewpoint_cam, gaussians, pipe, background\)$/ {getline n; if (n ~ /alpha"\]\[bg_mask\]/) ok=1} END {exit !ok}' train_dtu.py \
+  || { echo "train_dtu.py: the background-alpha pass must call render_for_opa without drop_comp"; md_ok=0; }
 if [ $md_ok -eq 1 ]; then pass; else fail "multi-dataset port"; fi
 
 printf '\n== Summary\n'

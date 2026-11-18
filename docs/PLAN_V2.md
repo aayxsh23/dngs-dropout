@@ -381,6 +381,8 @@ paired by scene, 95 % t-intervals over scenes, δ = 0.25 dB on PSNR, the class o
 - Metrics: unmasked PSNR, SSIM, SSIM_sk, LPIPS from `metrics.py` on white background.
 - Data: DPT depth run **once**; `blender_with_depth.tar` frozen by md5 and recorded.
 
+**Diagnostics on DTU and Blender** *(noted 18 Nov, review of #36)*: `diag.csv`'s `loss_depth_used` / `loss_depth_clean` use the LLFF-form depth loss (`train_llff.depth_diag`: no background handling, smoothness after 3000, no DTU EMA gate), so they compare variants **within** a dataset only, never across datasets. No pre-registered test uses them.
+
 **Both datasets:** variants A–E with the LLFF flags of the table in AGENTS.md (`drop_rate 0.2`, schedule
 `r = drop_rate · iteration / 10000`, decision D1), seeds 0, 1, 2, one GPU type per seed. **No hyperparameter is tuned on
 DTU or Blender results.** If a run fails, it is rerun once; a run that fails twice is reported as missing.
