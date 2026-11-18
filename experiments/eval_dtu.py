@@ -12,8 +12,10 @@ the composited images. Writes
     <run>/mask/<render name>  the masks used, so bias_variance.py can read the same pixels
 No dropout anywhere (AGENTS.md invariant 1). Python 3.7 compatible.
 
-Mask files: either exactly one per eval render (sorted order = render order, as scripts/copy_mask_dtu.sh assumes),
-or one per DTU image (49), from which the 25 test indices of scene/dataset_readers.py are taken. Anything else stops.
+Mask files: either exactly one per eval render (sorted order = render order, as scripts/copy_mask_dtu.sh assumes; the
+RegNeRF masks name them by test index, 001.png, 002.png, 009.png, ...), or one per DTU image named by its index (IDR
+layout, scan110/scan114: mask/000.png ... 063.png), from which the 25 test indices of scene/dataset_readers.py are
+taken. Anything else stops.
 """
 import argparse
 import json
@@ -33,12 +35,17 @@ def mask_files(mask_dir, n_renders):
     files = sorted(f for f in os.listdir(d) if f.lower().endswith(".png"))
     if len(files) == n_renders:
         return [os.path.join(d, f) for f in files]
-    if len(files) == 49:
-        by_idx = {int(re.sub(r"\D", "", os.path.splitext(f)[0])): f for f in files}
-        if sorted(by_idx) != list(range(49)):
-            sys.exit("%s: 49 masks, but not named 0..48" % d)
-        return [os.path.join(d, by_idx[i]) for i in DTU_TEST]
-    sys.exit("%s: %d mask files; expected %d (one per eval render) or 49" % (d, len(files), n_renders))
+    # Otherwise one mask per DTU image, named by its 0-based index (IDR layout: <scan>/mask/000.png ..., 49 or 64 files,
+    # e.g. scan110, scan114): take the test indices, as scripts/copy_mask_dtu.sh does via scan8's file names.
+    by_idx = {}
+    for f in files:
+        digits = re.sub(r"\D", "", os.path.splitext(f)[0])
+        if digits:
+            by_idx[int(digits)] = f
+    missing = [i for i in DTU_TEST if i not in by_idx]
+    if missing:
+        sys.exit("%s: %d mask files, not one per eval render, and no mask for test indices %s" % (d, len(files), missing))
+    return [os.path.join(d, by_idx[i]) for i in DTU_TEST]
 
 
 def main():
