@@ -11,6 +11,8 @@
 # LAB_BLOCKS="comp depthdose noise2": run only these blocks (overrides the day's order).
 # LAB_AFTER=matrix_views.yaml: first wait (polling every 5 min) until no run_matrix.py process for that matrix is left,
 # e.g. views shards started by hand, so the two never share the GPU at once.
+# LAB_AFTER_TMUX="c0 c1 c2": first wait (every 5 min) until none of these tmux sessions exists any more, e.g. an earlier
+# day's queue that is still running, so the next blocks start right after it without anyone at the lab.
 #
 # The runner skips runs whose metrics.json exists, so re-running a day is safe; a STOP file in a worktree root lets
 # the run in progress finish and starts no new one in that block.
@@ -59,6 +61,15 @@ case $DAY in
 esac
 [ -n "${LAB_BLOCKS:-}" ] && ORDER=$LAB_BLOCKS
 
+TMUXBIN=$(command -v tmux || echo "$HOME/miniconda3/bin/tmux")
+if [ -n "${LAB_AFTER_TMUX:-}" ] && [ "$ARG" != "--dry_run" ]; then
+  while true; do
+    alive=""; for t in $LAB_AFTER_TMUX; do "$TMUXBIN" has-session -t "$t" 2>/dev/null && alive="$alive $t"; done
+    [ -z "$alive" ] && break
+    echo "$(date '+%a %H:%M') waiting for tmux session(s)$alive to finish"
+    sleep 300
+  done
+fi
 if [ -n "${LAB_AFTER:-}" ] && [ "$ARG" != "--dry_run" ]; then
   while pgrep -f "run_matrix\.py.*${LAB_AFTER}" >/dev/null; do
     echo "$(date '+%a %H:%M') waiting for the running ${LAB_AFTER} jobs to finish"
