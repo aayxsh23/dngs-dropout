@@ -27,7 +27,7 @@ import yaml
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 METRICS_KEYS = ["variant", "scene", "n_views", "seed", "psnr", "ssim", "ssim_sk", "lpips", "train_time_s", "fps",
                 "n_gaussians", "model_size_mb", "vram_peak_mb", "wall_time_s", "git_commit", "code_tag", "gpu",
-                "shared_gpu", "torch_version", "drop_rate", "depth_scale", "depth_render"]
+                "shared_gpu", "torch_version", "drop_rate", "depth_scale", "depth_render", "drop_mode"]
 
 
 def git(*args):
@@ -91,7 +91,7 @@ def build_metrics(work, variant, scene, n_views, seed, wall, tag, shared_gpu):
                psnr=m.get("PSNR"), ssim=m.get("SSIM"), ssim_sk=m.get("SSIM_sk"), lpips=m.get("LPIPS"),
                fps=rstats.get("fps"), wall_time_s=round(wall, 1), git_commit=config.get("git_commit"),
                code_tag=tag, gpu=config.get("gpu"), shared_gpu=shared_gpu)
-    for k in ("drop_rate", "depth_scale", "depth_render"):
+    for k in ("drop_rate", "depth_scale", "depth_render", "drop_mode"):
         rec.setdefault(k, config.get(k))
     for k in METRICS_KEYS:
         rec.setdefault(k, None)

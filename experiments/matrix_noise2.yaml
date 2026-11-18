@@ -1,0 +1,36 @@
+# Block noise2 (G6 / N2a): 4 same-seed repeats of A, B, C, D on 3 drawn scenes (48 runs, tag v1.1-exp; with T1 seed 0
+# that makes 5 each). Scenes drawn by the rule in PLAN_V2 §5.2.7 (prereg-v3, merged before this file was written):
+# random.Random(15112026).sample(["flower","fortress","horns","leaves","orchids","room","trex"], 3) = room, horns, trex
+# (CPython 3.7.13 and 3.13 agree). Output root: outputs_noise2/.
+# Identical to scripts/run_llff.sh except: no spiral video, eval-only render, explicit seed, variant flags.
+scenes: [room, horns, trex]
+seeds: [0]
+n_views: [3]
+keep_ckpt_seeds: []
+variants:
+  A_r1: {depth_scale: 0, drop_rate: 0.0, depth_render: shared}
+  A_r2: {depth_scale: 0, drop_rate: 0.0, depth_render: shared}
+  A_r3: {depth_scale: 0, drop_rate: 0.0, depth_render: shared}
+  A_r4: {depth_scale: 0, drop_rate: 0.0, depth_render: shared}
+  B_r1: {depth_scale: 1, drop_rate: 0.0, depth_render: shared}
+  B_r2: {depth_scale: 1, drop_rate: 0.0, depth_render: shared}
+  B_r3: {depth_scale: 1, drop_rate: 0.0, depth_render: shared}
+  B_r4: {depth_scale: 1, drop_rate: 0.0, depth_render: shared}
+  C_r1: {depth_scale: 0, drop_rate: 0.2, depth_render: shared}
+  C_r2: {depth_scale: 0, drop_rate: 0.2, depth_render: shared}
+  C_r3: {depth_scale: 0, drop_rate: 0.2, depth_render: shared}
+  C_r4: {depth_scale: 0, drop_rate: 0.2, depth_render: shared}
+  D_r1: {depth_scale: 1, drop_rate: 0.2, depth_render: shared}
+  D_r2: {depth_scale: 1, drop_rate: 0.2, depth_render: shared}
+  D_r3: {depth_scale: 1, drop_rate: 0.2, depth_render: shared}
+  D_r4: {depth_scale: 1, drop_rate: 0.2, depth_render: shared}
+train_flags: >-
+  -r 8 --eval --rand_pcd --iterations 6000 --lambda_dssim 0.2
+  --densify_grad_threshold 0.0013 --prune_threshold 0.01 --densify_until_iter 6000 --percent_dense 0.01
+  --position_lr_init 0.016 --position_lr_final 0.00016 --position_lr_max_steps 5500 --position_lr_start 500
+  --split_opacity_thresh 0.1 --error_tolerance 0.00025 --scaling_lr 0.003
+  --shape_pena 0.002 --opa_pena 0.001 --near 10
+steps:
+  - "{python} train_llff.py -s {scene_dir} --model_path {work} --n_sparse {n_views} --seed {seed} {variant_flags} {train_flags}"
+  - "{python} render.py -s {scene_dir} --model_path {work} -r 8 --near 10 --skip_train --skip_test"
+  - "{python} metrics.py --model_paths {work}"
