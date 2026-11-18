@@ -71,7 +71,9 @@ if [ -n "${LAB_AFTER_TMUX:-}" ] && [ "$ARG" != "--dry_run" ]; then
   done
 fi
 if [ -n "${LAB_AFTER:-}" ] && [ "$ARG" != "--dry_run" ]; then
-  while pgrep -f "run_matrix\.py.*${LAB_AFTER}" >/dev/null; do
+  # Only python processes count: the tmux server keeps the argv of the session that started it (the views command),
+  # so a plain pgrep -f matched it forever and the queue never started (17-18 Nov). Shell wrappers don't count either.
+  while ps -eo comm=,args= | awk -v pat="run_matrix[.]py.*${LAB_AFTER}" '$1 ~ /^python/ && $0 ~ pat {found=1} END {exit !found}'; do
     echo "$(date '+%a %H:%M') waiting for the running ${LAB_AFTER} jobs to finish"
     sleep 300
   done

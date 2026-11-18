@@ -1,7 +1,8 @@
 #!/bin/bash
 # What finished, what failed, what is running (EXECUTION_PLAN A9: twice a day).   bash lab_check.sh
 REPO=${LAB_REPO:-/home/snu/dngs-dropout}
-echo "== running"; pgrep -af "python.*(run_matrix|train_|render\.py|metrics\.py|eval_dtu)" || echo "(nothing)"
+echo "== running (python processes only; the tmux server's argv is not a job)"
+ps -eo pid=,comm=,args= | awk '$2 ~ /^python/ && /(run_matrix|train_|render\.py|metrics\.py|eval_dtu)/' | grep . || echo "(nothing)"
 TMUXBIN=$(command -v tmux || echo "$HOME/miniconda3/bin/tmux")   # the lab has tmux only in conda base
 echo "== tmux"; "$TMUXBIN" ls 2>/dev/null || echo "(no sessions)"
 echo "== finished runs (metrics.json) per block"
