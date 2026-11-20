@@ -1,0 +1,3 @@
+variant,scene,n_repeats,psnr_mean,psnr_sd_same_seed,psnr_sd_between_seeds_T1
+B,fern,5,20.96,0.2199,0.2128
+D,fern,5,21.6756,0.2155,0.2416

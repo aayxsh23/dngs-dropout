@@ -1,0 +1,65 @@
+Pooled across datasets (PLAN_V2 §5.2.2; PSNR; DerSimonian–Laird; τ² and Q are descriptive).
+Per-dataset p here is unadjusted; the Holm-corrected classes of each dataset are in verdict_<dataset>_<n>v.txt (stats.py --dataset).
+
+  B-A   llff     +2.38 [+1.80, +2.96]       n 8
+  B-A   dtu      +4.34 [+3.25, +5.42]       n 15  not informative
+  B-A   blender  -0.80 [-1.78, +0.18]       n 8  not informative
+  B-A   pooled   +1.96 [-0.56, +4.48]       n 3  τ² 4.811, Q 69.25 (p <0.001)
+  C-A   llff     +0.48 [+0.18, +0.77]       n 8
+  C-A   dtu      +0.48 [+0.01, +0.95]       n 15  replicates
+  C-A   blender  +0.37 [+0.19, +0.55]       n 8  replicates
+  C-A   pooled   +0.40 [+0.28, +0.53]       n 3  τ² 0.000, Q 0.69 (p 0.708)
+  D-B   llff     +0.50 [+0.08, +0.91]       n 8
+  D-B   dtu      +0.20 [-0.36, +0.77]       n 15  replicates
+  D-B   blender  +0.11 [-0.05, +0.27]       n 8  replicates
+  D-B   pooled   +0.24 [-0.02, +0.50]       n 3  τ² 0.028, Q 4.28 (p 0.118)
+  E-B   llff     +0.60 [+0.30, +0.91]       n 8
+  E-B   dtu      +0.30 [-0.09, +0.68]       n 15  replicates
+  E-B   blender  +0.15 [+0.02, +0.28]       n 8  not informative
+  E-B   pooled   +0.34 [+0.04, +0.64]       n 3  τ² 0.056, Q 10.47 (p 0.005)
+  I_D   llff     +0.02 [-0.34, +0.38]       n 8
+  I_D   dtu      -0.28 [-0.85, +0.30]       n 15  not informative
+  I_D   blender  -0.26 [-0.37, -0.15]       n 8  not informative
+  I_D   pooled   -0.19 [-0.37, -0.01]       n 3  τ² 0.011, Q 3.11 (p 0.212)
+  I_E   llff     +0.13 [-0.17, +0.42]       n 8
+  I_E   dtu      -0.18 [-0.65, +0.29]       n 15  not informative
+  I_E   blender  -0.21 [-0.36, -0.07]       n 8  not informative
+  I_E   pooled   -0.09 [-0.34, +0.15]       n 3  τ² 0.030, Q 6.11 (p 0.047)
+  E-D   llff     +0.10 [-0.10, +0.30]       n 8
+  E-D   dtu      +0.09 [-0.24, +0.42]       n 15  replicates
+  E-D   blender  +0.04 [-0.05, +0.13]       n 8  replicates
+  E-D   pooled   +0.05 [-0.01, +0.12]       n 3  τ² 0.000, Q 0.50 (p 0.778)
+
+X5 (one-sided Welch, D − B on DTU > on LLFF): difference -0.30 dB, t = -0.94, df = 20.9, p = 0.820 -> not supported
+H-PD (exploratory; D − B rank llff ≤ dtu ≤ blender): llff +0.50, dtu +0.20, blender +0.11 -> does not hold
+
+Mixed model (psnr ~ variant × dataset + (1 | scene), reference B, LLFF):
+                                       Mixed Linear Model Regression Results
+===================================================================================================================
+Model:                                MixedLM                     Dependent Variable:                     psnr     
+No. Observations:                     155                         Method:                                 REML     
+No. Groups:                           31                          Scale:                                  0.8977   
+Min. group size:                      5                           Log-Likelihood:                         -256.3154
+Max. group size:                      5                           Converged:                              Yes      
+Mean group size:                      5.0                                                                          
+-------------------------------------------------------------------------------------------------------------------
+                                                                         Coef.  Std.Err.   z    P>|z| [0.025 0.975]
+-------------------------------------------------------------------------------------------------------------------
+Intercept                                                                18.707    0.886 21.122 0.000 16.971 20.443
+C(variant, Treatment('B'))[T.A]                                          -2.380    0.474 -5.024 0.000 -3.309 -1.452
+C(variant, Treatment('B'))[T.C]                                          -1.903    0.474 -4.017 0.000 -2.831 -0.974
+C(variant, Treatment('B'))[T.D]                                           0.499    0.474  1.054 0.292 -0.429  1.428
+C(variant, Treatment('B'))[T.E]                                           0.603    0.474  1.273 0.203 -0.325  1.531
+C(dataset, Treatment('llff'))[T.blender]                                  3.957    1.253  3.160 0.002  1.503  6.412
+C(dataset, Treatment('llff'))[T.dtu]                                     -0.336    1.097 -0.307 0.759 -2.486  1.813
+C(variant, Treatment('B'))[T.A]:C(dataset, Treatment('llff'))[T.blender]  3.181    0.670  4.748 0.000  1.868  4.494
+C(variant, Treatment('B'))[T.C]:C(dataset, Treatment('llff'))[T.blender]  3.071    0.670  4.584 0.000  1.758  4.384
+C(variant, Treatment('B'))[T.D]:C(dataset, Treatment('llff'))[T.blender] -0.389    0.670 -0.580 0.562 -1.702  0.924
+C(variant, Treatment('B'))[T.E]:C(dataset, Treatment('llff'))[T.blender] -0.450    0.670 -0.672 0.501 -1.763  0.863
+C(variant, Treatment('B'))[T.A]:C(dataset, Treatment('llff'))[T.dtu]     -1.955    0.587 -3.333 0.001 -3.105 -0.805
+C(variant, Treatment('B'))[T.C]:C(dataset, Treatment('llff'))[T.dtu]     -1.953    0.587 -3.330 0.001 -3.103 -0.804
+C(variant, Treatment('B'))[T.D]:C(dataset, Treatment('llff'))[T.dtu]     -0.297    0.587 -0.506 0.613 -1.446  0.853
+C(variant, Treatment('B'))[T.E]:C(dataset, Treatment('llff'))[T.dtu]     -0.307    0.587 -0.524 0.600 -1.457  0.842
+Group Var                                                                 5.378    1.753                           
+===================================================================================================================
+

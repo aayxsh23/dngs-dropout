@@ -39,8 +39,8 @@ else PYP=(); fi
 TRAIN_PATHS=(train_llff.py render.py metrics.py spiral.py gaussian_renderer utils scene arguments)
 [ -f experiments/run_matrix.py ] && TRAIN_PATHS+=(experiments/run_matrix.py)
 # Also run in the laptop's Python 3.7 env.
-for f in experiments/geometry.py scripts/peak_vram.py; do [ -f "$f" ] && TRAIN_PATHS+=("$f"); done
-EVAL_PATHS=(render.py render_sh.py metrics.py metrics_dtu.py metrics_count.py spiral.py)
+for f in experiments/geometry.py scripts/peak_vram.py train_dtu.py train_blender.py experiments/eval_dtu.py; do [ -f "$f" ] && TRAIN_PATHS+=("$f"); done
+EVAL_PATHS=(render.py render_sh.py metrics.py metrics_dtu.py metrics_count.py spiral.py experiments/eval_dtu.py)
 step "1. Syntax errors and undefined names (ruff E9,F63,F7,F82)"
 if ruff_ check --no-cache --quiet --select E9,F63,F7,F82 --target-version py37 \
      --exclude submodules,dpt,lpipsPyTorch . ; then pass; else fail "ruff critical errors"; fi
@@ -117,8 +117,9 @@ cfg = yaml.safe_load(open(sys.argv[1]))
 missing = [k for k in ("scenes", "seeds", "n_views", "variants", "steps") if k not in cfg]
 assert not missing, "%s: missing keys %s" % (sys.argv[1], missing)
 for name, v in cfg["variants"].items():
-    assert set(v) == {"depth_scale", "drop_rate", "depth_render"}, "%s variant %s: %s" % (sys.argv[1], name, v)
+    assert set(v) - {"drop_mode"} == {"depth_scale", "drop_rate", "depth_render"}, "%s variant %s: %s" % (sys.argv[1], name, v)
     assert v["depth_render"] in ("shared", "clean", "hard_only", "soft_only"), (sys.argv[1], name)
+    assert v.get("drop_mode", "uniform") in ("uniform", "clamp_aware", "nc"), (sys.argv[1], name)
 print("ok", sys.argv[1], len(cfg["scenes"]) * len(cfg["seeds"]) * len(cfg["n_views"]) * len(cfg["variants"]), "runs")
 EOF
   done
@@ -224,12 +225,36 @@ EOF
   if "${PYP[@]}" experiments/plots/diag_curves.py --out_root "$F" --tables "$T/neg" --figures "$G/neg" >"$TMP/an_neg.log" 2>&1; then
     echo "diag_curves.py passed a D run whose gap is identically 0"; an_ok=0
   elif ! grep -q "FAIL D/fern/seed0: gap identically 0" "$TMP/an_neg.log"; then echo "diag_curves.py failed but did not name the failing run"; an_ok=0; fi
+  # Dataset factor (PLAN_V2 §5.2.1–3): DTU and Blender blocks aggregate under their own tag, stats.py --dataset
+  # analyses one of them, --pooled pools all three. LLFF file names and contents are unchanged by the factor.
+  for b in _dtu _blender; do
+    "${PYP[@]}" experiments/aggregate.py --out_root "$F$b" --tables "$T$b" >>"$TMP/an.log" 2>&1 || an_ok=0
+  done
+  { "${PYP[@]}" experiments/stats.py --runs "${T}_dtu/runs.csv" --dataset dtu --tables "${T}_dtu" \
+    && "${PYP[@]}" experiments/stats.py --pooled llff="$T/runs.csv" dtu="${T}_dtu/runs.csv" \
+         blender="${T}_blender/runs.csv" --tables "${T}_pooled"; } >>"$TMP/an.log" 2>&1 || an_ok=0
+  for f in "${T}_dtu/main_dtu_3v.md" "${T}_blender/main_blender_8v.md" "${T}_dtu/verdict_dtu_3v.txt" \
+           "${T}_pooled/pooled.csv" "${T}_pooled/verdict_pooled.txt"; do
+    [ -s "$f" ] || { echo "missing output: $f"; an_ok=0; }
+  done
+  # A scan excluded by the pre-registered rule is dropped from every output, not only from missing.txt.
+  "${PYP[@]}" experiments/aggregate.py --out_root "$F"_dtu --tables "${T}_dtu_ex" --exclude scan21 >>"$TMP/an.log" 2>&1 || an_ok=0
+  if grep -q ",scan21," "${T}_dtu_ex/runs.csv" 2>/dev/null || grep -q "scan21" "${T}_dtu_ex/missing.txt" 2>/dev/null \
+     || grep -q "scan21" "${T}_dtu_ex/per_scene_dtu_3v.csv" 2>/dev/null; then echo "--exclude scan21 left it in an output"; an_ok=0; fi
+  grep -qx "dtu_3v/D/scan30/seed2" "${T}_dtu/missing.txt" 2>/dev/null || { echo "DTU missing.txt lacks the removed run"; an_ok=0; }
+  [ "$(tail -c 9 <(head -1 "$T/runs.csv"))" = ",dataset" ] || { echo "runs.csv: dataset is not the last column"; an_ok=0; }
+  grep -q "^X5 .*-> supported$" "${T}_pooled/verdict_pooled.txt" 2>/dev/null \
+    || { echo "pooled verdict on the fixtures changed: $(grep '^X5' "${T}_pooled/verdict_pooled.txt" 2>/dev/null)"; an_ok=0; }
   if [ $an_ok -eq 1 ]; then pass; else tail -15 "$TMP/an.log"; tail -5 "$TMP/an_neg.log" 2>/dev/null; fail "analysis scripts on fixtures"; fi
 fi
 
 step "15. Dropout schedule (D1) and random point-cloud path (W7) match the agreed design"
 sched_ok=1
-grep -q 'drop_rate_now = opt.drop_rate \* iteration / 10000' train_llff.py || { echo "train_llff.py: schedule is not drop_rate * iteration / 10000 (D1)"; sched_ok=0; }
+for t in train_llff.py train_dtu.py train_blender.py; do
+  grep -q 'drop_rate_now = opt.drop_rate \* iteration / 10000' $t || { echo "$t: schedule is not drop_rate * iteration / 10000 (D1)"; sched_ok=0; }
+done
+awk '/^def readNerfSyntheticInfo/{f=1;next} f&&/^def /{exit} f' scene/dataset_readers.py | grep -q 'tempfile.mkdtemp' \
+  || { echo "scene/dataset_readers.py: the Blender random cloud must go to a temp dir, not the dataset folder (W7)"; sched_ok=0; }
 grep -q 'iteration / opt.iterations' AGENTS.md && { echo "AGENTS.md still states the rescaled schedule (/ opt.iterations); D1 keeps / 10000"; sched_ok=0; }
 grep -q 'r = drop_rate \* iteration / 10000' AGENTS.md || { echo "AGENTS.md invariant 7 does not state the D1 schedule"; sched_ok=0; }
 if grep -rn 'sparse/0/points3D_random' scene/; then echo "the random cloud is written into the dataset folder again (W7)"; sched_ok=0; fi
@@ -346,6 +371,104 @@ assert real.returncode != 0 and "tag" in (real.stdout + real.stderr), "an untagg
 print("runner ok")
 EOF
 fi
+
+step "18. Clamp-aware dropout (H7): uniform compensation is biased by the 0.99 alpha cap, clamp-aware is not; default stays verbatim"
+: >"$TMP/ca.txt"
+ca_need() { grep -qF -- "$2" "$1" || echo "$1: missing \`$2\` ($3)" >>"$TMP/ca.txt"; }
+ca_need train_llff.py 'drop_comp = torch.nn.Dropout(p=drop_rate_now)(torch.ones(gaussians.get_xyz.shape[0], device="cuda"))' "the default mask must stay DropGaussian verbatim"
+ca_need arguments/__init__.py 'self.drop_mode = "uniform"' "uniform must be the default"
+ca_need train_llff.py 'HARD_OPACITY = 0.95' "the hard pass's fixed opacity"
+ca_need gaussian_renderer/__init__.py 'value=0.95, drop_comp=None' "render_for_depth's opacity must equal HARD_OPACITY"
+ca_need train_llff.py 'hard_comp = hard_drop_comp if' "the hard pass gets its own clamp-aware mask"
+ca_need train_llff.py '"drop_rate_eff", "drop_rate_eff_hard"]' "diag.csv records the effective dose: H7 is confounded with dose otherwise"
+ca_need docs/PLAN_V2.md 'drop_rate_eff' "the H7 pre-registration reads the contrasts with the effective dose"
+ca_need train_llff.py 'drop_comp, rate_eff = compensated_mask(u, rates), rates.mean()' "the photometric mask is re-capped after the soft step"
+if [ -s "$TMP/ca.txt" ]; then cat "$TMP/ca.txt"; fail "clamp-aware dropout wiring"
+elif [ ${#PYA[@]} -eq 0 ]; then skip "clamp-aware dropout Monte Carlo" "numpy unavailable"
+elif "${PYA[@]}" - >"$TMP/ca.txt" 2>&1 <<'EOF'; then pass; else cat "$TMP/ca.txt"; fail "clamp-aware dropout"; fi
+import importlib.util
+import numpy as np
+spec = importlib.util.spec_from_file_location("dropout", "utils/dropout.py")   # no utils/__init__ (it imports torch)
+d = importlib.util.module_from_spec(spec); spec.loader.exec_module(d)
+rng = np.random.default_rng(0)
+n, cap = 400000, d.ALPHA_MAX
+for r in (0.06, 0.12, 0.2):
+    for a in (0.3, 0.87, 0.9, 0.95, 0.99, 1.0):
+        u = rng.random(n)
+        uni = np.minimum(cap, a * (u >= r) / (1 - r)).mean()                 # DropGaussian, then the rasterizer clamp
+        ca = np.minimum(cap, a * d.compensated_mask(u, d.clamp_aware_rates(np.full(n, a), r))).mean()
+        clean = min(cap, a)
+        assert abs(ca - clean) < 4e-3, ("clamp-aware is biased", r, a, ca, clean)
+        if a / (1 - r) > cap + 1e-9 and a < cap:
+            assert uni < clean - 0.01, ("uniform should be biased here", r, a, uni, clean)
+# the hard-depth pass (opacity 0.95) at r = 0.12: uniform loses 8 %, as in PLAN_V2 §2.4
+u = rng.random(n)
+assert abs(np.minimum(cap, 0.95 * (u >= 0.12) / 0.88).mean() - 0.871) < 4e-3
+# rates: never above r, never negative, unchanged where the cap doesn't bind; nested masks across passes
+a = np.array([0.1, 0.5, 0.871, 0.9, 0.95, 0.99, 1.0])
+rt = d.clamp_aware_rates(a, 0.12)
+assert (rt <= 0.12 + 1e-12).all() and (rt >= 0).all() and rt[0] == 0.12 and rt[1] == 0.12 and rt[-1] == 0 and rt[-2] == 0, rt
+lo, hi = d.compensated_mask(u, np.full(n, 0.03)) > 0, d.compensated_mask(u, np.full(n, 0.12)) > 0
+assert (lo | ~hi).all(), "a Gaussian kept at the higher rate must be kept at the lower one"
+print("clamp-aware ok")
+EOF
+
+step "19. bias_variance.py and interaction_scales.py self-tests: N1 recovers a known bias and variance (mse = bias2 + var); N4 flags a dB-only interaction"
+if [ ${#PYP[@]} -eq 0 ]; then skip "bias_variance self-test" "pandas/matplotlib unavailable"
+elif "${PYP[@]}" experiments/bias_variance.py --self_test >"$TMP/bv.log" 2>&1 && grep -q "BIAS-VARIANCE SELF-TEST PASSED" "$TMP/bv.log" \
+  && "${PYP[@]}" experiments/interaction_scales.py --self_test >>"$TMP/bv.log" 2>&1 \
+  && grep -q "INTERACTION-SCALES SELF-TEST PASSED" "$TMP/bv.log"; then pass
+else tail -15 "$TMP/bv.log"; fail "bias_variance / interaction_scales self-test"; fi
+
+step "20. No-compensation dropout (nc): same draw as uniform, survivors never divided by (1 - r); new blocks' dry-run counts"
+nc_ok=1
+nc_block=$(awk '/if opt.drop_mode == "nc":/{f=1} f{print} /hard_drop_comp = drop_comp/{if(f) exit}' train_llff.py)
+if [ -z "$nc_block" ]; then echo "train_llff.py: no nc branch"; nc_ok=0
+elif printf '%s\n' "$nc_block" | sed 's/#.*//' | grep -qE '/|1 *- *drop_rate_now|1\.0 *-'; then
+  echo "train_llff.py: the nc branch rescales the survivors:"; printf '%s\n' "$nc_block"; nc_ok=0; fi
+printf '%s\n' "$nc_block" | grep -qF 'drop_comp = (drop_comp > 0).float()' || { echo "nc must reuse the uniform draw: (drop_comp > 0).float()"; nc_ok=0; }
+grep -qF 'DROP_MODES = ("uniform", "clamp_aware", "nc")' train_llff.py || { echo "train_llff.py: DROP_MODES must list nc"; nc_ok=0; }
+if [ ${#PYA[@]} -gt 0 ]; then
+  for mc in "matrix_comp.yaml 96" "matrix_depthdose.yaml 96" "matrix_noise2.yaml 48"; do
+    set -- $mc
+    [ -f "experiments/$1" ] || { echo "missing experiments/$1"; nc_ok=0; continue; }
+    got=$("${PYA[@]}" experiments/run_matrix.py --matrix "experiments/$1" --data_root /nonexistent --out_root "$TMP/out19" \
+          --dry_run --allow_untagged 2>&1 | head -1 | grep -oE '[0-9]+ of [0-9]+ runs' | awk '{print $3}')
+    [ "$got" = "$2" ] || { echo "experiments/$1: dry run lists ${got:-?} runs, expected $2"; nc_ok=0; }
+  done
+else
+  skip "new-block dry-run counts" "python/yaml unavailable"
+fi
+if [ $nc_ok -eq 1 ]; then pass; else fail "no-compensation dropout / new matrix files"; fi
+
+step "21. Multi-dataset port (v1.2-exp): run paths, SH guard, uniform-only DTU/Blender, depth passes get the routed masks"
+md_ok=1
+grep -qF 'raise SystemExit("dropout, --depth_render and --depth_scale are only ported to the non-SH path' train_blender.py \
+  || { echo "train_blender.py: the --use_SH guard is missing"; md_ok=0; }
+for t in train_dtu.py train_blender.py; do
+  for need in 'render_for_depth(viewpoint_cam, gaussians, pipe, background, drop_comp=hard_comp)' \
+              'render_for_opa(viewpoint_cam, gaussians, pipe, background, drop_comp=soft_comp)' \
+              'render(viewpoint_cam, gaussians, pipe, background, drop_comp=drop_comp)' \
+              'assert opt.drop_mode == "uniform"' 'safe_state(args.quiet, args.seed)' 'write_run_config(args)'; do
+    grep -qF -- "$need" $t || { echo "$t: missing \`$need\`"; md_ok=0; }
+  done
+done
+if [ ${#PYA[@]} -gt 0 ]; then
+  for mp in "matrix.yaml llff_3v/A/fern/seed0 120" "matrix_dtu.yaml dtu_3v/A/scan103/seed0 225" \
+            "matrix_blender.yaml blender_8v/A/chair/seed0 120"; do
+    set -- $mp
+    "${PYA[@]}" experiments/run_matrix.py --matrix "experiments/$1" --data_root /nonexistent --out_root /o20 \
+        --dry_run --allow_untagged >"$TMP/dry20.txt" 2>&1
+    grep -q -- "--model_path /o20/$2 " "$TMP/dry20.txt" || { echo "experiments/$1: run path is not /o20/$2"; md_ok=0; }
+    head -1 "$TMP/dry20.txt" | grep -q " $3 of $3 runs" || { echo "experiments/$1: expected $3 runs"; head -1 "$TMP/dry20.txt"; md_ok=0; }
+  done
+else
+  skip "multi-dataset run paths" "python/yaml unavailable"
+fi
+# Design choice (PR #36): DTU's background-alpha pass never sees the dropout mask, in any variant.
+awk '/render_pkg = render_for_opa\(viewpoint_cam, gaussians, pipe, background\)$/ {getline n; if (n ~ /alpha"\]\[bg_mask\]/) ok=1} END {exit !ok}' train_dtu.py \
+  || { echo "train_dtu.py: the background-alpha pass must call render_for_opa without drop_comp"; md_ok=0; }
+if [ $md_ok -eq 1 ]; then pass; else fail "multi-dataset port"; fi
 
 printf '\n== Summary\n'
 [ ${#SKIPPED[@]} -gt 0 ] && echo "Skipped locally: ${SKIPPED[*]}"
