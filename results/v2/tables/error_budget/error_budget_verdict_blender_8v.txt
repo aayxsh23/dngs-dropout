@@ -1,0 +1,6 @@
+Error budget blender_8v (PLAN_V2 §5.2.4), 8 scenes
+BV1: Δbias2 share of B-A = 0.78 (Δmse +0.00102, Δbias2 +0.000797 [-3.72e-05, +0.00163], Holm p 0.058) -> FAILS
+BV2: Δvar share of C-A = 0.78 (Δmse -0.000476, Δvar -0.000371 [-0.000571, -0.000171], Holm p 0.006) -> HOLDS
+BV3: mse(D) - bias2(B) = +0.00177 [+0.000961, +0.00258] (Holm p 0.004) -> CI above 0: D keeps variance above B's bias floor
+BV5 I_D: I_mse +0.000328 = I_bias2 +0.000279 [+8.14e-05, +0.000477] + I_var +4.87e-05 [-3.91e-05, +0.000136]
+BV5 I_E: I_mse +0.000304 = I_bias2 +0.000293 [+8.46e-05, +0.000501] + I_var +1.19e-05 [-7.4e-05, +9.78e-05]
