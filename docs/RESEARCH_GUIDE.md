@@ -371,6 +371,15 @@ E − D rises with dose in 7/8 scenes. This is a trend only (one seed).
 
 ### 6.1 Live status (edit this table at every 21:30 sync)
 
+> **Update, Fri 20 Nov.** Every item below is done:
+> - `prereg-v3` tagged (17 Nov);
+> - `v1.1-exp` (#27) and `v1.2-exp` (#36) tagged;
+> - all 825 new lab runs complete with 0 failures (19 Nov);
+> - DTU go/no-go: GO;
+> - Results v2 merged (#37).
+>
+> [RUNLOG.md](../RUNLOG.md) has the dated record and [results/v2/RESULTS_v2.md](../results/v2/RESULTS_v2.md) the numbers. What remains is the Fri 20:00 analysis freeze, the report, and submission on Sat 20:00.
+
 | Item | Owner | Due | Status (16 Nov 21:45) |
 | --- | --- | --- | --- |
 | prereg-v3 PR + tag (task D1) | Disha | ~~Sun 23:59~~ **tonight** | missed; not started on GitHub |
