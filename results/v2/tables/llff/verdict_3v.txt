@@ -1,0 +1,41 @@
+Reference: B (published DNGaussian), fixed. Margin δ = 0.25 dB. T1 scenes paired: 8.
+
+Primary (PSNR; Holm across the three):
+  E − D                      +0.10 [-0.10, +0.30]       Holm p 0.783   inconclusive wins 5/8
+  I_D = (D − C) − (B − A)    +0.02 [-0.34, +0.38]       Holm p 0.888   inconclusive wins 4/8
+  I_E = (E − C) − (B − A)    +0.13 [-0.17, +0.42]       Holm p 0.783   inconclusive wins 5/8
+
+Secondary (PSNR; 95% CI, uncorrected):
+  B − A                      +2.38 [+1.80, +2.96]       p <0.001       >0           wins 8/8
+  C − A                      +0.48 [+0.18, +0.77]       p 0.007        >0           wins 8/8
+  D − B                      +0.50 [+0.08, +0.91]       p 0.025        >0           wins 7/8
+  D − C                      +2.40 [+1.69, +3.11]       p <0.001       >0           wins 8/8
+  E − B                      +0.60 [+0.30, +0.91]       p 0.002        >0           wins 8/8
+  E − C                      +2.51 [+1.86, +3.16]       p <0.001       >0           wins 8/8
+
+Verdict for D: complementary
+  row: D beats B and C (D − B >0, D − C >0); column: I_D inconclusive
+  PSNR, SSIM and LPIPS: no significant disagreement
+
+Verdict for E: complementary
+  row: E beats B and C (E − B >0, E − C >0); column: I_E inconclusive
+  PSNR, SSIM and LPIPS: no significant disagreement
+
+VERDICT: D = complementary; E = complementary
+
+Pass localization (block P, PSNR; Holm across the two):
+  not evaluated (give --pass_runs)
+
+Mechanism 'through the depth supervision': not supported (a condition is not met)
+  1. E − D > 0 (Holm): +0.10 [-0.10, +0.30], class inconclusive → not met
+  2. gap(D) > gap(C): not evaluated (give --diag_summary)
+  3. E − D larger at γ = 1/3 than at γ = 0.1 in ≥ 6/8 scenes: not evaluated (give --dose_runs)
+
+Mechanism 'through the opacity cap': open (no condition failed; some are pending or their data failed a check); the probe condition is checked by hand
+  not evaluated (give --pass_runs)
+
+Noise floor (block N):
+  B fern: 5 same-seed runs, SD 0.220 dB (T1 between-seed SD, pooled over scenes: 0.213 dB)
+  D fern: 5 same-seed runs, SD 0.216 dB (T1 between-seed SD, pooled over scenes: 0.242 dB)
+
+Power: with 8 scenes x 3 seeds, interactions smaller than about 0.35–0.5 dB are below the detection limit (RESEARCH_ANALYSIS §5.3).

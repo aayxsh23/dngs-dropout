@@ -1,0 +1,35 @@
+Reference: B (published DNGaussian), fixed. Margin δ = 0.25 dB. T1 scenes paired: 15.
+
+Primary (PSNR; Holm across the three):
+  E − D                      +0.09 [-0.24, +0.42]       Holm p 0.966   inconclusive wins 10/15
+  I_D = (D − C) − (B − A)    -0.28 [-0.85, +0.30]       Holm p 0.966   inconclusive wins 5/15
+  I_E = (E − C) − (B − A)    -0.18 [-0.65, +0.29]       Holm p 0.966   inconclusive wins 6/15
+
+Secondary (PSNR; 95% CI, uncorrected):
+  B − A                      +4.34 [+3.25, +5.42]       p <0.001       >0           wins 15/15
+  C − A                      +0.48 [+0.01, +0.95]       p 0.046        >0           wins 13/15
+  D − B                      +0.20 [-0.36, +0.77]       p 0.455        inconclusive wins 8/15
+  D − C                      +4.06 [+2.93, +5.19]       p <0.001       >0           wins 14/15
+  E − B                      +0.30 [-0.09, +0.68]       p 0.120        inconclusive wins 7/15
+  E − C                      +4.15 [+2.87, +5.43]       p <0.001       >0           wins 14/15
+
+Verdict for D: inconclusive
+  row: otherwise (D − B inconclusive, D − C >0); column: I_D inconclusive
+  PSNR, SSIM and LPIPS: no significant disagreement
+
+Verdict for E: inconclusive
+  row: otherwise (E − B inconclusive, E − C >0); column: I_E inconclusive
+  PSNR, SSIM and LPIPS: no significant disagreement
+
+VERDICT: D = inconclusive; E = inconclusive
+
+Pass localization (block P, PSNR; Holm across the two):
+  not evaluated (give --pass_runs)
+
+Mechanism 'through the depth supervision': not supported (a condition is not met)
+  1. E − D > 0 (Holm): +0.09 [-0.24, +0.42], class inconclusive → not met
+  2. gap(D) > gap(C): not evaluated (give --diag_summary)
+  3. E − D larger at γ = 1/3 than at γ = 0.1 in ≥ 6/8 scenes: not evaluated (give --dose_runs)
+
+Mechanism 'through the opacity cap': open (no condition failed; some are pending or their data failed a check); the probe condition is checked by hand
+  not evaluated (give --pass_runs)

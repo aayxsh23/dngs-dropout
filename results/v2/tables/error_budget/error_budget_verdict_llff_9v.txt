@@ -1,0 +1,6 @@
+Error budget llff_9v (PLAN_V2 §5.2.4), 8 scenes
+BV1: Δbias2 share of B-A = -2.90 (Δmse -0.000241, Δbias2 +0.000701 [+0.000336, +0.00107], Holm p 0.008) -> FAILS
+BV2: Δvar share of C-A = 1.39 (Δmse -0.000324, Δvar -0.00045 [-0.000929, +2.97e-05], Holm p 0.062) -> FAILS (refuted: dropout is not a variance reducer here)
+BV3: mse(D) - bias2(B) = +0.0017 [+0.000639, +0.00276] (Holm p 0.014) -> CI above 0: D keeps variance above B's bias floor
+BV5 I_D: I_mse +0.000259 = I_bias2 +0.0002 [-0.000126, +0.000526] + I_var +5.91e-05 [-0.000307, +0.000425]
+BV5 I_E: I_mse +0.000285 = I_bias2 +0.000151 [-4.81e-05, +0.00035] + I_var +0.000134 [-0.000261, +0.000529]
