@@ -54,11 +54,15 @@ REL_TOL = 1e-6
 
 # ---------------------------------------------------------------- image loading
 
-def read_png(path):
-    """float64 H x W x C in [0, 1]; RGBA loses its alpha (render.py writes RGB)."""
+def read_png(path, size=None):
+    """float64 H x W x C in [0, 1]; RGBA loses its alpha (render.py writes RGB).
+    size (H, W): resize to it first with PIL's default filter, as eval_dtu.py does when the /4 mask differs."""
     try:
         from PIL import Image
-        a = np.asarray(Image.open(path)).astype(np.float64)
+        im = Image.open(path)
+        if size is not None and (im.size[1], im.size[0]) != tuple(size):
+            im = im.resize((size[1], size[0]))
+        a = np.asarray(im).astype(np.float64)
         a = a / (65535.0 if a.max() > 255 else 255.0)
     except ImportError:
         import matplotlib.image as mpimg
@@ -68,8 +72,9 @@ def read_png(path):
     return a[:, :, :3]
 
 
-def read_mask(path, size):
-    """metrics_dtu.py's mask: resized to 1/4 with PIL's default filter; a pixel-channel counts where it is exactly 1."""
+def read_mask(path, size=None):
+    """metrics_dtu.py's mask: resized to 1/4 with PIL's default filter; a pixel-channel counts where it is exactly 1.
+    size=None: no check (the caller resizes renders and GT to the mask, as eval_dtu.py does)."""
     from PIL import Image
     m = Image.open(path)
     m = m.resize((m.size[0] // 4, m.size[1] // 4))
@@ -77,7 +82,7 @@ def read_mask(path, size):
     if a.ndim == 2:
         a = a[:, :, None]
     a = a[:, :, :3]
-    if a.shape[:2] != size:
+    if size is not None and a.shape[:2] != tuple(size):
         sys.exit("mask {} is {} after /4, the render is {}".format(path, a.shape[:2], size))
     return a == 1.0
 
@@ -151,18 +156,22 @@ def budget_cell(seed_dirs, scene, dataset, mask_root):
     psnr_runs, psnr_ens = [], []
     run_sse = np.zeros(len(seed_dirs))
     for i, name in enumerate(names):
-        gts = [read_png(os.path.join(d, "gt", name)) for d in seed_dirs]
+        # DTU: the /4 mask sets the size; renders and GT are resized to it when they differ (eval_dtu.py; e.g. the IDR
+        # masks of scan110/scan114 are 300 x 400 after /4 while the renders are 298 x 397).
+        mask = read_mask(masks[i]) if masks is not None else None
+        size = mask.shape[:2] if mask is not None else None
+        gts = [read_png(os.path.join(d, "gt", name), size) for d in seed_dirs]
         for d, g in zip(seed_dirs[1:], gts[1:]):
             if g.shape != gts[0].shape or np.abs(g - gts[0]).max() > 1e-9:
                 sys.exit("ground truth differs between seeds: {} vs {}".format(
                     os.path.join(seed_dirs[0], "gt", name), os.path.join(d, "gt", name)))
         gt = gts[0]
-        r = np.stack([read_png(os.path.join(d, "renders", name)) for d in seed_dirs])
+        r = np.stack([read_png(os.path.join(d, "renders", name), size) for d in seed_dirs])
         if r.shape[1:] != gt.shape:
             sys.exit("{}: render {} vs gt {}".format(name, r.shape[1:], gt.shape))
         valid = None
         if masks is not None:
-            valid = np.broadcast_to(read_mask(masks[i], gt.shape[:2]), gt.shape)
+            valid = np.broadcast_to(mask, gt.shape)
             if not valid.any():
                 sys.exit("mask {} has no valid pixel".format(masks[i]))
         sums, cnt, run_mse, ens_mse = budget_arrays(r, gt, valid)
@@ -443,6 +452,31 @@ def self_test():
             cnt += c
         if cnt >= 2 * h * w * 3 or abs(dtu.iloc[0]["bias2"] - tot / cnt) > 1e-9 * abs(tot / cnt):
             sys.exit("self-test: DTU masked budget is not the left-half budget")
+        # 3b. A mask that is bigger than the render after /4 (IDR masks of scan110/114: 300 x 400 vs 298 x 397):
+        # renders and GT are resized to the mask, as eval_dtu.py does, instead of stopping.
+        for k in range(3):
+            src = os.path.join(tmp, "llff_3v", "B", "s1", "seed{}".format(k))
+            shutil.copytree(src, os.path.join(tmp, "dtu_3v", "B", "scan114", "seed{}".format(k)))
+        mdir2 = os.path.join(tmp, "idrmasks", "scan114", "mask")
+        os.makedirs(mdir2)
+        big = np.ones((4 * (h + 2), 4 * (w + 3), 3))
+        for i in range(2):
+            write_png8(os.path.join(mdir2, "{:03d}.png".format(i)), big)
+        dtu2, _ = collect(tmp, "dtu", 3, ["B"], [0, 1, 2], os.path.join(tmp, "idrmasks"))
+        r114 = dtu2[dtu2["scene"] == "scan114"]
+        if len(r114) != 1 or not np.isfinite(r114.iloc[0]["mse"]) or r114.iloc[0]["mse"] <= 0:
+            sys.exit("self-test: a mask larger than the render should resize the images, not fail")
+        ev2 = [os.path.join(tmp, "dtu_3v", "B", "scan114", "seed{}".format(k), "eval", "ours_6000") for k in range(3)]
+        tot2, cnt2 = 0.0, 0
+        for i in range(2):
+            g2 = read_png(os.path.join(ev2[0], "gt", "{:05d}.png".format(i)), (h + 2, w + 3))
+            r2 = np.stack([read_png(os.path.join(e, "renders", "{:05d}.png".format(i)), (h + 2, w + 3)) for e in ev2])
+            sm, c, _, _ = budget_arrays(r2, g2)
+            tot2 += sm["mse"]
+            cnt2 += c
+        if cnt2 != 2 * (h + 2) * (w + 3) * 3 or abs(r114.iloc[0]["mse"] - tot2 / cnt2) > 1e-9 * tot2 / cnt2:
+            sys.exit("self-test: resized DTU budget does not match the resized images")
+        shutil.rmtree(os.path.join(tmp, "dtu_3v", "B", "scan114"))
         # 4. BV3 is read after Holm: a raw CI that excludes 0 with Holm p >= 0.05 "contains 0".
         if "contains 0 (after Holm)" not in bv3_reading(dict(mean=0.1, ci_lo=0.01, ci_hi=0.2, p=0.03, p_holm=0.09)):
             sys.exit("self-test: BV3 ignored the Holm adjustment")
