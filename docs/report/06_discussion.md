@@ -6,9 +6,9 @@ We asked whether DNGaussian's monocular-depth regularization and DropGaussian's 
 
 | Regime | Answer |
 | --- | --- |
-| Very sparse forward-facing scenes (LLFF, 2–3 views) | **Complementary.** Adding dropout to DNGaussian gains +0.5 to +0.6 dB, and the two gains add up about additively in PSNR. |
+| Very sparse forward-facing scenes (LLFF, 2–3 views) | **Complementary.** Adding dropout to DNGaussian gains about +0.5 dB (+0.45 to +0.60 across D/E and 2/3 views), and the two gains add up about additively in PSNR. |
 | Across three datasets | **Additive at best.** The pooled interaction is slightly negative (I_D = −0.19 dB [−0.37, −0.01]). Where the depth prior itself stops helping (Blender at 8 views, LLFF at 9 views), the combination is partly redundant. |
-| How dropout reaches the depth passes | **Doesn't matter measurably.** Shielding the depth passes from the mask (E vs D) changes PSNR by less than 0.25 dB on every dataset and view count. |
+| How dropout reaches the depth passes | **No measurable effect.** Shielding the depth passes from the mask (E vs D) moves PSNR by under 0.25 dB in every point estimate; the CIs are inconclusive on LLFF and DTU and ≈ 0 on Blender and pooled. |
 
 The practical recommendation is simple. On very sparse inputs, add dropout to a depth-regularized 3DGS model, as is. The decoupled variant is not needed.
 
@@ -37,17 +37,17 @@ We pre-registered two other mechanisms. The data do not support either.
 - **The hypothesis:** the dropout mask corrupts the depth passes, so shielding them helps.
 - **What we found:**
   - E − D is ≈ 0 everywhere.
-  - Neither depth pass alone carries an effect (block P).
+  - No single depth pass shows a detectable effect (block P; both CIs inconclusive).
   - Geometry is, if anything, slightly better with the shared mask.
 
 **Through the opacity cap (H7).**
 - **The hypothesis:** compensation pushes opacities into the 0.99 clamp.
 - **What we found:**
-  - Removing compensation (nc) or capping it per Gaussian (clamp-aware) changes nothing significantly.
+  - Removing compensation (nc) or capping it per Gaussian (clamp-aware) shows no significant effect, and none is shown equivalent either.
   - Clamp-aware even trends worse.
   - The Monte-Carlo depth bias goes in the predicted direction, but it is tiny (0.05 % of depth).
 
-We report these as negative results, because they rule out the most obvious "fixes" one might try when combining the two methods.
+We report these as negative results, because they show no support for the most obvious "fixes" one might try when combining the two methods.
 
 ## 6.4 The remaining headroom is variance
 

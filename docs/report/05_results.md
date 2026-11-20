@@ -70,7 +70,7 @@ The two other probes of the dose and of geometry do not settle the question eith
 | Verdict (D and E) | complementary | inconclusive | partly redundant | |
 
 Four patterns stand out:
-1. **Dropout's gain replicates almost exactly.** It is +0.37 to +0.48 dB on every dataset, with no heterogeneity.
+1. **Dropout's gain is consistent.** It is +0.37 to +0.48 dB on every dataset, with no detectable heterogeneity (τ² = 0).
 2. **Depth's gain does not.** It is large on the forward-facing LLFF and on DTU, but on Blender at 8 views the monocular prior *hurts* (−0.80 dB), and dropout alone is the best variant there.
 3. **Adding dropout to DNGaussian still helps.** E − B is positive pooled and on Blender, though smaller than on LLFF. The pre-registered prediction that the gain would be larger on DTU than on LLFF (X5) is not supported (p 0.82). The predicted ordering LLFF ≤ DTU ≤ Blender (H-PD) is reversed.
 4. **The interaction is never positive.** Pooled, I_D is −0.19 dB, with no significant heterogeneity (Q p 0.21). On Blender it is significantly negative for both D and E.

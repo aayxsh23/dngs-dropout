@@ -35,11 +35,11 @@ PSNR (dB) on held-out views, mean over 3 seeds. Differences are paired by scene,
 | E − D: decoupling the depth passes | +0.10 | +0.09 | +0.04 | +0.05 (≈ 0) |
 | I_D: interaction (D − C) − (B − A) | +0.02 | −0.28 | −0.26 | **−0.19 [−0.37, −0.01]** |
 
-1. **Complementary where it matters most.** On very sparse forward-facing scenes (LLFF, 2–3 views), adding dropout to DNGaussian gains +0.5 to +0.6 dB, and the two gains add up about additively.
+1. **Complementary where it matters most.** On very sparse forward-facing scenes (LLFF, 2–3 views), adding dropout to DNGaussian gains about +0.5 dB (D − B +0.45 at 2 views, +0.50 at 3; E − B +0.60 at 3), and the two gains add up about additively.
 2. **Additive at best across datasets.** The pooled interaction is slightly negative. Where the depth prior itself stops helping (Blender at 8 views, LLFF at 9 views), the combination is partly redundant.
-3. **Decoupling doesn't matter.** Shielding the depth passes from the dropout mask changes PSNR by less than 0.25 dB everywhere.
+3. **Decoupling shows no measurable effect.** Shielding the depth passes from the dropout mask moves PSNR by under 0.25 dB in every point estimate; the CIs are inconclusive on LLFF and DTU and the effect is ≈ 0 on Blender and pooled.
 4. **The mechanism is the error budget.** Depth reduces *bias* and dropout reduces *run-to-run variance*, in the sparsest settings. Neither removes the variance left above DNGaussian's bias floor, so the remaining headroom is variance.
-5. **Two explanations are ruled out.** The compensation and opacity-cap explanations are not supported (§5.2.9 of the pre-registration).
+5. **Two proposed explanations are not supported by the data.** Neither the compensation nor the opacity-cap explanation shows a detectable effect (§5.2.9 of the pre-registration); the contrasts are inconclusive, not shown to be zero.
 
 | | |
 | --- | --- |

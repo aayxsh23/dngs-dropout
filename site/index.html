@@ -60,10 +60,10 @@ a{color:var(--accent)}
 <section class="tldr">
   <strong>In short</strong>
   <ol>
-    <li><strong>Complementary on very sparse forward-facing scenes.</strong> Adding dropout to DNGaussian gains <span class="pos">+0.5 to +0.6 dB</span> on LLFF at 2–3 views.</li>
+    <li><strong>Complementary on very sparse forward-facing scenes.</strong> Adding dropout to DNGaussian gains about <span class="pos">+0.5 dB</span> on LLFF at 2–3 views.</li>
     <li><strong>Additive at best across datasets.</strong> The pooled interaction over LLFF, DTU and Blender is slightly negative (<span class="neg">−0.19 dB</span>).</li>
     <li><strong>Depth fixes bias, dropout fixes variance.</strong> They combine well only where each one still does its job.</li>
-    <li><strong>Decoupling the depth passes from the dropout mask changes nothing measurable.</strong></li>
+    <li><strong>Decoupling the depth passes from the dropout mask shows no measurable effect</strong> (point estimates under 0.25 dB, ≈ 0 pooled).</li>
   </ol>
 </section>
 
@@ -108,7 +108,7 @@ a{color:var(--accent)}
 
 <figure>
   <img src="assets/fig_pooled.png" alt="Forest plot of each contrast per dataset and pooled" loading="lazy">
-  <figcaption><strong>Figure 1.</strong> Each contrast per dataset and pooled. Dropout's own gain replicates exactly across datasets; the interaction is never positive.</figcaption>
+  <figcaption><strong>Figure 1.</strong> Each contrast per dataset and pooled. Dropout's own gain is consistent across datasets (no detectable heterogeneity, τ² = 0); the interaction is never positive.</figcaption>
 </figure>
 
 <h2>Why: the error budget</h2>
@@ -134,10 +134,10 @@ a{color:var(--accent)}
 </div>
 
 <h2>What did not explain it</h2>
-<p>We pre-registered two other explanations, and the data support neither.</p>
+<p>We pre-registered two other explanations. The data do not support either one, although the contrasts are inconclusive rather than shown to be zero.</p>
 <ul>
-  <li><strong>The mask corrupts the depth passes.</strong> Shielding the depth passes changes nothing (E − D ≈ 0 everywhere), and neither depth pass alone carries an effect.</li>
-  <li><strong>Compensation hits the opacity cap.</strong> Removing the 1/(1−r) rescaling, or capping it per Gaussian, changes nothing significant. Clamp-aware dropout even trends worse.</li>
+  <li><strong>The mask corrupts the depth passes.</strong> Shielding the depth passes shows no measurable gain (E − D under 0.25 dB in every estimate, ≈ 0 pooled), and no single depth pass shows a detectable effect.</li>
+  <li><strong>Compensation hits the opacity cap.</strong> Removing the 1/(1−r) rescaling, or capping it per Gaussian, shows no significant effect. Clamp-aware dropout even trends worse.</li>
 </ul>
 <div class="grid">
   <figure>
