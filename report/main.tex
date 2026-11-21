@@ -329,8 +329,8 @@ The interaction is scale-dependent (Loftus~\cite{loftus1978}): on LLFF, $D-B$ an
 \label{fig:budget}
 \end{figure*}
 
-\begin{table}[t]
-\caption{Error budget. Top: pixel MSE $\times10^3$ (variance share). Bottom: pre-registered tests (\checkmark holds, $\times$ fails) and D's ensemble gain.}\label{tab:budget}
+\begin{table*}[t]
+\caption{Error budget. Top: pixel MSE $\times10^3$ (variance share). Bottom: pre-registered tests (\checkmark holds, $\times$ fails) and D's ensemble gain. Variance share = mean over scenes of var/MSE.}\label{tab:budget}
 \centering\footnotesize\setlength{\tabcolsep}{2.2pt}
 \begin{tabular}{@{}lcccccc@{}}
 \toprule
@@ -350,7 +350,7 @@ BV3 MSE(D) $>$ bias$^2$(B) & yes & yes & yes & yes & yes & yes \\
 D ensemble gain (dB) & 1.10 & 1.02 & 0.71 & 0.57 & 0.81 & 0.69 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 \subsection{Noise and power (O5)}
 Repeating one seed varies as much as changing the seed: on fern the same-seed SD is 0.220\dB{} (B) and 0.216\dB{} (D), against between-seed SDs of 0.213 and 0.242\dB; on three more drawn scenes the same-seed/between-seed SD ratio of A--D lies between 1.00 and 1.67. Variants without depth are noisier: their run variance is 2.90 times that of the depth variants (SD about 1.7$\times$; one-sided $F$-test $p=2.5\times10^{-5}$). A single-run 8-scene mean is uncertain by $\pm0.26$\dB{} with depth and $\pm0.43$\dB{} without, the size of many published gains on LLFF 3-view. With 3 seeds, the smallest interaction detectable at 80\% power is 0.49\dB{} with 8 scenes, 0.33 with 15, 0.26 with 23 and 0.22 with all 31 pooled. This is why most per-dataset verdicts are ``inconclusive'' and only the pooled $\ID$ excludes 0.
