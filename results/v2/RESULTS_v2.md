@@ -31,7 +31,7 @@ Mean over seeds of the scene average, ± SD over the 3 seeds. LLFF is in v1 (B 1
 | D: both, shared mask | 18.57 ± 0.26 | **0.810** | **0.160** | 22.77 ± 0.02 | 0.873 | 0.109 |
 | E: both, clean depth | **18.67 ± 0.17** | 0.807 | 0.163 | 22.82 ± 0.03 | 0.874 | 0.108 |
 
-DTU metrics are masked (`eval_dtu.py`). On Blender at 8 views, the monocular-depth prior is not shown to help: B − A is −0.80 dB [−1.78, +0.18], inconclusive (B ahead in 1 of 8 objects). The robust Blender facts are D − C < 0, E − C < 0 and I_D, I_E < 0 (§2).
+DTU metrics are masked (`eval_dtu.py`). On Blender at 8 views, the monocular-depth prior is not shown to help: B − A is −0.80 dB [−1.78, +0.18], inconclusive (B ahead in 1 of 8 objects). On Blender, dropout alone beats both combinations (D − C −1.06 [−2.07, −0.05], E − C −1.02 [−2.01, −0.02]; nominally significant, unadjusted) and I_D, I_E < 0 after Holm (§2).
 
 ## 2. Factorial per dataset and pooled (X4, X5, H-PD)
 
@@ -69,7 +69,7 @@ Files: `tables/error_budget/`, `tables/n4/`, [`figures/fig_budget.png`](figures/
 Reading:
 - **Depth reduces bias in the sparsest settings.** Its effect fades by 6 views.
 - **Dropout reduces variance** on LLFF up to 6 views and on Blender, but not on DTU.
-- **BV3 holds everywhere.** The naive combination never gets below DNGaussian's variance-free error. Run-to-run variance is 18–44% of the MSE over all variants (18–34% for D), and a 3-seed ensemble would gain about 1 dB on LLFF (+0.6 to +1.1 dB for D across settings).
+- **BV3 holds everywhere.** The naive combination never gets below DNGaussian's variance-free error. Run-to-run variance is 18–44% of the MSE over all variants (minimum: D at 9 views, 18.4%; 18–34% for D and E), and a 3-seed ensemble would gain about 1 dB on LLFF (+0.6 to +1.1 dB for D across settings).
 - **N4 (scale robustness):**
   - LLFF: D − B and E − D keep their sign on every scale (PSNR, MSE, RMSE, SSIM). I_D and I_E are scale-dependent: near 0 on PSNR (inconclusive), below 0 on SSIM.
   - DTU: every contrast is scale-dependent.
@@ -110,7 +110,7 @@ Caveat: the variance-component model "fits" with ratio 1.00 by construction. τ�
 ## 5. Summary for the report
 
 1. Both regularizers help on their own on LLFF and DTU. On Blender at 8 views, the depth prior is not shown to help (B − A −0.80, inconclusive) and dropout alone is best.
-2. The combination beats DNGaussian on LLFF (+0.5–0.6 dB), and E − B is positive pooled. The interaction itself is about 0 on LLFF and ≤ 0 elsewhere. The overall label is therefore **"complementary on LLFF, partly redundant elsewhere"**, not a synergy.
+2. The combination beats DNGaussian on LLFF (+0.5–0.6 dB), and E − B is positive pooled. The interaction itself is about 0 on LLFF and ≤ 0 elsewhere. The overall label is therefore **"complementary on LLFF, inconclusive on DTU, partly redundant on Blender"**, not a synergy.
 3. Decoupling the depth passes from the mask (E vs D) shows no measurable effect on any dataset (≈ 0 on Blender and pooled; inconclusive on LLFF and DTU).
 4. Mechanism:
    - Depth removes bias, and dropout removes run-to-run variance, in the sparsest settings.

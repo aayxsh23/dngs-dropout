@@ -108,6 +108,8 @@ seed. Any single-run difference below about 0.4–0.5 dB is noise.
 
 ## Views, block V (seed 0; 3 views = T1 seed 0; `tables/views/`, `figures/fig_views*.png`)
 
+Superseded by the 3-seed contrasts in `v2/tables/views/contrasts_3seed.csv` (Results v2). The seed-0 numbers below are kept as the record of what was seen before `prereg-v3`.
+
 Mean PSNR over 8 scenes:
 
 | Views | A | B | C | D | E |

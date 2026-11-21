@@ -116,7 +116,7 @@ a{color:var(--accent)}
 <ul>
   <li>In the sparse settings, depth's gain is mostly a bias reduction, and dropout's gain is mostly a variance reduction.</li>
   <li>Because the two fix different errors, their gains add up there.</li>
-  <li>Where depth stops reducing bias (6–9 views, Blender), the gains no longer add.</li>
+  <li>Where depth stops reducing bias (6–9 LLFF views), the combination no longer beats DNGaussian measurably. On Blender, where depth gives no detectable gain, dropout alone is best.</li>
 </ul>
 <figure>
   <img src="assets/fig_budget.png" alt="Bias and variance stacked bars per variant and dataset" loading="lazy">
