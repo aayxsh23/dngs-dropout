@@ -36,7 +36,7 @@ PSNR (dB) on held-out views, mean over 3 seeds. Differences are paired by scene,
 | I_D: interaction (D − C) − (B − A) | +0.02 | −0.28 | −0.26 | **−0.19 [−0.37, −0.01]** |
 
 1. **Complementary where it matters most.** On very sparse forward-facing scenes (LLFF, 2–3 views), adding dropout to DNGaussian gains about +0.5 dB (D − B +0.45 at 2 views, +0.50 at 3; E − B +0.60 at 3), and the two gains add up about additively.
-2. **Additive at best across datasets.** The pooled interaction is slightly negative. Where the depth prior itself stops helping (Blender at 8 views, LLFF at 9 views), the combination is partly redundant.
+2. **Additive at best across datasets.** The pooled interaction is slightly negative. Where the depth prior itself stops helping (Blender at 8 views, LLFF at 9 views), the gains stop adding up: partly redundant on Blender, inconclusive at 9 views.
 3. **Decoupling shows no measurable effect.** Shielding the depth passes from the dropout mask moves PSNR by under 0.25 dB in every point estimate; the CIs are inconclusive on LLFF and DTU and the effect is ≈ 0 on Blender and pooled.
 4. **The mechanism is the error budget.** Depth reduces *bias* and dropout reduces *run-to-run variance*, in the sparsest settings. Neither removes the variance left above DNGaussian's bias floor, so the remaining headroom is variance.
 5. **Two proposed explanations are not supported by the data.** Neither the compensation nor the opacity-cap explanation shows a detectable effect (§5.2.9 of the pre-registration); the contrasts are inconclusive, not shown to be zero.
@@ -44,14 +44,14 @@ PSNR (dB) on held-out views, mean over 3 seeds. Differences are paired by scene,
 | | |
 | --- | --- |
 | ![error budget](results/v2/figures/fig_budget.png) | ![pooled forest](results/v2/figures/fig_pooled.png) |
-| **F1** Error budget: bias² (solid) and variance (hatched) | **F3** Each contrast per dataset and pooled |
+| **Fig. 2** Error budget: bias² (solid) and variance (hatched) | **Fig. 1** Each contrast per dataset and pooled |
 
 More figures:
-- [F5 bias floor](results/v2/figures/fig_ceiling.png)
-- [F2 budget vs views](results/v2/figures/fig_budget_views.png)
-- [F9 compensation](results/v2/figures/fig_comp.png)
-- [F8 depth dose](results/v2/figures/fig_depthdose.png)
-- [F7 power](results/v2/figures/fig_power.png)
+- [Fig. 4 bias floor](results/v2/figures/fig_ceiling.png)
+- [Fig. 3 budget vs views](results/v2/figures/fig_budget_views.png)
+- [Fig. 5 compensation](results/v2/figures/fig_comp.png)
+- [Fig. 6 depth dose](results/v2/figures/fig_depthdose.png)
+- [Fig. 7 power](results/v2/figures/fig_power.png)
 - [LLFF forest](results/figures/fig_forest.png)
 - [views](results/figures/fig_views.png)
 - [qualitative](results/figures/fig_qual.png)

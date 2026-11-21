@@ -1,6 +1,6 @@
 # 5 Results (draft for review)
 
-Every number here comes from `results/RESULTS.md` (v1, LLFF) or `results/v2/RESULTS_v2.md` (v2, PR #37). PSNR differences are paired by scene, as the mean with a 95 % t-interval. "≈ 0" means the CI lies inside ±0.25 dB, and "inconclusive" means it crosses 0 and extends past ±0.25 dB (§4.6). Figure numbers follow D10. **[Disha: check figure numbering against the final layout.]**
+Every number here comes from `results/RESULTS.md` (v1, LLFF) or `results/v2/RESULTS_v2.md` (v2, PR #37). PSNR differences are paired by scene, as the mean with a 95 % t-interval. "≈ 0" means the CI lies inside ±0.25 dB, and "inconclusive" means it crosses 0 and extends past ±0.25 dB (§4.6). Figures are numbered in order of first mention: Fig. 1 `fig_pooled`, Fig. 2 `fig_budget`, Fig. 3 `fig_budget_views`, Fig. 4 `fig_ceiling`, Fig. 5 `fig_comp`, Fig. 6 `fig_depthdose`, Fig. 7 `fig_power` (all in `results/v2/figures/`).
 
 ## 5.1 Main result on LLFF (RQ1)
 
@@ -14,13 +14,13 @@ Every number here comes from `results/RESULTS.md` (v1, LLFF) or `results/v2/RESU
 | D: depth + dropout, shared mask | 19.21 ± 0.06 | 0.611 | 0.303 |
 | E: depth + dropout, clean depth passes | **19.31 ± 0.09** | **0.617** | 0.303 |
 
-Our B reproduces DNGaussian within 0.4 dB of the published 19.12 dB. **[Disha: the 0.4 dB comes from 18.71 vs 19.12. Disha's T4 reproduction gave 18.93 dB; say which one the report uses.]**
+Our B (18.71 dB, the lab A4000 runs that every comparison uses) is 0.41 dB below DNGaussian's published 19.12 dB; an independent reproduction on a Colab T4 gave 18.93 dB.
 
 Both regularizers help on their own: depth by +2.38 dB [+1.80, +2.96], dropout by +0.48 dB [+0.18, +0.77]. Combining them adds to DNGaussian:
 - D − B = +0.50 dB [+0.08, +0.91]
 - E − B = +0.60 dB [+0.30, +0.91]
 
-E − B is positive in 8 of 8 scenes. Both combinations also beat dropout alone by about 2.4 dB. Under the pre-registered rule, D and E are therefore **complementary** on LLFF (Fig. F3, LLFF rows).
+E − B is positive in 8 of 8 scenes. Both combinations also beat dropout alone by about 2.4 dB. Under the pre-registered rule, D and E are therefore **complementary** on LLFF (Fig. 1, LLFF rows).
 
 The interaction terms are near zero:
 - I_D = +0.02 [−0.34, +0.38]
@@ -57,7 +57,7 @@ The two other probes of the dose and of geometry do not settle the question eith
 | D | 18.57 ± 0.26 | **0.810** | **0.160** | 22.77 ± 0.02 | 0.873 | 0.109 |
 | E | **18.67 ± 0.17** | 0.807 | 0.163 | 22.82 ± 0.03 | 0.874 | 0.108 |
 
-**Table 3:** Contrasts per dataset and pooled (DerSimonian–Laird, PSNR). Also Fig. F3.
+**Table 3:** Contrasts per dataset and pooled (DerSimonian–Laird, PSNR). Also Fig. 1.
 
 | Contrast | LLFF | DTU | Blender | Pooled |
 | --- | --- | --- | --- | --- |
@@ -71,7 +71,7 @@ The two other probes of the dose and of geometry do not settle the question eith
 
 Four patterns stand out:
 1. **Dropout's gain is consistent.** It is +0.37 to +0.48 dB on every dataset, with no detectable heterogeneity (τ² = 0).
-2. **Depth's gain does not.** It is large on the forward-facing LLFF and on DTU, but on Blender at 8 views the monocular prior *hurts* (−0.80 dB), and dropout alone is the best variant there.
+2. **Depth's gain does not.** It is large on the forward-facing LLFF and on DTU. On Blender at 8 views it is not shown to help at all: B − A = −0.80 dB [−1.78, +0.18], inconclusive, with B ahead in only 1 of 8 objects. What is robust on Blender is that both combinations lose to dropout alone (D − C −1.06, E − C −1.02, CIs below 0) and that I_D and I_E are negative; dropout alone is the best variant there.
 3. **Adding dropout to DNGaussian still helps.** E − B is positive pooled and on Blender, though smaller than on LLFF. The pre-registered prediction that the gain would be larger on DTU than on LLFF (X5) is not supported (p 0.82). The predicted ordering LLFF ≤ DTU ≤ Blender (H-PD) is reversed.
 4. **The interaction is never positive.** Pooled, I_D is −0.19 dB, with no significant heterogeneity (Q p 0.21). On Blender it is significantly negative for both D and E.
 
@@ -88,16 +88,16 @@ On DTU, all three primaries are inconclusive: the 15 scans have wide between-sca
 | 6 | 20.96 | 21.97 | 21.50 | 22.05 | 22.08 | +0.08 [−0.12, +0.28] | −0.46 [−0.96, +0.04] |
 | 9 | 22.85 | 22.64 | 22.91 | 22.60 | 22.55 | −0.04 [−0.18, +0.10] | −0.10 [−0.34, +0.14] |
 
-**[Disha: these 3-seed numbers replace v1's seed-0 table.]** In the seed-0 table, I_D at 6 views was −0.96 dB [−1.68, −0.24]. With three seeds it shrinks to −0.46 dB and its CI includes 0.
+These 3-seed numbers replace v1's seed-0 table; the contrasts and CIs are in `results/v2/tables/views/contrasts_3seed.csv`. In the seed-0 table, I_D at 6 views was −0.96 dB [−1.68, −0.24]. With three seeds it shrinks to −0.46 dB and its CI includes 0.
 
 The pattern across view counts:
 - **The combination's benefit is a very-sparse effect.** It lasts at 2 and 3 views and vanishes by 6.
-- **At 9 views depth no longer helps** (B < A), the same regime as Blender at 8 views.
+- **At 9 views depth is not shown to help** (B − A −0.20 [−0.73, +0.32], B ahead in 3 of 8 scenes), like Blender at 8 views.
 - **E − D stays within ±0.25 dB at every view count.**
 
 ## 5.5 Why: the error budget (N1)
 
-We split each variant's pixel MSE on the held-out views into squared bias (the error of the 3-seed mean image) and run-to-run variance (Fig. F1, Fig. F2).
+We split each variant's pixel MSE on the held-out views into squared bias (the error of the 3-seed mean image) and run-to-run variance (Figs. 2 and 3).
 
 **Table 5:** Error budget per setting.
 
@@ -115,13 +115,13 @@ This is the mechanistic basis for complementarity on LLFF. Two exceptions:
 - On DTU, dropout's small PSNR gain is not a variance reduction.
 - At 6 and 9 views, depth no longer reduces bias.
 
-**Neither removes all the variance.** In every setting, the naive combination's MSE stays above DNGaussian's bias floor (BV3, Fig. F5). Run-to-run variance is still 18–34 % of the MSE for D, and averaging the renders of 3 seeds would gain +0.6 to +1.1 dB. **The remaining headroom is variance, not bias.**
+**Neither removes all the variance.** In every setting, the naive combination's MSE stays above DNGaussian's bias floor (BV3, Fig. 4). Run-to-run variance is still 18–34 % of the MSE for D, and averaging the renders of 3 seeds would gain +0.6 to +1.1 dB. **The remaining headroom is variance, not bias.**
 
-**Scale robustness (N4).** On LLFF, D − B and E − D keep their sign under PSNR, MSE, RMSE and SSIM. The interaction terms do not: I_D is ≈ 0 in PSNR but negative in SSIM. Interaction claims are therefore scale-dependent, and we make none beyond "not positive".
+**Scale robustness (N4).** On LLFF, D − B and E − D keep their sign under PSNR, MSE, RMSE and SSIM. The interaction terms do not: I_D is near 0 in PSNR (inconclusive) but negative in SSIM. Interaction claims are therefore scale-dependent, and we make none beyond "not positive".
 
 ## 5.6 Mechanism probes
 
-**Compensation (Fig. F9).** Holm across 4 contrasts, TOST δ = 0.25 dB:
+**Compensation (Fig. 5).** Holm across 4 contrasts, TOST δ = 0.25 dB:
 
 | Contrast | ΔPSNR [95 % CI] |
 | --- | --- |
@@ -132,7 +132,7 @@ This is the mechanistic basis for complementarity on LLFF. Two exceptions:
 
 None is significant after Holm, and none is shown to be equivalent. Removing the compensation does not matter detectably. Clamp-aware dropout tends to be *worse*, which is the opposite of what the opacity-cap explanation (H7) predicts.
 
-**Depth dose (Fig. F8).** I_D at depth weight 0.5 / 1 / 2 is +0.15 / +0.02 / −0.00 dB, all inconclusive. There is no sign that a stronger or weaker prior changes the interaction.
+**Depth dose (Fig. 6).** I_D at depth weight 0.5 / 1 / 2 is +0.15 / +0.02 / −0.00 dB, all inconclusive. There is no sign that a stronger or weaker prior changes the interaction.
 
 **Test-time robustness.** Removing 20 % of the Gaussians costs dropout-trained models about half as much PSNR as their dropout-free counterparts:
 - C: −0.32 vs A: −0.79
@@ -140,9 +140,9 @@ None is significant after Holm, and none is shown to be equivalent. Removing the
 
 Dropout makes the representation more redundant, as DropGaussian argues.
 
-**Noise.** Repeating one seed varies as much as changing the seed (same-seed / between-seed SD 1.0–1.7). Variants without the depth prior are about 3× noisier (σ² ratio F = 2.90, p 2.5 × 10⁻⁵). A single-run 8-scene mean is uncertain by ±0.26 dB with depth and ±0.43 dB without.
+**Noise.** Repeating one seed varies as much as changing the seed (same-seed / between-seed SD 1.0–1.7). Variants without the depth prior have about 2.9× the run-to-run variance (σ² ratio F = 2.90, p 2.5 × 10⁻⁵), about 1.7× the SD. A single-run 8-scene mean is uncertain by ±0.26 dB with depth and ±0.43 dB without.
 
-## 5.7 Statistical power (Fig. F7)
+## 5.7 Statistical power (Fig. 7)
 
 With 3 seeds, the smallest I_D we can detect at 80 % power is:
 
