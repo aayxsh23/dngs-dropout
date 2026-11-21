@@ -39,7 +39,7 @@ DNGaussian runs **three rasterizations per training iteration**, each with its o
 flowchart LR
   M["Dropout mask<br/>keep with prob. 1 − r"]
   H["1 · Hard depth<br/>opacity fixed at 0.95<br/>grads → centres"]
-  S["2 · Soft depth (t ≥ 1000)<br/>real opacity<br/>grads → opacities"]
+  S["2 · Soft depth (t > 1000)<br/>real opacity<br/>grads → opacities"]
   P["3 · Photometric<br/>L1 + D-SSIM + penalties<br/>grads → all"]
   M -- "D, D_hard" --> H
   M -- "D, D_soft" --> S

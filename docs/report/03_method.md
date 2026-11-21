@@ -21,7 +21,7 @@ DNGaussian (Li et al., CVPR 2024) supervises the rendered depth with a monocular
 Every training iteration runs **three separate rasterizations**, each with its own backward pass and optimizer step:
 
 1. **Hard-depth pass.** Every Gaussian's opacity is fixed at 0.95, and gradients reach only the centres. This moves Gaussians onto the surface the prior suggests.
-2. **Soft-depth pass** (from iteration 1000). The real opacities are used, while centres, scales and rotations are detached, so gradients reach only the opacities.
+2. **Soft-depth pass** (after iteration 1000). The real opacities are used, while centres, scales and rotations are detached, so gradients reach only the opacities.
 3. **Photometric pass.** The normal render, with L1 + λ·D-SSIM against the training image, plus DNGaussian's shape, scale and opacity penalties.
 
 The depth losses never use the photometric render. One weight, `--depth_scale` (λ_d), multiplies both depth losses, and λ_d = 0 skips passes 1 and 2 entirely.
