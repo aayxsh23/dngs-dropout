@@ -52,22 +52,39 @@ Our contribution is therefore not that the combination helps. It is a pre-regist
 ## References
 
 [1] B. Mildenhall et al. NeRF: Representing scenes as neural radiance fields for view synthesis. ECCV 2020.
+
 [2] B. Kerbl, G. Kopanas, T. Leimkühler, G. Drettakis. 3D Gaussian Splatting for real-time radiance field rendering. ACM TOG (SIGGRAPH) 2023.
+
 [3] J. Li et al. DNGaussian: Optimizing sparse-view 3D Gaussian radiance fields with global-local depth normalization. CVPR 2024.
+
 [4] J. Zhang et al. CoR-GS: Sparse-view 3D Gaussian Splatting via co-regularization. ECCV 2024.
+
 [5] H. Park et al. DropGaussian: Structural regularization for sparse-view Gaussian Splatting. CVPR 2025.
+
 [6] Y. Xu et al. DropoutGS: Dropping out Gaussians for better sparse-view rendering. CVPR 2025.
+
 [7] Z. Zhu et al. FSGS: Real-time few-shot view synthesis using Gaussian Splatting. ECCV 2024.
+
 [8] J. Yang, M. Pavone, Y. Wang. FreeNeRF: Improving few-shot neural rendering with free frequency regularization. CVPR 2023.
+
 [9] G. Wang et al. SparseNeRF: Distilling depth ranking for few-shot novel view synthesis. ICCV 2023.
+
 [10] M. Niemeyer et al. RegNeRF: Regularizing neural radiance fields for view synthesis from sparse inputs. CVPR 2022.
+
 [11] DNGaussian++ (extended version of [3]). IEEE TPAMI 2026.
+
 [12] R. Ranftl, A. Bochkovskiy, V. Koltun. Vision transformers for dense prediction (DPT). ICCV 2021.
+
 [13] Co-adaptation in sparse-view 3D Gaussian Splatting. arXiv:2508.12720, 2025.
+
 [14] DropAnSH-GS. CVPR 2026, arXiv:2602.20933.
+
 [15] N. Srivastava et al. Dropout: A simple way to prevent neural networks from overfitting. JMLR 2014.
+
 [16] S. Wager, S. Wang, P. Liang. Dropout training as adaptive regularization. NeurIPS 2013.
+
 [17] P. Baldi, P. Sadowski. Understanding dropout. NeurIPS 2013.
+
 [18] X. Li, S. Chen, X. Hu, J. Yang. Understanding the disharmony between dropout and batch normalization by variance shift. CVPR 2019.
 
 **[Disha: fill in the authors of [11], [13] and [14], and check the first authors of [4] and [6].]**
