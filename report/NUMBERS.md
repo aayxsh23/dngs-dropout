@@ -5,7 +5,7 @@ the table or paragraph it sits in (exact text, then rounded values in that secti
 Rows of Table IX (views) are traced cell by cell to `contrasts_3seed.csv` and the main tables, with value checks. Elsewhere a match shows the value exists in that section's sources; provenance is NOT verified per row. Layout lengths are skipped;
 derived values are marked DERIVED and explained under the table. Rows marked UNMATCHED need a manual source.
 
-433 numbers; 0 without a direct text or rounded match.
+435 numbers; 0 without a direct text or rounded match.
 
 | main.tex line | value | source |
 | --- | --- | --- |
@@ -26,6 +26,8 @@ derived values are marked DERIVED and explained under the table. Rows marked UNM
 | 80 | 0.99 | `docs/report/03_method.md:13` |
 | 114 | 0.95 | `results/v2/RESULTS_v2.md:43` |
 | 131 | 0.95 | `results/v2/RESULTS_v2.md:43` |
+| 131 | 0.1 | `results/RESULTS.md:93` |
+| 131 | +0.1 | `results/RESULTS.md:93` |
 | 133 | 0.2 | `results/RESULTS.md:94` |
 | 133 | 0.12 | `results/RESULTS.md:76` |
 | 133 | 0.2 | `results/RESULTS.md:94` |
@@ -48,9 +50,9 @@ derived values are marked DERIVED and explained under the table. Rows marked UNM
 | 196 | 0.0013 | `docs/report/04_setup.md:31` |
 | 196 | 0.001 | `results/RESULTS.md:55` |
 | 196 | 0.0005 | `docs/report/04_setup.md:43` |
-| 197 | 0.01 | `results/RESULTS.md:177` |
+| 197 | 0.01 | `results/RESULTS.md:179` |
 | 197 | 0.1 | `results/RESULTS.md:93` |
-| 197 | 0.01 | `results/RESULTS.md:177` |
+| 197 | 0.01 | `results/RESULTS.md:179` |
 | 198 | 0.016 | `results/RESULTS.md:71` |
 | 198 | 0.00016 | `docs/report/04_setup.md:32` |
 | 198 | 0.0016 | `docs/report/04_setup.md:38` |
@@ -62,7 +64,7 @@ derived values are marked DERIVED and explained under the table. Rows marked UNM
 | 200 | 0.005 | `results/RESULTS.md:67` |
 | 200 | 0.001 | `results/RESULTS.md:55` |
 | 201 | 0.00025 | `docs/report/04_setup.md:34` |
-| 201 | 0.01 | `results/RESULTS.md:177` |
+| 201 | 0.01 | `results/RESULTS.md:179` |
 | 201 | 0.001 | `results/RESULTS.md:55` |
 | 226 | 19.11 | `RUNLOG.md:31` |
 | 228 | 17.75 | `RUNLOG.md:9` |
@@ -224,11 +226,11 @@ derived values are marked DERIVED and explained under the table. Rows marked UNM
 | 306 | -0.80 | `results/v2/RESULTS_v2.md:34` |
 | 306 | -1.78 | `results/v2/RESULTS_v2.md:34` |
 | 306 | +0.18 | `results/RESULTS.md:71` |
-| 306 | -1.06 | `results/v2/tables/blender/verdict_blender_8v.txt:12` |
-| 306 | -2.07 | `results/v2/tables/blender/verdict_blender_8v.txt:12` |
-| 306 | -0.05 | `results/RESULTS.md:176` |
-| 306 | -1.02 | `results/v2/tables/blender/verdict_blender_8v.txt:14` |
-| 306 | -2.01 | `results/v2/tables/blender/verdict_blender_8v.txt:14` |
+| 306 | -1.06 | `results/v2/RESULTS_v2.md:34` |
+| 306 | -2.07 | `results/v2/RESULTS_v2.md:34` |
+| 306 | -0.05 | `results/RESULTS.md:178` |
+| 306 | -1.02 | `results/v2/RESULTS_v2.md:34` |
+| 306 | -2.01 | `results/v2/RESULTS_v2.md:34` |
 | 306 | -0.02 | `results/RESULTS.md:68` |
 | 306 | +0.34 | `results/RESULTS.md:68` |
 | 306 | +0.15 | `results/RESULTS.md:56` |
@@ -243,7 +245,7 @@ derived values are marked DERIVED and explained under the table. Rows marked UNM
 | 316 | -0.037 | `results/RESULTS.md:71` |
 | 316 | -0.005 | `results/RESULTS.md:67` |
 | 316 | 0.02 | `results/RESULTS.md:68` |
-| 316 | 0.049 | `results/RESULTS.md:152` |
+| 316 | 0.049 | `results/RESULTS.md:154` |
 | 319 | 0.51 | `results/v2/tables/error_budget/error_budget_verdict_dtu_3v.txt:2` |
 | 319 | -0.96 | `results/v2/tables/error_budget/error_budget_verdict_llff_2v.txt:2` |
 | 319 | 0.74 | `results/v2/tables/error_budget/error_budget_verdict_llff_2v.txt:3` |
@@ -433,14 +435,14 @@ derived values are marked DERIVED and explained under the table. Rows marked UNM
 | 414 | +0.45 | `results/RESULTS.md:94` |
 | 414 | +0.50 | `results/tables/paired_3v.md:8` |
 | 414 | -0.20 | `results/RESULTS.md:95` |
-| 414 | -0.96 | `results/RESULTS.md:126` |
+| 414 | -0.96 | `results/RESULTS.md:128` |
 | 414 | -0.46 | `results/v2/tables/extra/verdict_extra.txt:2` |
 | 416 | -0.32 | `results/tables/paired_3v.md:12` |
-| 416 | -0.79 | `results/RESULTS.md:169` |
+| 416 | -0.79 | `results/RESULTS.md:171` |
 | 416 | -0.48 | `results/tables/paired_3v.md:7` |
-| 416 | -1.03 | `results/RESULTS.md:169` |
+| 416 | -1.03 | `results/RESULTS.md:171` |
 | 420 | +0.60 | `results/RESULTS.md:73` |
-| 420 | 0.49 | `results/RESULTS.md:170` |
+| 420 | 0.49 | `results/RESULTS.md:172` |
 | 422 | 0.25 | `results/RESULTS.md:62` |
 
 ## Derived values
@@ -448,5 +450,6 @@ derived values are marked DERIVED and explained under the table. Rows marked UNM
 - Error-budget table, *D ensemble gain*: `psnr_ens − psnr_single`, mean over scenes, from `results/v2/tables/error_budget/error_budget_<setting>.csv` (D rows).
 - Error-budget table, MSE ×10³ and variance share: mean over scenes of `mse` and `share_var` in the same files.
 - Hyperparameters (Table II): `docs/report/04_setup.md` §4.2 and `scripts/run_{llff,dtu,blender}.sh`.
+- Depth-loss weights (0.1 local, 1 global, 0.1 smoothness) and pass start iterations (soft depth after 1000, smoothness after 3000): `train_llff.py` (loss lines 196–228) and `arguments/__init__.py` (`soft_depth_start = 1000`).
 - Win counts (e.g. E − B in 8 of 8 LLFF scenes, B − A in 1 of 8 Blender objects): the `wins` column of `results/v2/tables/<dataset>/verdict_*.txt`.
 - Integers (runs, scenes, views, seeds, iterations) come from `docs/report/04_setup.md` §4.3, `RUNLOG.md` and `experiments/matrix*.yaml`.
