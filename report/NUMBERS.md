@@ -5,7 +5,7 @@ the table or paragraph it sits in (exact text, then rounded values in that secti
 Rows of Table IX (views) are traced cell by cell to `contrasts_3seed.csv` and the main tables, with value checks. Elsewhere a match shows the value exists in that section's sources; provenance is NOT verified per row. Layout lengths are skipped;
 derived values are marked DERIVED and explained under the table. Rows marked UNMATCHED need a manual source.
 
-435 numbers; 0 without a direct text or rounded match.
+436 numbers; 0 without a direct text or rounded match.
 
 | main.tex line | value | source |
 | --- | --- | --- |
@@ -26,8 +26,9 @@ derived values are marked DERIVED and explained under the table. Rows marked UNM
 | 80 | 0.99 | `docs/report/03_method.md:13` |
 | 114 | 0.95 | `results/v2/RESULTS_v2.md:43` |
 | 131 | 0.95 | `results/v2/RESULTS_v2.md:43` |
-| 131 | 0.1 | `results/RESULTS.md:93` |
-| 131 | +0.1 | `results/RESULTS.md:93` |
+| 131 | 0.1 | DERIVED: train_llff.py depth-loss weights and train_dtu.py EMA gate (see notes) |
+| 131 | +0.1 | DERIVED: train_llff.py depth-loss weights and train_dtu.py EMA gate (see notes) |
+| 131 | 0.1 | DERIVED: train_llff.py depth-loss weights and train_dtu.py EMA gate (see notes) |
 | 133 | 0.2 | `results/RESULTS.md:94` |
 | 133 | 0.12 | `results/RESULTS.md:76` |
 | 133 | 0.2 | `results/RESULTS.md:94` |
