@@ -51,7 +51,7 @@ We report these as negative results, because they show no support for the most o
 
 ## 6.4 The remaining headroom is variance
 
-In every setting, the combined model's error stays above DNGaussian's bias floor (BV3). Run-to-run variance is still 18–34 % of its MSE, and an ensemble of three seeds would gain +0.6 to +1.1 dB.
+In every setting, the combined model's error stays above DNGaussian's bias floor (BV3). Run-to-run variance is still 18–34 % of the MSE of D and E, and an ensemble of three seeds would gain +0.6 to +1.1 dB.
 
 Dropout reduces variance, but far from completely. So the next gain in sparse-view 3DGS is more likely to come from variance reduction, such as seed ensembling, distillation of an ensemble, or stronger stochastic regularization, than from a better depth prior.
 

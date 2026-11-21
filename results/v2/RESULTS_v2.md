@@ -69,7 +69,7 @@ Files: `tables/error_budget/`, `tables/n4/`, [`figures/fig_budget.png`](figures/
 Reading:
 - **Depth reduces bias in the sparsest settings.** Its effect fades by 6 views.
 - **Dropout reduces variance** on LLFF up to 6 views and on Blender, but not on DTU.
-- **BV3 holds everywhere.** The naive combination never gets below DNGaussian's variance-free error. Run-to-run variance is 18–44% of the MSE over all variants (minimum: D at 9 views, 18.4%; 18–34% for D), and a 3-seed ensemble would gain about 1 dB on LLFF (+0.6 to +1.1 dB for D across settings).
+- **BV3 holds everywhere.** The naive combination never gets below DNGaussian's variance-free error. Run-to-run variance is 18–44% of the MSE over all variants (minimum: D at 9 views, 18.4%; 18–34% for D and E), and a 3-seed ensemble would gain about 1 dB on LLFF (+0.6 to +1.1 dB for D across settings).
 - **N4 (scale robustness):**
   - LLFF: D − B and E − D keep their sign on every scale (PSNR, MSE, RMSE, SSIM). I_D and I_E are scale-dependent: near 0 on PSNR (inconclusive), below 0 on SSIM.
   - DTU: every contrast is scale-dependent.

@@ -117,7 +117,7 @@ This is the mechanistic basis for complementarity on LLFF. Two exceptions:
 - On DTU, dropout's small PSNR gain is not a variance reduction.
 - At 6 and 9 views, depth no longer reduces bias.
 
-**Neither removes all the variance.** In every setting, the naive combination's MSE stays above DNGaussian's bias floor (BV3, Fig. 4). Run-to-run variance is still 18–34 % of the MSE for D (18–44 % over all variants; minimum D at 9 views, 18.4 %), and averaging the renders of 3 seeds would gain +0.6 to +1.1 dB. **The remaining headroom is variance, not bias.**
+**Neither removes all the variance.** In every setting, the naive combination's MSE stays above DNGaussian's bias floor (BV3, Fig. 4). Run-to-run variance is still 18–34 % of the MSE for D and E (18–44 % over all variants; minimum D at 9 views, 18.4 %), and averaging the renders of 3 seeds would gain +0.6 to +1.1 dB. **The remaining headroom is variance, not bias.**
 
 **Scale robustness (N4).** On LLFF, D − B and E − D keep their sign under PSNR, MSE, RMSE and SSIM. The interaction terms do not: I_D is near 0 in PSNR (inconclusive) but negative in SSIM. Interaction claims are therefore scale-dependent, and we make none beyond "not positive".
 
