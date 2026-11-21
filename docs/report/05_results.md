@@ -14,7 +14,7 @@ Every number here comes from `results/RESULTS.md` (v1, LLFF) or `results/v2/RESU
 | D: depth + dropout, shared mask | 19.21 ± 0.06 | 0.611 | 0.303 |
 | E: depth + dropout, clean depth passes | **19.31 ± 0.09** | **0.617** | 0.303 |
 
-Our B (18.71 dB, the lab A4000 runs that every comparison uses) is 0.41 dB below DNGaussian's published 19.12 dB; an independent reproduction on a Colab T4 gave 18.93 dB.
+Our B (18.71 dB, the lab A4000 runs that every comparison uses) is 0.41 dB below DNGaussian's published 19.12 dB; as a code check, a single run of the upstream code on a Colab T4 gave 18.93 dB (RUNLOG, 13 Oct).
 
 Both regularizers help on their own: depth by +2.38 dB [+1.80, +2.96], dropout by +0.48 dB [+0.18, +0.77]. Combining them adds to DNGaussian:
 - D − B = +0.50 dB [+0.08, +0.91]
@@ -65,13 +65,15 @@ The two other probes of the dose and of geometry do not settle the question eith
 | C − A | +0.48 | +0.48 | +0.37 | **+0.40 [+0.28, +0.53]**, τ² 0 |
 | D − B | **+0.50** | +0.20 | +0.11 | +0.24 [−0.02, +0.50] |
 | E − B | **+0.60** | +0.30 | **+0.15** | **+0.34 [+0.04, +0.64]** |
+| D − C | **+2.40** | **+4.06** | **−1.06 [−2.07, −0.05]** | – |
+| E − C | **+2.51** | **+4.15** | **−1.02 [−2.01, −0.02]** | – |
 | I_D | +0.02 | −0.28 | **−0.26 [−0.37, −0.15]** | **−0.19 [−0.37, −0.01]** |
 | I_E | +0.13 | −0.18 | **−0.21 [−0.36, −0.07]** | −0.09 [−0.34, +0.15] |
 | Verdict (D and E) | complementary | inconclusive | partly redundant | |
 
 Four patterns stand out:
 1. **Dropout's gain is consistent.** It is +0.37 to +0.48 dB on every dataset, with no detectable heterogeneity (τ² = 0).
-2. **Depth's gain does not.** It is large on the forward-facing LLFF and on DTU. On Blender at 8 views it is not shown to help at all: B − A = −0.80 dB [−1.78, +0.18], inconclusive, with B ahead in only 1 of 8 objects. What is robust on Blender is that both combinations lose to dropout alone (D − C −1.06, E − C −1.02, CIs below 0) and that I_D and I_E are negative; dropout alone is the best variant there.
+2. **Depth's gain does not.** It is large on the forward-facing LLFF and on DTU. On Blender at 8 views it is not shown to help at all: B − A = −0.80 dB [−1.78, +0.18], inconclusive, with B ahead in only 1 of 8 objects. On Blender both combinations lose to dropout alone (D − C −1.06, E − C −1.02, CIs below 0; nominally significant, unadjusted), and I_D and I_E are negative after Holm; dropout alone is the best variant there.
 3. **Adding dropout to DNGaussian still helps.** E − B is positive pooled and on Blender, though smaller than on LLFF. The pre-registered prediction that the gain would be larger on DTU than on LLFF (X5) is not supported (p 0.82). The predicted ordering LLFF ≤ DTU ≤ Blender (H-PD) is reversed.
 4. **The interaction is never positive.** Pooled, I_D is −0.19 dB, with no significant heterogeneity (Q p 0.21). On Blender it is significantly negative for both D and E.
 
@@ -93,7 +95,7 @@ These 3-seed numbers replace v1's seed-0 table; the contrasts and CIs are in `re
 The pattern across view counts:
 - **The combination's benefit is a very-sparse effect.** It lasts at 2 and 3 views and vanishes by 6.
 - **At 9 views depth is not shown to help** (B − A −0.20 [−0.73, +0.32], B ahead in 3 of 8 scenes), like Blender at 8 views.
-- **E − D stays within ±0.25 dB at every view count.**
+- **E − D's point estimate stays below 0.25 dB at every view count:** ≈ 0 at 6 and 9 views, inconclusive at 2 and 3 (unadjusted).
 
 ## 5.5 Why: the error budget (N1)
 
@@ -115,7 +117,7 @@ This is the mechanistic basis for complementarity on LLFF. Two exceptions:
 - On DTU, dropout's small PSNR gain is not a variance reduction.
 - At 6 and 9 views, depth no longer reduces bias.
 
-**Neither removes all the variance.** In every setting, the naive combination's MSE stays above DNGaussian's bias floor (BV3, Fig. 4). Run-to-run variance is still 18–34 % of the MSE for D, and averaging the renders of 3 seeds would gain +0.6 to +1.1 dB. **The remaining headroom is variance, not bias.**
+**Neither removes all the variance.** In every setting, the naive combination's MSE stays above DNGaussian's bias floor (BV3, Fig. 4). Run-to-run variance is still 18–34 % of the MSE for D (18–44 % over all variants; minimum D at 9 views, 18.4 %), and averaging the renders of 3 seeds would gain +0.6 to +1.1 dB. **The remaining headroom is variance, not bias.**
 
 **Scale robustness (N4).** On LLFF, D − B and E − D keep their sign under PSNR, MSE, RMSE and SSIM. The interaction terms do not: I_D is near 0 in PSNR (inconclusive) but negative in SSIM. Interaction claims are therefore scale-dependent, and we make none beyond "not positive".
 
