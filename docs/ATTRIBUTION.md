@@ -11,15 +11,24 @@
 
 ## Our changes, per file
 
-From `git diff --name-status upstream-baseline HEAD`, excluding `results/` (our run outputs and tables, all produced by the scripts below) and `docs/` (our plans and report drafts). A = added by us, M = upstream file modified by us. **Author** comes from the commits touching the file: PRs were squash-merged, so the author is the person who opened the PR. Commits made with an AI coding assistant on Aayush's machine are counted as Aayush's.
+From `git diff --name-status upstream-baseline HEAD`, excluding `results/` (our run outputs and tables, all produced by the scripts below), `docs/` (our plans and report drafts) and `report/` (the paper). A = added by us, M = upstream file modified by us. **Author** comes from the commits touching the file: PRs were squash-merged, so the author is the person who opened the PR. Commits made with an AI coding assistant on Aayush's machine are counted as Aayush's.
 
 | | File | Author (commits) |
 | --- | --- | --- |
+| A | `.claude/agents/pr-reviewer.md` | Aayush ×3 |
 | A | `.claude/settings.json` | Aayush ×1 |
+| A | `.claude/skills/pr-gate/SKILL.md` | Aayush ×4 |
 | A | `.github/CODEOWNERS` | Aayush ×4 |
+| A | `.github/copilot-instructions.md` | Aayush ×2 |
+| A | `.github/pull_request_template.md` | Aayush ×1 |
 | A | `.github/workflows/ci.yml` | Aayush ×2 |
 | M | `.gitignore` | Aayush ×1 |
+| A | `AGENTS.md` | Aayush ×9 |
+| A | `CLAUDE.md` | Aayush ×3 |
+| A | `GEMINI.md` | Aayush ×4 |
+| A | `LAB_RUNBOOK_11nov.md` | Aayush ×1 |
 | M | `README.md` | Disha ×2 |
+| A | `RUNLOG.md` | Aayush ×4; Disha ×1 |
 | M | `arguments/__init__.py` | Aayush ×2 |
 | A | `experiments/aggregate.py` | Disha ×2 |
 | A | `experiments/bias_variance.py` | Disha ×2 |
@@ -51,11 +60,11 @@ From `git diff --name-status upstream-baseline HEAD`, excluding `results/` (our 
 | A | `experiments/plots/style.py` | Disha ×2 |
 | A | `experiments/plots/v2_figures.py` | Disha ×1 |
 | A | `experiments/plots/views.py` | Disha ×2 |
-| A | `experiments/probes.py` | Aayush (written in 9f8d55f, restored here unchanged) ×1 |
+| A | `experiments/probes.py` | Aayush (commit 9f8d55f on branch feat/probes, AY-22; restored unchanged here via a81f943) ×1 |
 | A | `experiments/probes_summary.py` | Disha ×1 |
 | A | `experiments/run_matrix.py` | Aayush ×3 |
 | A | `experiments/stats.py` | Disha ×3 |
-| A | `experiments/views_contrasts.py` | Aayush (this PR) ×1 |
+| A | `experiments/views_contrasts.py` | Aayush ×1 |
 | M | `gaussian_renderer/__init__.py` | Aayush ×1 |
 | M | `gridencoder/backend.py` | Aayush ×1 |
 | M | `gridencoder/setup.py` | Aayush ×1 |
@@ -67,6 +76,7 @@ From `git diff --name-status upstream-baseline HEAD`, excluding `results/` (our 
 | A | `scripts/check.sh` | Aayush ×8; Disha ×1 |
 | A | `scripts/gpu_smoke.sh` | Aayush ×3 |
 | A | `scripts/hooks/guard_bash.py` | Aayush ×4 |
+| A | `scripts/make_submission_zip.sh` | Aayush ×1 |
 | A | `scripts/peak_vram.py` | Aayush ×1 |
 | A | `scripts/pr_ready.py` | Aayush ×4 |
 | A | `scripts/review_bundle.py` | Aayush ×2 |

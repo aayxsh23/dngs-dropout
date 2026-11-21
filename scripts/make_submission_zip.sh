@@ -7,6 +7,7 @@ NAME=CSD361_2410110012_2410110128
 REF=${1:-HEAD}; PDF=${2:-report/main.pdf}; OUT=${3:-$PWD/$NAME.zip}
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 git archive --format=tar --prefix="$NAME/" "$REF" | tar -x -C "$tmp"
+mkdir -p "$tmp/$NAME/report"   # report/ may not be in the archived ref yet
 if [ -f "$PDF" ]; then cp "$PDF" "$tmp/$NAME/report/${NAME}_report.pdf"; else echo "WARNING: no report PDF at $PDF; the zip has the LaTeX source only" >&2; fi
 bad=$(find "$tmp/$NAME" \( -name '*.pth' -o -name '*.pt' -o -name '*.ply' -o -name '*.tar' -o -name '*.tgz' -o -name '*.zip' \) -print)
 if [ -n "$bad" ]; then echo "refusing: forbidden files in the tree:" >&2; echo "$bad" >&2; exit 1; fi
