@@ -1,265 +1,215 @@
-# Depth meets Dropout: are DNGaussian and DropGaussian complementary in sparse-view 3DGS?
+# Do Depth Priors and Gaussian Dropout Add Up in Sparse-View 3D Gaussian Splatting?
 
-A course research project (CSD361) by Aayush and Disha. We ask whether two sparse-view 3D Gaussian Splatting regularizers are **complementary, redundant or interfering**:
+**A pre-registered factorial and bias–variance study of DNGaussian's depth prior and DropGaussian's dropout, on LLFF, DTU and Blender (1,169 training runs).**
 
-- **DNGaussian** (CVPR 2024) adds monocular-depth regularization. This repo is a fork of [Fictionarry/DNGaussian](https://github.com/Fictionarry/DNGaussian).
-- **DropGaussian** (CVPR 2025) randomly drops Gaussians during training. We port it verbatim from [DCVL-3D/DropGaussian_release](https://github.com/DCVL-3D/DropGaussian_release).
+Aayush Trivedi (2410110012) · Disha Singh (2410110128)
+Department of Computer Science and Engineering, Shiv Nadar University, Delhi NCR, India
+CSD361 – Introduction to Machine Learning
 
-Every variant is the same code with different flags. The 2×2 design plus a decoupled combination:
+[![CI](https://github.com/aayxsh23/dngs-dropout/actions/workflows/ci.yml/badge.svg)](https://github.com/aayxsh23/dngs-dropout/actions/workflows/ci.yml)
+[![Paper](https://img.shields.io/badge/paper-PDF-b31b1b)](report/main.pdf)
+[![Website](https://img.shields.io/badge/project-website-2a6fd6)](https://aayxsh23.github.io/dngs-dropout/)
+[![License](https://img.shields.io/badge/license-Gaussian--Splatting%20(non--commercial)-lightgrey)](LICENSE.md)
 
-| ID | Depth | Dropout | Mask reaches the depth passes |
-| --- | --- | --- | --- |
-| A | – | – | – |
-| B (DNGaussian) | ✓ | – | – |
-| C (DropGaussian-style) | – | ✓ | – |
-| D (naive combination) | ✓ | ✓ | yes |
-| E (decoupled combination) | ✓ | ✓ | no |
+![Error budget per variant on LLFF, DTU and Blender: squared bias (solid) and run-to-run variance (hatched)](results/v2/figures/fig_budget.png)
 
-The analysis rules were pre-registered before any results existed (tags `prereg-v1`…`v3`). The experiments ran only from tagged code (`v1.0-exp`, `v1.1-exp`, `v1.2-exp`), for 1,169 runs in total on one lab RTX A4000.
-
-## Key results
-
-PSNR (dB) on held-out views, mean over 3 seeds. Differences are paired by scene, with 95 % CIs.
-
-| Variant | LLFF 3-view | DTU 3-view (masked) | Blender 8-view |
-| --- | --- | --- | --- |
-| A: none | 16.33 | 14.04 | 23.47 |
-| B: depth (DNGaussian) | 18.71 | 18.37 | 22.66 |
-| C: dropout | 16.80 | 14.51 | **23.83** |
-| D: depth + dropout | 19.21 | 18.57 | 22.77 |
-| E: depth + dropout, decoupled | **19.31** | **18.67** | 22.82 |
-
-| Contrast | LLFF | DTU | Blender | Pooled |
-| --- | --- | --- | --- | --- |
-| E − B: adding dropout to DNGaussian | +0.60 [+0.30, +0.91] | +0.30 [−0.09, +0.68] | +0.15 [+0.02, +0.28] | **+0.34 [+0.04, +0.64]** |
-| E − D: decoupling the depth passes | +0.10 | +0.09 | +0.04 | +0.05 (≈ 0) |
-| I_D: interaction (D − C) − (B − A) | +0.02 | −0.28 | −0.26 | **−0.19 [−0.37, −0.01]** |
-
-1. **Complementary where it matters most.** On very sparse forward-facing scenes (LLFF, 2–3 views), adding dropout to DNGaussian gains about +0.5 dB (D − B +0.45 at 2 views, +0.50 at 3; E − B +0.60 at 3), and the two gains add up about additively.
-2. **Additive at best across datasets.** The pooled interaction is slightly negative. Where the depth prior itself stops helping (Blender at 8 views, LLFF at 9 views), the gains stop adding up: partly redundant on Blender, inconclusive at 9 views.
-3. **Decoupling shows no measurable effect.** Shielding the depth passes from the dropout mask moves PSNR by under 0.25 dB in every point estimate; the CIs are inconclusive on LLFF and DTU and the effect is ≈ 0 on Blender and pooled.
-4. **The mechanism is the error budget.** Depth reduces *bias* and dropout reduces *run-to-run variance*, in the sparsest settings. Neither removes the variance left above DNGaussian's bias floor, so the remaining headroom is variance.
-5. **Two proposed explanations are not supported by the data.** Neither the compensation nor the opacity-cap explanation shows a detectable effect (§5.2.9 of the pre-registration); the contrasts are inconclusive, not shown to be zero.
-
-| | |
-| --- | --- |
-| ![error budget](results/v2/figures/fig_budget.png) | ![pooled forest](results/v2/figures/fig_pooled.png) |
-| **Fig. 2** Error budget: bias² (solid) and variance (hatched) | **Fig. 1** Each contrast per dataset and pooled |
-
-More figures:
-- [Fig. 4 bias floor](results/v2/figures/fig_ceiling.png)
-- [Fig. 3 budget vs views](results/v2/figures/fig_budget_views.png)
-- [Fig. 5 compensation](results/v2/figures/fig_comp.png)
-- [Fig. 6 depth dose](results/v2/figures/fig_depthdose.png)
-- [Fig. 7 power](results/v2/figures/fig_power.png)
-- [LLFF forest](results/figures/fig_forest.png)
-- [views](results/figures/fig_views.png)
-- [qualitative](results/figures/fig_qual.png)
-
-Full write-ups:
-- [results/RESULTS.md](results/RESULTS.md) (v1, LLFF)
-- [results/v2/RESULTS_v2.md](results/v2/RESULTS_v2.md) (v2, all datasets)
-- report sections in [docs/report/](docs/report/)
-
-## Reproduce
-
-**1. Environment.** Python 3.7, PyTorch 1.12.1, CUDA 11.3 (see `setup_env.sh`), or Colab with `notebooks/colab_runner.ipynb`. Build the vendored extensions in `submodules/`, `gridencoder/` and `shencoder/` for your GPU.
-
-**2. Data,** each checked by md5:
-
-| Archive | md5 |
-| --- | --- |
-| `llff_with_depth.tar` | `0f6bd7bdae837ec58ad757c7c00b0561` |
-| `dtu_with_depth.tar` | `dc8df470e9cf6e46cd024cb34d19c175` |
-| `blender_with_depth.tar` | `e7597085f8682b660699a39f63d5957f` |
-
-The DPT depth is included in each archive, so never regenerate it.
-
-**3. One run,** variant E on fern, seed 0:
-```bash
-python train_llff.py -s data/llff/fern --model_path output/E/fern -r 8 --eval --n_sparse 3 --rand_pcd \
-  --depth_scale 1 --drop_rate 0.2 --depth_render clean --seed 0  # plus DNGaussian's LLFF flags, see scripts/run_llff.sh
-```
-
-**4. A whole block,** from a tag, sharded over GPUs. Always do a dry run first:
-```bash
-git checkout v1.2-exp
-python experiments/run_matrix.py --matrix experiments/matrix_dtu.yaml --data_root data/dtu --out_root outputs_dtu --shard 0/3 --dry_run
-```
-
-**5. Tables, statistics and figures** from the committed per-run metrics, with no GPU needed. The commands are in [results/v2/RESULTS_v2.md](results/v2/RESULTS_v2.md#how-to-regenerate). Everything, including the error budget from the renders, runs on a Colab CPU with [`notebooks/results_v2_colab.ipynb`](notebooks/results_v2_colab.ipynb).
-
-**6. Checks:** `bash scripts/check.sh` takes seconds and needs no GPU. `bash scripts/gpu_smoke.sh` takes 1.5–7 min.
-
-## Repository map
-
-| Path | What |
-| --- | --- |
-| `train_llff.py`, `train_dtu.py`, `train_blender.py` | Training, with dropout behind `--drop_rate`, `--depth_render`, `--drop_mode` |
-| `gaussian_renderer/` | Renderers. Dropout is applied only inside training (AGENTS.md invariants) |
-| `experiments/` | Runner, matrices, `aggregate.py`, `stats.py`, `bias_variance.py`, `extra_blocks.py`, plots |
-| `results/` | Committed tables, figures and write-ups (v1 and v2) |
-| `docs/` | Plans, the pre-registration (`PLAN_V2.md` §5) and report drafts |
-| `notebooks/` | Colab runner and the results-v2 analysis notebook |
+*Pixel MSE on held-out views, split into squared bias and run-to-run variance over 3 seeds. Depth (B) mainly removes bias and dropout (C) mainly removes variance; on Blender at 8 views, neither combination beats dropout alone.*
 
 ---
 
-## Upstream DNGaussian README
+## Overview
 
-### DNGaussian: Optimizing Sparse-View 3D Gaussian Radiance Fields with Global-Local Depth Normalization
+With 2–3 input photos, 3D Gaussian Splatting overfits: the training views are reproduced and novel views break. Two published regularizers attack this from opposite sides. **DNGaussian** (CVPR 2024) supervises the rendered depth with a monocular prior; **DropGaussian** (CVPR 2025) randomly drops Gaussians during training. We ask whether they are **complementary, redundant or interfering**, and whether it matters if the dropout mask reaches the depth supervision.
 
-This is the official repository for our CVPR 2024 paper **DNGaussian: Optimizing Sparse-View 3D Gaussian Radiance Fields with Global-Local Depth Normalization**.
+Every variant is the same code with different flags. All runs came from git tags, and the analysis rules were tagged before the data they govern existed. The answer is a careful, mostly null result: dropout is a cheap add-on to a depth prior in very sparse scenes, not a synergy.
 
-[Paper](https://arxiv.org/abs/2403.06912) | [Project](https://fictionarry.github.io/DNGaussian/) | [Video](https://www.youtube.com/watch?v=WKXCFNJHZ4o)
+## Key findings
 
-![image](assets/main.png)
+1. **Complementary on LLFF.** Adding dropout to DNGaussian gains +0.50 to +0.60 dB at 3 views (D − B +0.50 [+0.08, +0.91], E − B +0.60 [+0.30, +0.91]), and the gains add up about additively (I_D +0.02, inconclusive). [`results/tables/paired_3v.md`](results/tables/paired_3v.md)
+2. **Never significantly positive across datasets.** Pooled over LLFF, DTU and Blender, E − B is +0.34 dB [+0.04, +0.64] and the interaction I_D is −0.19 dB [−0.37, −0.01]. Verdicts: complementary on LLFF, inconclusive on DTU, partly redundant on Blender. [`results/v2/tables/pooled/verdict_pooled.txt`](results/v2/tables/pooled/verdict_pooled.txt)
+3. **Where the mask acts makes no measurable difference.** E − D (mask kept off the depth passes) is ≈ 0 on Blender and pooled (+0.05 [−0.01, +0.12]) and inconclusive on LLFF and DTU. The alpha-clamp and compensation explanations are not supported. [`results/v2/tables/extra/verdict_extra.txt`](results/v2/tables/extra/verdict_extra.txt)
+4. **Why: depth removes bias, dropout removes variance,** in the sparsest settings: depth's share of bias reduction is 0.51–0.96 on LLFF 2/3 views and DTU, and dropout's share of variance reduction is 0.74–0.84 on LLFF up to 6 views and Blender. Variance is still 18–34 % of the combinations' error, so the headroom is variance. [`results/v2/tables/error_budget/`](results/v2/tables/error_budget/)
+5. **Noise matters.** A single-run 8-scene mean is uncertain by ±0.26 dB (with depth) to ±0.43 dB (without), and the smallest detectable interaction with 8 scenes and 3 seeds is 0.49 dB. [`results/v2/tables/extra/verdict_extra.txt`](results/v2/tables/extra/verdict_extra.txt)
 
+## Method at a glance
 
-### Installation
+DNGaussian runs **three rasterizations per training iteration**, each with its own loss and optimizer step. The dropout mask (each Gaussian kept with probability 1 − r, survivors' opacity × 1/(1 − r), r = γ·t/10000, peak 0.12) can reach any subset of them:
 
-Tested on Ubuntu 18.04, CUDA 11.3, PyTorch 1.12.1
+```mermaid
+flowchart LR
+  M["Dropout mask<br/>keep with prob. 1 − r"]
+  H["1 · Hard depth<br/>opacity fixed at 0.95<br/>grads → centres"]
+  S["2 · Soft depth (t ≥ 1000)<br/>real opacity<br/>grads → opacities"]
+  P["3 · Photometric<br/>L1 + D-SSIM + penalties<br/>grads → all"]
+  M -- "D, D_hard" --> H
+  M -- "D, D_soft" --> S
+  M -- "C, D, E, D_hard, D_soft" --> P
+  R["Evaluation renders<br/>never masked"]
+```
 
-``````
-conda env create --file environment.yml
-conda activate dngaussian
+| ID | Depth (`--depth_scale`) | Dropout (`--drop_rate`) | Mask reaches (`--depth_render`) | Role |
+| --- | --- | --- | --- | --- |
+| A | 0 | 0 | – | 3DGS host without depth |
+| B | 1 | 0 | – | DNGaussian as published |
+| C | 0 | 0.2 | photometric | DropGaussian alone |
+| D | 1 | 0.2 | all three passes (`shared`) | naive combination |
+| E | 1 | 0.2 | photometric only (`clean`) | decoupled combination |
+| D_hard / D_soft | 1 | 0.2 | photometric + one depth pass | pass localization |
 
-cd submodules
-git clone git@github.com:ashawkey/diff-gaussian-rasterization.git --recursive
-git clone https://gitlab.inria.fr/bkerbl/simple-knn.git
-pip install ./diff-gaussian-rasterization ./simple-knn
-``````
+A–D form a 2×2 factorial; the interactions are I_D = (D − C) − (B − A) and I_E = (E − C) − (B − A). Further LLFF blocks vary the dropout dose, the depth weight, the compensation mode (`--drop_mode nc` / `clamp_aware`) and the number of views (2/3/6/9). Details: Sec. III–IV of the paper and [`docs/report/03_method.md`](docs/report/03_method.md).
 
-If encountering installation problem of the `diff-gaussian-rasterization` or `gridencoder`, you may get some help from [gaussian-splatting](https://github.com/graphdeco-inria/gaussian-splatting) and [torch-ngp](https://github.com/ashawkey/torch-ngp).
+## Results
 
+PSNR ↑ / SSIM ↑ / LPIPS ↓ on held-out views, mean over 3 seeds. DTU metrics are masked.
 
-### Evaluation
+| Variant | LLFF, 3 views | DTU, 3 views | Blender, 8 views |
+| --- | --- | --- | --- |
+| A: none | 16.33 / 0.460 / 0.394 | 14.04 / 0.690 / 0.260 | 23.47 / 0.879 / 0.098 |
+| B: depth | 18.71 / 0.592 / 0.302 | 18.37 / 0.776 / 0.176 | 22.66 / 0.868 / 0.112 |
+| C: dropout | 16.80 / 0.497 / 0.378 | 14.51 / 0.726 / 0.243 | **23.83 / 0.886 / 0.094** |
+| D: both, shared mask | 19.21 / 0.611 / 0.303 | 18.57 / **0.810 / 0.160** | 22.77 / 0.873 / 0.109 |
+| E: both, decoupled | **19.31 / 0.617** / 0.303 | **18.67** / 0.807 / 0.163 | 22.82 / 0.874 / 0.108 |
 
-#### LLFF
+Sources: [`T1/main_3v.md`](results/v2/tables/T1/main_3v.md), [`dtu/main_dtu_3v.md`](results/v2/tables/dtu/main_dtu_3v.md), [`blender/main_blender_8v.md`](results/v2/tables/blender/main_blender_8v.md).
 
-1. Download LLFF from [the official download link](https://drive.google.com/file/d/11PhkBXZZNYTD2emdG1awALlhCnkq7aN-/view?usp=drive_link).
+| PSNR contrast, 95 % CI | LLFF | DTU | Blender | Pooled |
+| --- | --- | --- | --- | --- |
+| B − A (depth) | +2.38 [+1.80, +2.96] | +4.34 [+3.25, +5.42] | −0.80 [−1.78, +0.18] | +1.96 [−0.56, +4.48] |
+| C − A (dropout) | +0.48 [+0.18, +0.77] | +0.48 [+0.01, +0.95] | +0.37 [+0.19, +0.55] | +0.40 [+0.28, +0.53] |
+| E − B | +0.60 [+0.30, +0.91] | +0.30 [−0.09, +0.68] | +0.15 [+0.02, +0.28] | +0.34 [+0.04, +0.64] |
+| E − D | +0.10 [−0.10, +0.30] | +0.09 [−0.24, +0.42] | +0.04 [−0.05, +0.13] | +0.05 [−0.01, +0.12] |
+| I_D | +0.02 [−0.34, +0.38] | −0.28 [−0.85, +0.30] | −0.26 [−0.37, −0.15] | −0.19 [−0.37, −0.01] |
 
-2. Generate monocular depths by DPT:
+Source: [`pooled/verdict_pooled.txt`](results/v2/tables/pooled/verdict_pooled.txt). Full write-ups: [Results v1 (LLFF)](results/RESULTS.md) and [Results v2 (all datasets)](results/v2/RESULTS_v2.md).
 
-   ```bash
-   cd dpt
-   python get_depth_map_for_llff_dtu.py --root_path $<dataset_path_for_llff> --benchmark LLFF
-   ```
+<details>
+<summary>Number of views (LLFF, 3 seeds)</summary>
 
-3. Start training and testing:
+| Views | A | B | C | D | E | D − B | I_D |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2 | 14.30 | 15.76 | 14.83 | 16.21 | 16.44 | +0.45 [+0.24, +0.66] | −0.08 [−0.30, +0.14] |
+| 3 | 16.33 | 18.71 | 16.80 | 19.21 | 19.31 | +0.50 [+0.08, +0.91] | +0.02 [−0.34, +0.38] |
+| 6 | 20.96 | 21.97 | 21.50 | 22.05 | 22.08 | +0.08 [−0.12, +0.28] | −0.46 [−0.96, +0.04] |
+| 9 | 22.85 | 22.64 | 22.91 | 22.60 | 22.55 | −0.04 [−0.18, +0.10] | −0.10 [−0.34, +0.14] |
 
-   ```bash
-   # for example
-   bash scripts/run_llff.sh data/llff/fern output/llff/fern ${gpu_id}
-   ```
+Sources: [`views/contrasts_3seed.csv`](results/v2/tables/views/contrasts_3seed.csv) and `views/main_*v.md`. The combination's benefit is a very-sparse effect.
+</details>
 
+<details>
+<summary>More figures</summary>
 
+- [Contrasts per dataset and pooled (forest plot)](results/v2/figures/fig_pooled.png)
+- [Error budget vs number of views](results/v2/figures/fig_budget_views.png)
+- [Bias floor: MSE(D) vs bias²(B)](results/v2/figures/fig_ceiling.png)
+- [Compensation modes](results/v2/figures/fig_comp.png) · [Depth weight](results/v2/figures/fig_depthdose.png) · [Power](results/v2/figures/fig_power.png)
+- [LLFF forest plot](results/figures/fig_forest.png) · [Pass localization](results/figures/fig_pass.png) · [Dropout dose](results/figures/fig_dose.png) · [Test-time robustness](results/figures/fig_robustness.png) · [Qualitative](results/figures/fig_qual.png)
+</details>
 
-#### DTU
-
-1. Download DTU dataset
-
-   - Download the DTU dataset "Rectified (123 GB)" from the [official website](https://roboimagedata.compute.dtu.dk/?page_id=36/), and extract it.
-   - Download masks (used for evaluation only) from [this link](https://drive.google.com/drive/folders/1OEmJcbP0XUVfG647mdYWxEy9yOw7L_Si?usp=drive_link) (backed up from RegNeRF).
-
-
-2. Organize DTU for few-shot setting
-
-   ```bash
-   bash scripts/organize_dtu_dataset.sh $rectified_path
-   ```
-
-3. Format
-
-   - Poses: following [gaussian-splatting](https://github.com/graphdeco-inria/gaussian-splatting), run `convert.py` to get the poses and the undistorted images by COLMAP.
-   - Render Path: following [LLFF](https://github.com/Fyusion/LLFF) to get the `poses_bounds.npy` from the COLMAP data. (Optional)
-
-
-4. Generate monocular depths by DPT:
-
-   ```bash
-   cd dpt
-   python get_depth_map_for_llff_dtu.py --root_path $<dataset_path_for_dtu> --benchmark DTU
-   ```
-
-5. Set the mask path and the expected output model path in `copy_mask_dtu.sh` for evaluation. (default: "data/dtu/submission_data/idrmasks" and "output/dtu") 
-
-6. Start training and testing:
-
-   ```bash
-   # for example
-   bash scripts/run_dtu.sh data/dtu/scan8 output/dtu/scan8 ${gpu_id}
-   ```
-
-
-
-#### Blender
-
-1. Download the NeRF Synthetic dataset from [here](https://drive.google.com/file/d/1OsiBs2udl32-1CqTXCitmov4NQCYdA9g/view?usp=drive_link).
-
-2. Generate monocular depths by DPT:
-
-   ```bash
-   cd dpt
-   python get_depth_map_for_blender.py --root_path $<dataset_path_for_blender>
-   ```
-
-3. Start training and testing:
-
-   ```bash
-   # for example
-   # there are some special settings for different scenes in the Blender dataset, please refer to "run_blender.sh".
-   bash scripts/run_blender.sh data/nerf_synthetic/drums output/blender/drums ${gpu_id}
-   ```
-
-
-### Reproducing Results
-Due to the randomness of the densification process and random initialization, the metrics may be unstable in some scenes, especially PSNR.
-
-
-#### Checkpoints and Results
-You can download our provided checkpoints from [here](https://drive.google.com/drive/folders/1V8XGg1MXJDb-bK3NAEo5Gw2GLLByF7FM?usp=sharing). These results are reproduced with a lower error tolerance bound to keep aligned with this repo, which is different from what we use in the paper. This could lead to higher metrics but worse visualization.
-
-
-#### MVS Point Cloud Initialization
-
-If more stable performance is needed, we recommend trying the dense initialization from [FSGS](https://github.com/VITA-Group/FSGS).
-
-Here we provide an example script for LLFF that just modifies a few hyperparameters to adapt our method to this initialization:
+## Quickstart
 
 ```bash
-# Following FSGS to get the "data/llff/$<scene>/3_views/dense/fused.ply" first
-bash scripts/run_llff_mvs.sh data/llff/$<scene> output_dense/$<scene> ${gpu_id}
+git clone https://github.com/aayxsh23/dngs-dropout.git && cd dngs-dropout
+bash scripts/check.sh            # CPU-only checks, seconds; no data needed
 ```
 
-However, there may still be some randomness.
+Training needs Python 3.7, PyTorch 1.12.1 and CUDA 11.3, with the vendored extensions built for your GPU: see [`setup_env.sh`](setup_env.sh) and the full package list in [`pip_freeze_laptop.txt`](pip_freeze_laptop.txt). Put LLFF with DPT depth in `data/llff/` (sources and md5s are in [`docs/REPRODUCE.md`](docs/REPRODUCE.md)), then run a short smoke test of every variant:
 
-For reference, the best results we get in two random tests are as follows:
-
-| PSNR   | LPIPS  | SSIM (SK)   |  SSIM (GS)   |
-| ------ | ------ | ----- | ----- |
-| 19.942 | 0.228  | 0.682 | 0.687 |
-
-where GS refers to the calculation originally provided by 3DGS, and SK denotes calculated by sklearn which is used in most previous NeRF-based methods.
-
-
-### Customized Dataset
-Similar to Gaussian Splatting, our method can read standard COLMAP format datasets. Please customize your sampling rule in `scenes/dataset_readers.py`, and see how to organize a COLMAP-format dataset from raw RGB images referring to our preprocessing of DTU.
-
-
-
-### Citation
-
-Consider citing as below if you find this repository helpful to your project:
-
+```bash
+bash scripts/gpu_smoke.sh        # 1100 iterations on fern per variant, 1.5–7 min
 ```
-@article{li2024dngaussian,
-   title={DNGaussian: Optimizing Sparse-View 3D Gaussian Radiance Fields with Global-Local Depth Normalization},
-   author={Li, Jiahe and Zhang, Jiawei and Bai, Xiao and Zheng, Jin and Ning, Xin and Zhou, Jun and Gu, Lin},
-   journal={arXiv preprint arXiv:2403.06912},
-   year={2024}
+
+## Reproduce the paper
+
+| Dataset | Tag | Matrix | Runs | Data archive md5 |
+| --- | --- | --- | --- | --- |
+| LLFF (T1, P, G, N, V) | `v1.0-exp` | `experiments/matrix{,_pass,_dose,_noise,_views}.yaml` | 120 + 48 + 48 + 8 + 360 | `0f6bd7bdae837ec58ad757c7c00b0561` |
+| LLFF (COMP, DDOSE, NOISE2) | `v1.1-exp` | `experiments/matrix_{comp,depthdose,noise2}.yaml` | 96 + 96 + 48 | same |
+| DTU | `v1.2-exp` | `experiments/matrix_dtu.yaml` | 225 | `dc8df470e9cf6e46cd024cb34d19c175` |
+| Blender | `v1.2-exp` | `experiments/matrix_blender.yaml` | 120 | `e7597085f8682b660699a39f63d5957f` |
+
+```bash
+git checkout v1.0-exp
+python experiments/run_matrix.py --matrix experiments/matrix.yaml --data_root data/llff --out_root outputs \
+    --shard 0/1 --seeds 0 1 2 --dry_run        # prints "120 of 120 runs"; drop --dry_run to train
+```
+
+Each run trains for 6000 iterations (about 84–145 s on an RTX A4000), renders the held-out views and writes its metrics. Tables, statistics and figures then regenerate on a CPU from the committed per-run results. **The full guide, with data preparation (COLMAP, DPT) and every command, is [`docs/REPRODUCE.md`](docs/REPRODUCE.md).**
+
+## Repository map
+
+```text
+train_llff.py, train_dtu.py, train_blender.py   training; dropout behind --drop_rate, --depth_render, --drop_mode
+gaussian_renderer/                             renderers; the optional drop_comp vector is the ported DropGaussian line
+utils/dropout.py                               clamp-aware and no-compensation dropout (our extensions)
+render.py, metrics.py, experiments/eval_dtu.py evaluation (never masked)
+experiments/run_matrix.py, matrix*.yaml        tag-gated experiment runner and the frozen experiment blocks
+experiments/{aggregate,stats,bias_variance,extra_blocks,interaction_scales,views_contrasts}.py   analysis
+experiments/{geometry,probes}.py               MVC@5% geometry and test-time probes (need checkpoints)
+experiments/plots/                             figure scripts
+results/                                       committed per-run results, tables, figures, write-ups (v1, v2)
+report/                                        the paper: LaTeX, references, number trace, compliance table
+docs/                                          plan, pre-registration (PLAN_V2 §5), report drafts, REPRODUCE, ATTRIBUTION
+scripts/                                       check.sh, gpu_smoke.sh, run scripts, merge gate, submission zip
+notebooks/                                     Colab runner and the results-v2 analysis notebook
+dpt/, gridencoder/, shencoder/, submodules/    upstream depth scripts and vendored CUDA extensions
+```
+
+## Engineering and reproducibility
+
+- **Tag-gated runs.** `run_matrix.py` refuses to run from anything but a clean tag (`v1.0-exp`, `v1.1-exp`, `v1.2-exp`). Each run's `config.json` records the commit, and its `metrics.json` the GPU and whether it was shared.
+- **Pre-registration.** Decision rules, margins and hypotheses were tagged before the data they govern: `prereg-v1` (LLFF), `prereg-v2` (compensation) and `prereg-v3` (DTU, Blender, error budget). `prereg-v3` was written after the LLFF results were seen, and says so. See [`docs/PLAN_V2.md`](docs/PLAN_V2.md) §5.
+- **Frozen data.** One depth archive per dataset, checked by md5 on every machine.
+- **CI.** [`scripts/check.sh`](scripts/check.sh) checks the verbatim DropGaussian port, the no-mask evaluation paths, Python 3.7 compatibility, the analysis on fixtures and the runner end to end. Merges to `main` go through CI and an independent review ([`AGENTS.md`](AGENTS.md)).
+- **Run log.** Every machine event, rerun decision and checksum is in [`RUNLOG.md`](RUNLOG.md). A CPU regeneration of all tables matches the committed ones ([`docs/REPRODUCE.md`](docs/REPRODUCE.md) §3).
+
+## Limitations
+
+- **Power.** With 8 scenes and 3 seeds, interactions below about 0.5 dB cannot be detected per dataset. "Inconclusive" means "not shown", not "absent".
+- **Nondeterminism.** The rasterizer's backward pass is not deterministic, and the same seed varies as much as a new seed.
+- **One dose and one protocol.** DropGaussian's schedule is kept verbatim (peak rate 0.12). Blender uses one setting for all objects, so DNGaussian is not tuned per object there.
+- **Shared GPU.** Only the first blocks ran on an unshared GPU, so efficiency numbers come from LLFF T1 only.
+- **Post hoc elements.** `prereg-v3` came after the LLFF results, and its variance-component check is circular, so the power numbers are planning figures.
+
+## Citation
+
+```bibtex
+@misc{trivedi2026depthdropout,
+  author       = {Trivedi, Aayush and Singh, Disha},
+  title        = {Do Depth Priors and Gaussian Dropout Add Up in Sparse-View {3D} {G}aussian Splatting?
+                  {A} Pre-Registered Factorial and Bias--Variance Study},
+  howpublished = {CSD361 course project, Shiv Nadar University},
+  year         = {2026},
+  url          = {https://github.com/aayxsh23/dngs-dropout}
+}
+
+@inproceedings{li2024dngaussian,
+  author    = {Li, Jiahe and Zhang, Jiawei and Bai, Xiao and Zheng, Jin and Ning, Xin and Zhou, Jun and Gu, Lin},
+  title     = {{DNGaussian}: Optimizing Sparse-View {3D} {G}aussian Radiance Fields with Global-Local Depth Normalization},
+  booktitle = {Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2024}
+}
+
+@inproceedings{park2025dropgaussian,
+  author    = {Park, Hyunwoo and Ryu, Gun and Kim, Wonjun},
+  title     = {{DropGaussian}: Structural Regularization for Sparse-view {G}aussian Splatting},
+  booktitle = {Proc. IEEE/CVF Conf. Computer Vision and Pattern Recognition (CVPR)},
+  pages     = {21600--21609},
+  year      = {2025}
 }
 ```
 
-### Acknowledgement
+## Team and contributions
 
-This code is developed on [gaussian-splatting](https://github.com/graphdeco-inria/gaussian-splatting) with [simple-knn](https://gitlab.inria.fr/bkerbl/simple-knn) and a modified [diff-gaussian-rasterization](https://github.com/ashawkey/diff-gaussian-rasterization). The implementation of neural renderer are based on [torch-ngp](https://github.com/ashawkey/torch-ngp). Codes about [DPT](https://github.com/isl-org/MiDaS) are partial from [SparseNeRF](https://github.com/Wanggcong/SparseNeRF). Thanks for these great projects!
+| | Aayush Trivedi | Disha Singh |
+| --- | --- | --- |
+| Code | dropout port and mask routing, compensation modes, DTU and Blender port, runner and matrices, CI and review gate | Colab runner, aggregation and statistics, error budget, pooled analysis, plots |
+| Data and runs | DTU preparation (COLMAP, DPT), laptop reproduction, lab runs | LLFF and Blender depth archives, Colab reproduction, lab runs |
+| Writing | research analysis and plan, method and setup, paper | pre-registration v3, results v1 and v2, results and discussion, website |
+
+Per-file authorship from the commit history: [`docs/ATTRIBUTION.md`](docs/ATTRIBUTION.md).
+
+## Acknowledgments and license
+
+We thank the CSD361 course staff, the lab that provided the GPU, and the authors of [DNGaussian](https://github.com/Fictionarry/DNGaussian) and [DropGaussian](https://github.com/DCVL-3D/DropGaussian_release) for releasing their code.
+
+This repository is a fork of DNGaussian, which builds on 3D Gaussian Splatting. It keeps their licence, the Gaussian-Splatting License (non-commercial research use), in [`LICENSE.md`](LICENSE.md). Only DropGaussian's two dropout lines are ported; see [`docs/ATTRIBUTION.md`](docs/ATTRIBUTION.md). The original DNGaussian README is in [`docs/UPSTREAM_README.md`](docs/UPSTREAM_README.md).
