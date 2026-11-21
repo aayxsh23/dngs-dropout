@@ -92,7 +92,7 @@ These 3-seed numbers replace v1's seed-0 table; the contrasts and CIs are in `re
 
 The pattern across view counts:
 - **The combination's benefit is a very-sparse effect.** It lasts at 2 and 3 views and vanishes by 6.
-- **At 9 views depth no longer helps** (B < A), the same regime as Blender at 8 views.
+- **At 9 views depth is not shown to help** (B − A −0.20 [−0.73, +0.32], B ahead in 3 of 8 scenes), like Blender at 8 views.
 - **E − D stays within ±0.25 dB at every view count.**
 
 ## 5.5 Why: the error budget (N1)

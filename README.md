@@ -44,14 +44,14 @@ PSNR (dB) on held-out views, mean over 3 seeds. Differences are paired by scene,
 | | |
 | --- | --- |
 | ![error budget](results/v2/figures/fig_budget.png) | ![pooled forest](results/v2/figures/fig_pooled.png) |
-| **F1** Error budget: bias² (solid) and variance (hatched) | **F3** Each contrast per dataset and pooled |
+| **Fig. 2** Error budget: bias² (solid) and variance (hatched) | **Fig. 1** Each contrast per dataset and pooled |
 
 More figures:
-- [F5 bias floor](results/v2/figures/fig_ceiling.png)
-- [F2 budget vs views](results/v2/figures/fig_budget_views.png)
-- [F9 compensation](results/v2/figures/fig_comp.png)
-- [F8 depth dose](results/v2/figures/fig_depthdose.png)
-- [F7 power](results/v2/figures/fig_power.png)
+- [Fig. 4 bias floor](results/v2/figures/fig_ceiling.png)
+- [Fig. 3 budget vs views](results/v2/figures/fig_budget_views.png)
+- [Fig. 5 compensation](results/v2/figures/fig_comp.png)
+- [Fig. 6 depth dose](results/v2/figures/fig_depthdose.png)
+- [Fig. 7 power](results/v2/figures/fig_power.png)
 - [LLFF forest](results/figures/fig_forest.png)
 - [views](results/figures/fig_views.png)
 - [qualitative](results/figures/fig_qual.png)
