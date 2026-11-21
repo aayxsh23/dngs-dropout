@@ -49,7 +49,7 @@ Files: `tables/<ds>/verdict_*.txt`, `tables/pooled/`, [`figures/fig_pooled.png`]
 | **Verdict D / E** | complementary / complementary | inconclusive / inconclusive | partly redundant / partly redundant | |
 
 Reading:
-- **Dropout's own gain replicates exactly.** C − A is about +0.4 dB on every dataset, with τ² = 0.
+- **Dropout's own gain is consistent.** C − A is about +0.4 dB on every dataset, with no detectable heterogeneity (τ² = 0).
 - **Adding dropout to DNGaussian helps, by less outside LLFF.** E − B is positive pooled. D − B is positive on LLFF only.
 - **Decoupling does nothing measurable.** E − D is about 0 on every dataset, and pooled it sits inside ±0.12 dB.
 - **The interaction is ≤ 0.** I_D is about 0 on LLFF and negative on Blender, where depth itself hurts. Pooled, I_D is −0.19 dB (Q p 0.21, so the datasets don't disagree significantly).
@@ -69,7 +69,7 @@ Files: `tables/error_budget/`, `tables/n4/`, [`figures/fig_budget.png`](figures/
 Reading:
 - **Depth reduces bias in the sparsest settings.** Its effect fades by 6 views.
 - **Dropout reduces variance** on LLFF up to 6 views and on Blender, but not on DTU.
-- **BV3 holds everywhere.** The naive combination never gets below DNGaussian's variance-free error. Run-to-run variance is 20–44% of the MSE, and a 3-seed ensemble would gain about 1 dB on LLFF.
+- **BV3 holds everywhere.** The naive combination never gets below DNGaussian's variance-free error. Run-to-run variance is 20–44% of the MSE over all variants (18–34% for D), and a 3-seed ensemble would gain about 1 dB on LLFF (+0.6 to +1.1 dB for D across settings).
 - **N4 (scale robustness):**
   - LLFF: D − B and E − D keep their sign on every scale (PSNR, MSE, RMSE, SSIM). I_D and I_E are scale-dependent: about 0 on PSNR, below 0 on SSIM.
   - DTU: every contrast is scale-dependent.
@@ -111,7 +111,7 @@ Caveat: the variance-component model "fits" with ratio 1.00 by construction. τ�
 
 1. Both regularizers help on their own on LLFF and DTU. On Blender at 8 views, the depth prior hurts and dropout alone is best.
 2. The combination beats DNGaussian on LLFF (+0.5–0.6 dB), and E − B is positive pooled. The interaction itself is about 0 on LLFF and ≤ 0 elsewhere. The overall label is therefore **"complementary on LLFF, partly redundant elsewhere"**, not a synergy.
-3. Decoupling the depth passes from the mask (E vs D) changes nothing measurable on any dataset.
+3. Decoupling the depth passes from the mask (E vs D) shows no measurable effect on any dataset (≈ 0 on Blender and pooled; inconclusive on LLFF and DTU).
 4. Mechanism:
    - Depth removes bias, and dropout removes run-to-run variance, in the sparsest settings.
    - Neither removes the variance left above DNGaussian's bias floor (BV3).

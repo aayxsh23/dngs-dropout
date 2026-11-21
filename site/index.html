@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Depth meets Dropout</title>
+<meta name="description" content="Are DNGaussian's depth regularization and DropGaussian's dropout complementary in sparse-view 3D Gaussian Splatting? A pre-registered study on LLFF, DTU and Blender.">
+<style>
+:root{--bg:#fbfbf9;--fg:#1d1d1b;--muted:#5d5d58;--line:#e2e1dc;--card:#ffffff;--accent:#2a6fd6;--good:#1a8f5a;--bad:#c2410c}
+@media (prefers-color-scheme:dark){:root{--bg:#141413;--fg:#ecebe6;--muted:#a3a29b;--line:#33322e;--card:#1d1d1b;--accent:#7aa7f0;--good:#4cc38a;--bad:#f0915c}
+ figure img{background:#fff;border-radius:6px}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+main{max-width:920px;margin:0 auto;padding:40px 16px 80px}
+header{text-align:center;margin-bottom:36px}
+h1{font-size:2.1rem;line-height:1.2;margin:0 0 10px;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:1.05rem;margin:0 0 14px}
+.authors{font-size:1rem;margin:6px 0}
+.links{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+.links a{display:inline-block;padding:7px 14px;border:1px solid var(--line);border-radius:999px;color:var(--fg);text-decoration:none;background:var(--card);font-size:.92rem}
+.links a:hover{border-color:var(--accent);color:var(--accent)}
+h2{font-size:1.35rem;margin:44px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+p{margin:0 0 12px}
+.tldr{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:16px 18px}
+.tldr ol{margin:6px 0 0;padding-left:20px}.tldr li{margin:4px 0}
+.tablewrap{overflow-x:auto;margin:10px 0 16px}
+table{border-collapse:collapse;width:100%;font-size:.93rem;font-variant-numeric:tabular-nums}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:600}
+td strong{color:var(--accent)}
+.pos{color:var(--good)}.neg{color:var(--bad)}
+figure{margin:18px 0 26px}
+figure img{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:6px}
+figcaption{color:var(--muted);font-size:.9rem;margin-top:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:700px){.grid{grid-template-columns:1fr}h1{font-size:1.6rem}}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88rem}
+pre{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto}
+.muted{color:var(--muted)}
+footer{margin-top:56px;color:var(--muted);font-size:.88rem;text-align:center}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Depth meets Dropout</h1>
+  <p class="sub">Are DNGaussian's depth regularization and DropGaussian's dropout complementary, redundant or interfering in sparse-view 3D Gaussian Splatting?</p>
+  <p class="authors">Aayush · Disha Singh</p>
+  <p class="muted">CSD361 course project · November 2026</p>
+  <div class="links">
+    <a href="https://github.com/aayxsh23/dngs-dropout">Code</a>
+    <a href="https://github.com/aayxsh23/dngs-dropout/blob/main/results/v2/RESULTS_v2.md">Results</a>
+    <a href="https://github.com/aayxsh23/dngs-dropout/tree/main/docs/report">Report</a>
+    <a href="https://github.com/aayxsh23/dngs-dropout/blob/main/docs/PLAN_V2.md">Pre-registration</a>
+  </div>
+</header>
+
+<section class="tldr">
+  <strong>In short</strong>
+  <ol>
+    <li><strong>Complementary on very sparse forward-facing scenes.</strong> Adding dropout to DNGaussian gains about <span class="pos">+0.5 dB</span> on LLFF at 2–3 views.</li>
+    <li><strong>Additive at best across datasets.</strong> The pooled interaction over LLFF, DTU and Blender is slightly negative (<span class="neg">−0.19 dB</span>).</li>
+    <li><strong>Depth fixes bias, dropout fixes variance.</strong> They combine well only where each one still does its job.</li>
+    <li><strong>Decoupling the depth passes from the dropout mask shows no measurable effect</strong> (point estimates under 0.25 dB, ≈ 0 pooled).</li>
+  </ol>
+</section>
+
+<h2>Question and design</h2>
+<p>Sparse-view 3DGS overfits the few training views. Two recent fixes attack this from different sides:</p>
+<ul>
+  <li><a href="https://github.com/Fictionarry/DNGaussian">DNGaussian</a> (CVPR 2024) supervises rendered depth with a monocular depth prior.</li>
+  <li><a href="https://github.com/DCVL-3D/DropGaussian_release">DropGaussian</a> (CVPR 2025) randomly drops Gaussians during training.</li>
+</ul>
+<p>Every variant below is the same code with different flags. We test A–E on three datasets with 3 seeds each.</p>
+<div class="tablewrap"><table>
+<tr><th>Variant</th><th>Depth</th><th>Dropout</th><th>Mask reaches the depth passes</th></tr>
+<tr><td>A</td><td>–</td><td>–</td><td>–</td></tr>
+<tr><td>B (DNGaussian)</td><td>✓</td><td>–</td><td>–</td></tr>
+<tr><td>C (dropout only)</td><td>–</td><td>✓</td><td>–</td></tr>
+<tr><td>D (naive combination)</td><td>✓</td><td>✓</td><td>yes</td></tr>
+<tr><td>E (decoupled)</td><td>✓</td><td>✓</td><td>no</td></tr>
+</table></div>
+<p class="muted">The analysis rules were tagged before any result existed (<code>prereg-v1…v3</code>). All 1,169 runs came from tagged code on one RTX A4000. A combination is <em>complementary</em> if it beats both parents, and its interaction is I<sub>D</sub> = (D − C) − (B − A).</p>
+
+<h2>Results</h2>
+<p>PSNR in dB on held-out views, mean over 3 seeds. DTU metrics are masked.</p>
+<div class="tablewrap"><table>
+<tr><th>Variant</th><th>LLFF 3-view</th><th>DTU 3-view</th><th>Blender 8-view</th></tr>
+<tr><td>A: none</td><td>16.33</td><td>14.04</td><td>23.47</td></tr>
+<tr><td>B: depth (DNGaussian)</td><td>18.71</td><td>18.37</td><td>22.66</td></tr>
+<tr><td>C: dropout</td><td>16.80</td><td>14.51</td><td><strong>23.83</strong></td></tr>
+<tr><td>D: depth + dropout</td><td>19.21</td><td>18.57</td><td>22.77</td></tr>
+<tr><td>E: depth + dropout, decoupled</td><td><strong>19.31</strong></td><td><strong>18.67</strong></td><td>22.82</td></tr>
+</table></div>
+
+<p>Each contrast below is paired by scene, with a 95 % CI. The pooled column is a DerSimonian–Laird random-effects meta-analysis.</p>
+<div class="tablewrap"><table>
+<tr><th>Contrast</th><th>LLFF</th><th>DTU</th><th>Blender</th><th>Pooled</th></tr>
+<tr><td>E − B: adding dropout to DNGaussian</td><td class="pos">+0.60</td><td>+0.30</td><td class="pos">+0.15</td><td class="pos">+0.34 [+0.04, +0.64]</td></tr>
+<tr><td>C − A: dropout alone</td><td class="pos">+0.48</td><td class="pos">+0.48</td><td class="pos">+0.37</td><td class="pos">+0.40 [+0.28, +0.53]</td></tr>
+<tr><td>B − A: depth alone</td><td class="pos">+2.38</td><td class="pos">+4.34</td><td>−0.80</td><td>heterogeneous</td></tr>
+<tr><td>E − D: decoupling</td><td>+0.10</td><td>+0.09</td><td>+0.04</td><td>+0.05 (≈ 0)</td></tr>
+<tr><td>I<sub>D</sub>: interaction</td><td>+0.02</td><td>−0.28</td><td class="neg">−0.26</td><td class="neg">−0.19 [−0.37, −0.01]</td></tr>
+<tr><td>Verdict</td><td>complementary</td><td>inconclusive</td><td>partly redundant</td><td></td></tr>
+</table></div>
+
+<figure>
+  <img src="assets/fig_pooled.png" alt="Forest plot of each contrast per dataset and pooled" loading="lazy">
+  <figcaption><strong>Figure 1.</strong> Each contrast per dataset and pooled. Dropout's own gain is consistent across datasets (no detectable heterogeneity, τ² = 0); the interaction is never positive.</figcaption>
+</figure>
+
+<h2>Why: the error budget</h2>
+<p>We split each variant's pixel error into <strong>squared bias</strong> (the error of the mean image over seeds) and <strong>run-to-run variance</strong>.</p>
+<ul>
+  <li>In the sparse settings, depth's gain is mostly a bias reduction, and dropout's gain is mostly a variance reduction.</li>
+  <li>Because the two fix different errors, their gains add up there.</li>
+  <li>Where depth stops reducing bias (6–9 views, Blender), the gains no longer add.</li>
+</ul>
+<figure>
+  <img src="assets/fig_budget.png" alt="Bias and variance stacked bars per variant and dataset" loading="lazy">
+  <figcaption><strong>Figure 2.</strong> Error budget: bias² (solid) and variance (hatched), with the variance share on top.</figcaption>
+</figure>
+<div class="grid">
+  <figure>
+    <img src="assets/fig_ceiling.png" alt="MSE of D against bias squared of B" loading="lazy">
+    <figcaption><strong>Figure 3.</strong> The naive combination never beats DNGaussian's bias floor. The remaining headroom is variance.</figcaption>
+  </figure>
+  <figure>
+    <img src="assets/fig_budget_views.png" alt="Error budget across 2, 3, 6 and 9 views" loading="lazy">
+    <figcaption><strong>Figure 4.</strong> Depth's bias reduction fades as views are added.</figcaption>
+  </figure>
+</div>
+
+<h2>What did not explain it</h2>
+<p>We pre-registered two other explanations. The data do not support either one, although the contrasts are inconclusive rather than shown to be zero.</p>
+<ul>
+  <li><strong>The mask corrupts the depth passes.</strong> Shielding the depth passes shows no measurable gain (E − D under 0.25 dB in every estimate, ≈ 0 pooled), and no single depth pass shows a detectable effect.</li>
+  <li><strong>Compensation hits the opacity cap.</strong> Removing the 1/(1−r) rescaling, or capping it per Gaussian, shows no significant effect. Clamp-aware dropout even trends worse.</li>
+</ul>
+<div class="grid">
+  <figure>
+    <img src="assets/fig_comp.png" alt="Compensation contrasts" loading="lazy">
+    <figcaption><strong>Figure 5.</strong> Compensation variants against uniform dropout (Holm, TOST ±0.25 dB).</figcaption>
+  </figure>
+  <figure>
+    <img src="assets/fig_depthdose.png" alt="Interaction across depth weights" loading="lazy">
+    <figcaption><strong>Figure 6.</strong> The interaction does not depend on the depth weight.</figcaption>
+  </figure>
+</div>
+
+<h2>Qualitative</h2>
+<figure>
+  <img src="assets/fig_qual.png" alt="Rendered held-out views for variants A to E" loading="lazy">
+  <figcaption><strong>Figure 7.</strong> Held-out view 0 of each LLFF scene, variants A–E (seed 0).</figcaption>
+</figure>
+
+<h2>Caveats</h2>
+<ul>
+  <li>With 8 scenes and 3 seeds, interactions below about 0.5 dB are below the detection limit. Pooling all 31 scenes reaches about 0.2 dB.</li>
+  <li>Interaction signs differ between PSNR and SSIM.</li>
+  <li>We used DropGaussian's schedule and DNGaussian's LLFF settings unchanged on every dataset.</li>
+  <li>The rasterizer is nondeterministic, so a single-run 8-scene mean is uncertain by about ±0.3 dB.</li>
+</ul>
+
+<h2>Reproduce</h2>
+<pre>git clone https://github.com/aayxsh23/dngs-dropout && cd dngs-dropout
+bash scripts/check.sh                                  # seconds, no GPU
+# tables + figures from the committed per-run metrics:
+python experiments/stats.py --pooled llff=results/v2/tables/T1/runs.csv \
+  dtu=results/v2/tables/dtu/runs.csv blender=results/v2/tables/blender/runs.csv \
+  --blender_views 8 --tables /tmp/pooled</pre>
+<p>Training commands, data checksums and the full regeneration recipe are in the <a href="https://github.com/aayxsh23/dngs-dropout#reproduce">README</a>.</p>
+
+<footer>
+  Built on <a href="https://github.com/Fictionarry/DNGaussian">DNGaussian</a> and <a href="https://github.com/DCVL-3D/DropGaussian_release">DropGaussian</a>.
+</footer>
+</main>
+</body>
+</html>
