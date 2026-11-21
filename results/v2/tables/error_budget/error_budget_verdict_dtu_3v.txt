@@ -1,0 +1,6 @@
+Error budget dtu_3v (PLAN_V2 §5.2.4), 15 scenes
+BV1: Δbias2 share of B-A = 0.51 (Δmse -0.026, Δbias2 -0.0132 [-0.0181, -0.00824], Holm p <0.001) -> HOLDS
+BV2: Δvar share of C-A = -0.76 (Δmse +0.00228, Δvar -0.00174 [-0.0052, +0.00171], Holm p 0.297) -> FAILS (refuted: dropout is not a variance reducer here)
+BV3: mse(D) - bias2(B) = +0.00786 [+0.00481, +0.0109] (Holm p <0.001) -> CI above 0: D keeps variance above B's bias floor
+BV5 I_D: I_mse -0.00181 = I_bias2 -0.00183 [-0.00776, +0.0041] + I_var +2.18e-05 [-0.00365, +0.00369]
+BV5 I_E: I_mse -0.00235 = I_bias2 -0.00264 [-0.00845, +0.00316] + I_var +0.00029 [-0.0031, +0.00368]

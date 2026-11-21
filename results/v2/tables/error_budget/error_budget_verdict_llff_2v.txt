@@ -1,0 +1,6 @@
+Error budget llff_2v (PLAN_V2 §5.2.4), 8 scenes
+BV1: Δbias2 share of B-A = 0.96 (Δmse -0.00953, Δbias2 -0.00915 [-0.012, -0.0063], Holm p <0.001) -> HOLDS
+BV2: Δvar share of C-A = 0.74 (Δmse -0.0041, Δvar -0.00302 [-0.00394, -0.00211], Holm p <0.001) -> HOLDS
+BV3: mse(D) - bias2(B) = +0.00931 [+0.00532, +0.0133] (Holm p <0.001) -> CI above 0: D keeps variance above B's bias floor
+BV5 I_D: I_mse +0.00134 = I_bias2 +0.000873 [-0.000319, +0.00206] + I_var +0.00047 [-0.000803, +0.00174]
+BV5 I_E: I_mse +0.000119 = I_bias2 +5.24e-05 [-0.000913, +0.00102] + I_var +6.67e-05 [-0.0015, +0.00163]

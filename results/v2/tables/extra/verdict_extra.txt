@@ -1,0 +1,22 @@
+COMP (§5.2.9), PSNR, Holm across 4, TOST δ = 0.25 dB:
+  C_nc-C  +0.14 [-0.10, +0.38] p_holm 0.46  class inconclusive  TOST p 0.161 -> not shown equivalent
+  D_nc-D  -0.18 [-0.48, +0.12] p_holm 0.46  class inconclusive  TOST p 0.307 -> not shown equivalent
+  C_ca-C  -0.27 [-0.48, -0.05] p_holm 0.0913  class inconclusive  TOST p 0.567 -> not shown equivalent
+  D_ca-D  -0.23 [-0.56, +0.11] p_holm 0.46  class inconclusive  TOST p 0.438 -> not shown equivalent
+DEPTH-DOSE (N5, §5.2.6), I_D(s) on PSNR, Holm across the doses:
+  s = 0.5  +0.15 [-0.06, +0.36] class inconclusive
+  s = 1.0  +0.02 [-0.34, +0.38] class inconclusive
+  s = 2.0  -0.00 [-0.27, +0.27] class inconclusive
+  prediction (all three ≈0): does not hold
+NOISE (G6), same-seed SD / between-seed SD per variant (prediction: in [0.5, 2]):
+  A  0.370 / 0.370 = 1.00  (in range; scenes horns room trex)
+  B  0.328 / 0.196 = 1.67  (in range; scenes fern horns room trex)
+  C  0.452 / 0.399 = 1.13  (in range; scenes horns room trex)
+  D  0.305 / 0.283 = 1.08  (in range; scenes fern horns room trex)
+NOISE CLASS: σ²(A,C) / σ²(B,D) = 0.1967 / 0.0679 = F 2.90 (df 56, 64), one-sided p 2.54e-05 -> HOLDS
+NOISE BAND (audit, single-run 8-scene mean): depth host ±0.26 dB, prior-free ±0.43 dB
+VARIANCE COMPONENTS and power (§5.2.7):
+  B-A  τ² 0.4016  predicted 95% half-width 0.580 vs observed 0.580 (ratio 1.00) -> model fits
+  I_D  τ² 0.0077  predicted 95% half-width 0.359 vs observed 0.359 (ratio 1.00) -> model fits
+  MDE B-A at R = 3: S=8 0.80 dB, S=15 0.54 dB, S=23 0.42 dB, S=31 0.36 dB
+  MDE I_D at R = 3: S=8 0.49 dB, S=15 0.33 dB, S=23 0.26 dB, S=31 0.22 dB

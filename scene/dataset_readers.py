@@ -9,8 +9,11 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
+import atexit
 import os
+import shutil
 import sys
+import tempfile
 from PIL import Image
 from typing import NamedTuple
 from scene.colmap_loader import read_extrinsics_text, read_intrinsics_text, qvec2rotmat, \
@@ -219,7 +222,10 @@ def readColmapSceneInfo(path, images, dataset, eval, rand_pcd, mvs_pcd, llffhold
 
     if rand_pcd:
         print('Init random point cloud.')
-        ply_path = os.path.join(path, "sparse/0/points3D_random.ply")
+        # A unique temp dir, not the dataset folder: parallel runs on one scene would overwrite each other (PLAN W7)
+        pcd_dir = tempfile.mkdtemp(prefix="dngs_pcd_")
+        atexit.register(shutil.rmtree, pcd_dir, True)   # Scene copies the cloud to <model_path>/input.ply at once
+        ply_path = os.path.join(pcd_dir, "points3D_random.ply")
         bin_path = os.path.join(path, "sparse/0/points3D.bin")
         txt_path = os.path.join(path, "sparse/0/points3D.txt")
 
@@ -344,6 +350,11 @@ def readNerfSyntheticInfo(path, white_background, eval, rand_pcd, llffhold=8, N_
     ply_path = os.path.join(path, "points3d.ply")
     if rand_pcd:
         print('Init random point cloud.')
+        # A unique temp dir, not the dataset folder: parallel runs on one object would overwrite each other's cloud
+        # and change the dataset's md5 (PLAN W7, applied to Blender in v1.2-exp)
+        pcd_dir = tempfile.mkdtemp(prefix="dngs_pcd_")
+        atexit.register(shutil.rmtree, pcd_dir, True)   # Scene copies the cloud to <model_path>/input.ply at once
+        ply_path = os.path.join(pcd_dir, "points3d.ply")
     if rand_pcd or not os.path.exists(ply_path):
         # Since this data set has no colmap data, we start with random points
         num_pts = 10_000

@@ -4,7 +4,7 @@ Instructions for any AI coding agent working in this repository (Claude Code, Ge
 
 ## What this project is
 
-This is a two-person course research project (Aayush and Disha) with a deadline of **Tue 20 Oct 2026**. It asks whether two sparse-view 3D Gaussian Splatting regularizers are **complementary, redundant or interfering**:
+This is a two-person course research project (Aayush and Disha) with a submission deadline of **Sat 21 Nov 2026, 20:00** (moved from 20 Oct and 15 Nov; see `docs/EXECUTION_PLAN_15-21Nov.md`). It asks whether two sparse-view 3D Gaussian Splatting regularizers are **complementary, redundant or interfering**:
 
 - **DNGaussian** (CVPR 2024): monocular-depth regularization. This repo is a fork of [Fictionarry/DNGaussian](https://github.com/Fictionarry/DNGaussian).
 - **DropGaussian** (CVPR 2025): randomly drops Gaussians during training. It is ported from [DCVL-3D/DropGaussian_release](https://github.com/DCVL-3D/DropGaussian_release).
@@ -18,8 +18,12 @@ Every experimental variant is the **same code with different command-line flags*
 | C | 0 | 0.2 | shared | Dropout only |
 | D | 1 | 0.2 | shared | Naive combination: the dropout mask also hits the depth passes |
 | E | 1 | 0.2 | clean | Decoupled: the depth passes never see the mask |
+| D_hard | 1 | 0.2 | hard_only | Only the hard-depth pass sees the mask (PLAN_V2 block P) |
+| D_soft | 1 | 0.2 | soft_only | Only the soft-depth pass sees the mask (PLAN_V2 block P) |
+| C_ca, D_ca | 0, 1 | 0.2 | shared | C and D with `--drop_mode clamp_aware`: each Gaussian's rate is capped so its compensated opacity never exceeds the 0.99 alpha cap (block COMP, H7) |
+| C_nc, D_nc | 0, 1 | 0.2 | shared | C and D with `--drop_mode nc`: the same drops as uniform, but survivors keep their opacity (no 1/(1−r) compensation; block COMP, prereg-v3) |
 
-The main benchmark is LLFF 3-view (8 scenes × 5 variants × 3 seeds = 120 runs).
+The main benchmark is LLFF 3-view (8 scenes × 5 variants × 3 seeds = 120 runs). From `v1.2-exp` the same A–E also run on DTU 3-view (15 scans, `train_dtu.py`, masked metrics by `experiments/eval_dtu.py`) and Blender 8-view (8 objects, the non-SH path of `train_blender.py` only).
 
 **Read these before planning any work:**
 - [docs/PLAN.md](docs/PLAN.md): the current plan, status, decisions, specs and schedule. **It overrides the playbook wherever they differ.**
@@ -31,7 +35,7 @@ The main benchmark is LLFF 3-view (8 scenes × 5 variants × 3 seeds = 120 runs)
 | --- | --- | --- | --- | --- | --- |
 | Laptop (WSL2 Ubuntu 24.04) | **3.7.13** | **1.12.1** | 11.3, gcc 9 | RTX 3050 Ti, 4 GB, sm_86 | conda env `dngaussian`; see `setup_env.sh` |
 | Colab | 3.13 | 2.11 | 13.0 | T4, 16 GB, sm_75 | `notebooks/colab_runner.ipynb`; extension wheels cached on Drive |
-| A100 lab machine | ? | ? | ? | A100, sm_80 | Physical access only; optional (see PLAN) |
+| Lab PC (`/home/snu/dngs-dropout`) | ? | 1.12.1 | ? | RTX A4000, 16 GB, sm_86 | Physical access only; every v1.0-exp result ran here; jobs run in `tmux` |
 
 Consequences for the code:
 - **Python 3.7 syntax only** in anything the training pipeline imports: no walrus `:=`, no `f"{x=}"`, no `list[int]` or `dict[str, int]` annotations, no `dict | dict`, no `match`.
@@ -61,7 +65,7 @@ peak VRAM of one training run: python scripts/peak_vram.py train_llff.py <same f
 8-scene reproduction summary:   python avg_llff.py    # reads output/llff/<scene>/results_eval.json
 ```
 
-Experiment runner (being built, see PLAN W8): `python experiments/run_matrix.py --matrix experiments/matrix.yaml --data_root <llff dir> --out_root <outputs> --shard i/N --seeds 0 [--dry_run]`. Always try `--dry_run` first.
+Experiment runner (PLAN W8, PLAN_V2 §3): `python experiments/run_matrix.py --matrix experiments/matrix.yaml --data_root <llff dir> --out_root <outputs> --shard i/N --seeds 0 [--dry_run]`. Always try `--dry_run` first.
 
 ## How the code is laid out (what matters for this project)
 
@@ -70,7 +74,7 @@ Experiment runner (being built, see PLAN W8): `python experiments/run_matrix.py 
   2. **Soft depth:** `render_for_opa`, from iteration 1000 on. Positions, scales and rotations are detached; gradients flow to opacity only.
   3. **Photometric:** `render`. Opacity and colour come from the neural field (`gridencoder`/`shencoder`). It computes L1 + D-SSIM plus the shape, scale and opacity penalties.
 
-  The depth losses never use the photometric render. `--depth_scale 0` skips steps 1 and 2 entirely.
+  The depth losses never use the photometric render. `--depth_scale 0` skips steps 1 and 2 entirely. (`train_dtu.py` also has a background-alpha pass, `alpha[bg_mask]²`, which runs in every variant and never sees the dropout mask.)
 - `gaussian_renderer/__init__.py`: `render`, `render_for_depth`, `render_for_opa` (plus `_sh` variants used by Blender/DTU, which we don't touch).
 - `arguments/__init__.py`: `ModelParams`, `OptimizationParams`, `PipelineParams`. A new training option goes in `OptimizationParams`, so it is recorded in `opt_args` automatically.
 - `utils/general_utils.py`: `safe_state(silent, seed)` seeds `random`, `numpy` and `torch`. `load_checkpoint()`.
@@ -84,11 +88,11 @@ Experiment runner (being built, see PLAN W8): `python experiments/run_matrix.py 
 
 1. **Dropout runs only inside the training loop.** `render.py`, `metrics.py`, `spiral.py`, `training_report`, `clean_views` and every evaluation path must never apply a mask. Render functions take an optional per-Gaussian compensation vector that defaults to `None` (no dropout).
 2. **Flag defaults reproduce DNGaussian exactly.** `--depth_scale 1 --drop_rate 0 --depth_render shared` must be the upstream behaviour (variant B). When `drop_rate` is 0, do not even create a mask.
-3. **The output layout and file formats are frozen** (agreed 12 Oct): `outputs/llff_<n>v/<variant>/<scene>/seed<k>/` containing `config.json`, `diag.csv`, `metrics.json`, `train_stats.json`, `render_stats.json`, `results_eval.json`, `eval/`. You may **add** keys or columns. Never rename or remove them: `experiments/aggregate.py` and the figure scripts depend on them.
+3. **The output layout and file formats are frozen** (agreed 12 Oct): `outputs/<dataset>_<n>v/<variant>/<scene>/seed<k>/` (`<dataset>` is `llff`, and from `v1.2-exp` also `dtu` or `blender`, set by the matrix's `dataset` key) containing `config.json`, `diag.csv`, `metrics.json`, `train_stats.json`, `render_stats.json`, `results_eval.json`, `eval/`. You may **add** keys or columns. Never rename or remove them: `experiments/aggregate.py` and the figure scripts depend on them.
 4. **One GPU type per seed.** All five variants of a given seed run on the same GPU type. `metrics.json` records `gpu` and `shared_gpu`. Efficiency numbers come only from runs with `shared_gpu: false`.
-5. **Experiments run only from a tag** (`v1.0-exp`, then `v1.1-exp` for fixes). `config.json` records the commit. Don't run the matrix from a branch.
-6. **Same data everywhere:** `llff_with_depth.tar`, checked by md5.
-7. Port DropGaussian, don't reinvent it. The official code (`gaussian_renderer/__init__.py` in their repo) is: `compensation = torch.nn.Dropout(p=r)(torch.ones(N))`, then `opacity = opacity * compensation[:, None]`, with `r = 0.2 * iteration / 10000`, where 10000 is their total iteration count. We keep it verbatim, `r = drop_rate * iteration / 10000`, even though we train for 6000 iterations, so with `--drop_rate 0.2` the rate peaks at 0.12 (decision D1, 13 Oct). The full spec is in PLAN W2.
+5. **Experiments run only from a tag** (`v1.0-exp`; `v1.1-exp` for blocks COMP/DDOSE/NOISE2; `v1.2-exp` for DTU and Blender). `config.json` records the commit. Don't run the matrix from a branch.
+6. **Same data everywhere:** `llff_with_depth.tar` (md5 `0f6bd7bdae837ec58ad757c7c00b0561`), `dtu_with_depth.tar` (`dc8df470e9cf6e46cd024cb34d19c175`) and `blender_with_depth.tar` (`e7597085f8682b660699a39f63d5957f`), checked by md5.
+7. Port DropGaussian, don't reinvent it. The official code (`gaussian_renderer/__init__.py` in their repo) is: `compensation = torch.nn.Dropout(p=r)(torch.ones(N))`, then `opacity = opacity * compensation[:, None]`, with `r = 0.2 * iteration / 10000`, where 10000 is their total iteration count. We keep it verbatim, `r = drop_rate * iteration / 10000`, even though we train for 6000 iterations, so with `--drop_rate 0.2` the rate peaks at 0.12 (decision D1, 13 Oct). The full spec is in PLAN W2. `--drop_mode clamp_aware` and `--drop_mode nc` (blocks CA and COMP) are our own extensions, never the default: `--drop_mode uniform` must stay the verbatim port above (`scripts/check.sh` step 18).
 
 ## Git and ownership
 
@@ -156,7 +160,7 @@ Claude Code runs this as the **`pr-gate` skill** (`.claude/skills/pr-gate/SKILL.
 - **The rasterizer is nondeterministic.** The same seed gave 17.75 and 17.29 PSNR on fern at 1100 iterations. Compare variants with means over seeds and scenes, never single runs.
 - The laptop GPU has 4 GB, and a training run's footprint is about 1.7 GB. Run **one** training job at a time, and check `pgrep -af "train_llff|render.py|metrics.py"` before you start one. nvidia-smi can't show per-process memory under WSL, so use `scripts/peak_vram.py`.
 - Long runs on the laptop: start them in `tmux` or with `nohup`. A job started in a VS Code terminal dies when VS Code restarts.
-- `--rand_pcd` writes `sparse/0/points3D_random.ply` into the **dataset folder**. Parallel runs on the same scene race on that file (PLAN W7 fixes this).
+- `--rand_pcd` writes its random cloud to a unique temp dir (PLAN W7), never into the dataset folder, so parallel runs on one scene don't race. `scripts/check.sh` fails if the old `sparse/0/points3D_random` path comes back.
 - The playbook's `run_matrix.py` sketch reads `results.json`. The real file is `results_eval.json`.
 - `run_llff.sh` also renders a spiral video with `spiral.py`. The matrix skips it.
 - Training writes large files: `chkpnt_latest.pth` is about 164 MB and TensorBoard events are about 13 MB per run. Drive quota is 15 GB per account, so the runner deletes them (PLAN W8).

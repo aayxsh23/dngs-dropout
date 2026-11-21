@@ -34,7 +34,7 @@ def mip_scales(viewpoint_camera, pc : GaussianModel):
 
 
 
-def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, inference=False):
+def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, inference=False, drop_comp=None):
     """
     Render the scene. 
     
@@ -93,6 +93,9 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
     opacity, colors_precomp = render_neural(viewpoint_camera, pc)
     if inference:
         opacity = pc.get_opacity_
+    opacity_clean = opacity
+    if drop_comp is not None:  # DropGaussian; only the training loop ever passes drop_comp
+        opacity = opacity * drop_comp[:, None]
 
     # sh
     # opacity = pc.get_opacity
@@ -119,13 +122,13 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
             "viewspace_points": screenspace_points,
             "visibility_filter" : radii > 0,
             "radii": radii,
-            "opacity": opacity,
+            "opacity": opacity_clean,
             "color": colors_precomp}
 
 
 
 
-def render_for_depth(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, value=0.95):
+def render_for_depth(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, value=0.95, drop_comp=None):
     screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True, device="cuda") + 0
     try:
         screenspace_points.retain_grad()
@@ -157,6 +160,8 @@ def render_for_depth(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torc
     means2D = screenspace_points
     # opacity = pc.get_opacity
     opacity = torch.ones(pc.get_xyz.shape[0], 1, device=pc.get_xyz.device) * value
+    if drop_comp is not None:  # DropGaussian; survivors exceed the rasterizer's 0.99 alpha cap once 0.95/(1-r) > 0.99
+        opacity = opacity * drop_comp[:, None]
 
     with torch.no_grad():
         scales = None
@@ -198,7 +203,7 @@ def render_for_depth(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torc
 
 
 
-def render_for_opa(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0):
+def render_for_opa(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, drop_comp=None):
     screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True, device="cuda") + 0
     try:
         screenspace_points.retain_grad()
@@ -229,6 +234,9 @@ def render_for_opa(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.
     means3D = pc.get_xyz.detach()
     means2D = screenspace_points
     opacity = pc.get_opacity
+    opacity_clean = opacity
+    if drop_comp is not None:  # DropGaussian; only the training loop ever passes drop_comp
+        opacity = opacity * drop_comp[:, None]
 
     scales = None
     rotations = None
@@ -266,7 +274,7 @@ def render_for_opa(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.
             "viewspace_points": screenspace_points,
             "visibility_filter" : radii > 0,
             "radii": radii,
-            "opacity": opacity}
+            "opacity": opacity_clean}
 
 
 
